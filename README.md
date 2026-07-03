@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌟 CampusConnect
+#  CampusConnect
 
 ### *Connecting Colleges. Creating Opportunities. Celebrating Talent.*
 
@@ -13,7 +13,7 @@
 
 ---
 
-## ✨ About CampusConnect
+##  About CampusConnect
 
 > **CampusConnect** is a **next-generation Inter-College Event Management Platform** that transforms the way colleges organize, manage, and participate in events. It serves as a **single digital ecosystem** where **Participants**, **Organizers**, and **Administrators** collaborate seamlessly to deliver engaging and hassle-free event experiences.
 
