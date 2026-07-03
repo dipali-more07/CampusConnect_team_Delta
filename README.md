@@ -4,7 +4,7 @@
 
 ### *Connecting Colleges. Creating Opportunities. Celebrating Talent.*
 
-![Status](https://img.shields.io/badge/Status-In%20Development-ff9800?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-In%20Development-00A693?style=for-the-badge)
 ![Frontend](https://img.shields.io/badge/Frontend-React-61DAFB?style=for-the-badge&logo=react&logoColor=white)
 ![Backend](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
 ![Database](https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)
@@ -53,6 +53,6 @@ Whether you're a **student eager to participate**, an **organizer planning memor
 
 <div align="center">
 
-### 💙 *"One Platform • Three Roles • Infinite Possibilities"* 🚀
+### One Platform • Three Roles • Infinite Possibilities 
 
 </div>
