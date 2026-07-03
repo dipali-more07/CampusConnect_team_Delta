@@ -5,9 +5,9 @@
 ### *Connecting Colleges. Creating Opportunities. Celebrating Talent.*
 
 ![Status](https://img.shields.io/badge/Status-In%20Development-ff9800?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-4CAF50?style=for-the-badge)
-![Built With](https://img.shields.io/badge/Built%20With-MERN-2196F3?style=for-the-badge)
-![Contributions](https://img.shields.io/badge/Contributions-Welcome-E91E63?style=for-the-badge)
+![Frontend](https://img.shields.io/badge/Frontend-React-61DAFB?style=for-the-badge&logo=react&logoColor=white)
+![Backend](https://img.shields.io/badge/Backend-FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Database](https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white)
 
 </div>
 
