@@ -1,0 +1,34 @@
+[
+  {
+    "id": "notif-1",
+    "title": "Certificate Available",
+    "message": "Your certificate for AI/ML Workshop is now ready for download.",
+    "time": "2 hours ago",
+    "unread": true,
+    "type": "certificate"
+  },
+  {
+    "id": "notif-2",
+    "title": "Event Reminder",
+    "message": "Alumni Meet 2024 is on Dec 5. Confirm your attendance!",
+    "time": "1 day ago",
+    "unread": true,
+    "type": "event"
+  },
+  {
+    "id": "notif-3",
+    "title": "Registration Closing",
+    "message": "Design Sprint Challenge registration closes in 3 days.",
+    "time": "1 day ago",
+    "unread": false,
+    "type": "registration"
+  },
+  {
+    "id": "notif-4",
+    "title": "Attendance Recorded",
+    "message": "Your QR scan attendance for TechFest 2K25 has been confirmed.",
+    "time": "3 days ago",
+    "unread": false,
+    "type": "attendance"
+  }
+]

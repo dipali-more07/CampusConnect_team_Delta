@@ -1,0 +1,6 @@
+[
+  { "id": "CERT-001-4706", "event": "TechFest 2K25", "issueDate": "2025-08-15", "category": "Technical", "position": "Winner (1st Place)", "verifyCode": "CERT-001-4706" },
+  { "id": "CERT-002-6193", "event": "Annual Cultural Fest", "issueDate": "2025-07-22", "category": "Cultural", "position": "Participant", "verifyCode": "CERT-002-6193" },
+  { "id": "CERT-003-7688", "event": "National Hackathon", "issueDate": "2025-09-01", "category": "Technical", "position": "Runner Up (2nd Place)", "verifyCode": "CERT-003-7688" },
+  { "id": "CERT-004-9167", "event": "AI & Data Workshop", "issueDate": "2025-09-10", "category": "Workshop", "position": "Completed", "verifyCode": "CERT-004-9167" }
+]

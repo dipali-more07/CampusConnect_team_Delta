@@ -1,0 +1,20 @@
+{
+  "profile": {
+    "name": "Dr. Priya Sharma",
+    "email": "priya.s@university.edu",
+    "department": "Computer Science",
+    "employeeId": "EMP-2019-0042",
+    "phone": "+91 98765 43210",
+    "avatarColor": "#7c3aed"
+  },
+  "appearance": {
+    "themeMode": "Light",
+    "accentColor": "#615FFF",
+    "fontSize": "medium"
+  },
+  "permissions": {
+    "Admin": ["All modules", "User management", "System config", "Audit logs"],
+    "Organizer": ["Create/edit events", "View registrations", "Manage attendance", "Generate certificates"],
+    "Student": ["View events", "Register events", "View attendance", "Download certificates"]
+  }
+}

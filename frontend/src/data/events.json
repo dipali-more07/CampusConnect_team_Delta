@@ -1,0 +1,142 @@
+[
+  { 
+    "id": "EVT081", 
+    "name": "TechFest 2025", 
+    "organizer": "Dr. Priya Sharma", 
+    "category": "Technical", 
+    "venue": "Main Auditorium", 
+    "date": "2025-08-15", 
+    "time": "09:00",
+    "capacity": 500, 
+    "registrationsCount": 423, 
+    "status": "Upcoming",
+    "qrAttendance": "Enabled",
+    "description": "TechFest 2025 is the flagship annual technical festival of the university, bringing together the brightest minds from across departments. Featuring hackathons, coding contests, robotics challenges, paper presentations, and industry expert talks. This year's theme is 'AI for Social Good' — participants will compete in real-world problem-solving tracks sponsored by leading tech firms.",
+    "schedule": [
+      { "time": "09:00 AM", "title": "Inauguration & Welcome Address", "description": "Dr. Vice Chancellor" },
+      { "time": "10:30 AM", "title": "Keynote: The Future of AI", "description": "Dr. Rajesh Kumar, IIT Bombay" },
+      { "time": "12:00 PM", "title": "Hackathon Kickoff", "description": "All Participants" },
+      { "time": "02:00 PM", "title": "Workshop: Cloud & DevOps", "description": "AWS Solutions Architect" },
+      { "time": "04:30 PM", "title": "Paper Presentation Finals", "description": "Panel of Judges" },
+      { "time": "06:00 PM", "title": "Prize Distribution & Valediction", "description": "Organizing Committee" }
+    ]
+  },
+  { 
+    "id": "EVT082", 
+    "name": "Annual Cultural Fest", 
+    "organizer": "Prof. Raj Kumar", 
+    "category": "Cultural", 
+    "venue": "Open Air Theatre", 
+    "date": "2025-07-22", 
+    "time": "18:00",
+    "capacity": 1000, 
+    "registrationsCount": 876, 
+    "status": "Upcoming",
+    "qrAttendance": "Enabled",
+    "description": "Celebrate the vibrant colors of talent, music, and art at the Annual Cultural Fest. Experience state-of-the-art stage performances, fashion shows, street plays, and live concerts by top indie artists. This event serves as our campus's largest platform for cultural exchange.",
+    "schedule": [
+      { "time": "06:00 PM", "title": "Cultural Procession & Opening", "description": "Student Council" },
+      { "time": "07:00 PM", "title": "Classical Dance & Drama", "description": "Cultural Club Students" },
+      { "time": "08:30 PM", "title": "Fusion Band Performance", "description": "Campus Rock Band" },
+      { "time": "10:00 PM", "title": "Celebrity Night Concert", "description": "Guest Artist" }
+    ]
+  },
+  { 
+    "id": "EVT083", 
+    "name": "National Hackathon", 
+    "organizer": "Dr. Anita Nair", 
+    "category": "Technical", 
+    "venue": "CS Lab Block", 
+    "date": "2025-07-10", 
+    "time": "10:00",
+    "capacity": 200, 
+    "registrationsCount": 198, 
+    "status": "Ongoing",
+    "qrAttendance": "Enabled",
+    "description": "A continuous 36-hour hackathon where students build innovative solutions for real-world municipal problems. Mentorship will be provided by senior engineers from leading technology firms, followed by pitching to venture capitalists.",
+    "schedule": [
+      { "time": "10:00 AM", "title": "Hackathon Opening & Briefing", "description": "Dr. Anita Nair" },
+      { "time": "11:00 AM", "title": "Coding Begins & Team Allocation", "description": "All Participants" },
+      { "time": "03:00 PM", "title": "Mentorship Session 1", "description": "Industry Experts" },
+      { "time": "09:00 PM", "title": "Mid-way Progress Evaluation", "description": "Judging Committee" }
+    ]
+  },
+  { 
+    "id": "EVT084", 
+    "name": "Industry Connect Summit", 
+    "organizer": "Prof. Sanjay Mehta", 
+    "category": "Seminar", 
+    "venue": "Conference Hall A", 
+    "date": "2025-06-28", 
+    "time": "09:30",
+    "capacity": 300, 
+    "registrationsCount": 280, 
+    "status": "Completed",
+    "qrAttendance": "Enabled",
+    "description": "A premium event connecting corporate leaders with campus talent. Features panel discussions on future skills, recruitment trends, and the impact of automation on job markets.",
+    "schedule": [
+      { "time": "09:30 AM", "title": "Welcome Speech & Introduction", "description": "Prof. Sanjay Mehta" },
+      { "time": "10:15 AM", "title": "Panel Discussion: Future of Work", "description": "HR Directors from Tech & Finance" },
+      { "time": "12:00 PM", "title": "Interactive QA Session", "description": "Students and Panelists" },
+      { "time": "01:30 PM", "title": "Networking Luncheon", "description": "All Attendees" }
+    ]
+  },
+  { 
+    "id": "EVT085", 
+    "name": "Sports Meet 2025", 
+    "organizer": "Dr. Kavitha Reddy", 
+    "category": "Sports", 
+    "venue": "University Grounds", 
+    "date": "2025-09-05", 
+    "time": "07:00",
+    "capacity": 800, 
+    "registrationsCount": 612, 
+    "status": "Upcoming",
+    "qrAttendance": "Disabled",
+    "description": "The annual inter-departmental athletic competition. Features track and field, volleyball, basketball, and football tournaments. Encourage your department teams and win the championship trophy!",
+    "schedule": [
+      { "time": "07:00 AM", "title": "March Past & Torch Lighting", "description": "Athletes & Department Captains" },
+      { "time": "08:00 AM", "title": "100m, 200m & Relay Finals", "description": "Track Finalists" },
+      { "time": "10:30 AM", "title": "Team Sports Playoffs", "description": "Field Grounds" },
+      { "time": "04:00 PM", "title": "Medal Ceremony & Closing", "description": "Sports Director" }
+    ]
+  },
+  { 
+    "id": "EVT086", 
+    "name": "Research Symposium", 
+    "organizer": "Dr. Priya Sharma", 
+    "category": "Academic", 
+    "venue": "Seminar Hall B", 
+    "date": "2025-06-15", 
+    "time": "11:00",
+    "capacity": 150, 
+    "registrationsCount": 143, 
+    "status": "Completed",
+    "qrAttendance": "Enabled",
+    "description": "A showcase of undergraduate and postgraduate research papers and posters. Keynote address by eminent research scientists followed by award presentation for outstanding papers.",
+    "schedule": [
+      { "time": "11:00 AM", "title": "Inauguration & Paper Keynote", "description": "Dr. Priya Sharma" },
+      { "time": "12:00 PM", "title": "Session A: Technology and Engineering", "description": "Research Presenters" },
+      { "time": "02:30 PM", "title": "Session B: Applied Sciences", "description": "Research Presenters" },
+      { "time": "04:30 PM", "title": "Awards and Valedictory Address", "description": "Eminent Scientists Panel" }
+    ]
+  },
+  { 
+    "id": "EVT087", 
+    "name": "Entrepreneurship Bootcamp", 
+    "organizer": "Prof. Raj Kumar", 
+    "category": "Workshop", 
+    "venue": "Innovation Hub", 
+    "date": "2025-08-01", 
+    "time": "10:00",
+    "capacity": 80, 
+    "registrationsCount": 24, 
+    "status": "Cancelled",
+    "qrAttendance": "Enabled",
+    "description": "An intensive weekend bootcamp for aspiring student startup founders. Learn ideation, customer validation, business model canvas drafting, and pitch preparation.",
+    "schedule": [
+      { "time": "10:00 AM", "title": "Welcome Remarks & Bootcamp Kickoff", "description": "Prof. Raj Kumar" },
+      { "time": "10:30 AM", "title": "Ideation Workshop & Brainstorming", "description": "Startup Mentors" }
+    ]
+  }
+]

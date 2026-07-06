@@ -1,0 +1,118 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --brand-color: #615FFF;
+}
+
+@theme {
+  --color-brand: var(--brand-color);
+  --color-brand-hover: var(--brand-color);
+}
+
+@layer base {
+  html, body, #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden !important;
+    max-width: 100vw;
+  }
+  * {
+    box-sizing: border-box;
+  }
+}
+
+.bg-brand { background-color: var(--brand-color) !important; }
+.text-brand { color: var(--brand-color) !important; }
+.border-brand { border-color: var(--brand-color) !important; }
+.accent-brand { accent-color: var(--brand-color) !important; }
+
+/* ── Page & Sub-view Transition Animations ── */
+@keyframes pageFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(18px) scale(0.985);
+    filter: blur(3px);
+  }
+  60% {
+    filter: blur(0px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0px);
+  }
+}
+
+@keyframes pageProgressLine {
+  0% {
+    width: 0%;
+    opacity: 1;
+  }
+  40% {
+    width: 70%;
+    opacity: 0.9;
+  }
+  85% {
+    width: 95%;
+    opacity: 0.7;
+  }
+  100% {
+    width: 100%;
+    opacity: 0;
+  }
+}
+
+@keyframes tabSlideIn {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-page-transition {
+  animation: pageFadeIn 0.36s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity, filter;
+}
+
+.animate-page-progress {
+  animation: pageProgressLine 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: width, opacity;
+}
+
+.animate-tab-slide {
+  animation: tabSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ── Custom Sleek Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(30, 45, 69, 0.6);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 85, 125, 0.85);
+}

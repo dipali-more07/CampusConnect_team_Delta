@@ -1,0 +1,57 @@
+[
+  {
+    "id": "ORG001",
+    "name": "Dr. Priya Sharma",
+    "department": "Computer Science",
+    "email": "priya.s@university.edu",
+    "role": "Senior",
+    "eventsManaged": 12,
+    "avatarColor": "#615FFF",
+    "phone": "+91 98765 00001",
+    "office": "Block A, Room 302"
+  },
+  {
+    "id": "ORG002",
+    "name": "Prof. Raj Kumar",
+    "department": "Electronics",
+    "email": "raj.k@university.edu",
+    "role": "Organizer",
+    "eventsManaged": 8,
+    "avatarColor": "#4f46e5",
+    "phone": "+91 98765 00002",
+    "office": "Block B, Room 105"
+  },
+  {
+    "id": "ORG003",
+    "name": "Dr. Anita Nair",
+    "department": "Computer Science",
+    "email": "anita.n@university.edu",
+    "role": "Organizer",
+    "eventsManaged": 6,
+    "avatarColor": "#00BC7D",
+    "phone": "+91 98765 00003",
+    "office": "Block A, Room 304"
+  },
+  {
+    "id": "ORG004",
+    "name": "Prof. Sanjay Mehta",
+    "department": "Management",
+    "email": "sanjay.m@university.edu",
+    "role": "Senior",
+    "eventsManaged": 9,
+    "avatarColor": "#7c3aed",
+    "phone": "+91 98765 00004",
+    "office": "Block C, Room 201"
+  },
+  {
+    "id": "ORG005",
+    "name": "Dr. Kavitha Reddy",
+    "department": "Physical Education",
+    "email": "kavitha.r@university.edu",
+    "role": "Organizer",
+    "eventsManaged": 4,
+    "avatarColor": "#FE9A00",
+    "phone": "+91 98765 00005",
+    "office": "Sports Complex, Room 12"
+  }
+]

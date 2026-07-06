@@ -1,0 +1,82 @@
+[
+  {
+    "id": "REG001",
+    "eventId": "EVT081",
+    "studentName": "Arjun Patel",
+    "rollNo": "21CS001",
+    "department": "CSE",
+    "year": "3rd",
+    "date": "2025-07-01",
+    "status": "Approved"
+  },
+  {
+    "id": "REG002",
+    "eventId": "EVT081",
+    "studentName": "Sneha Krishnan",
+    "rollNo": "21ECE042",
+    "department": "ECE",
+    "year": "3rd",
+    "date": "2025-07-02",
+    "status": "Approved"
+  },
+  {
+    "id": "REG003",
+    "eventId": "EVT081",
+    "studentName": "Rahul Gupta",
+    "rollNo": "22ME015",
+    "department": "ME",
+    "year": "2nd",
+    "date": "2025-07-03",
+    "status": "Pending"
+  },
+  {
+    "id": "REG004",
+    "eventId": "EVT081",
+    "studentName": "Priya Nair",
+    "rollNo": "21MBA008",
+    "department": "MBA",
+    "year": "2nd",
+    "date": "2025-07-01",
+    "status": "Approved"
+  },
+  {
+    "id": "REG005",
+    "eventId": "EVT081",
+    "studentName": "Vikram Singh",
+    "rollNo": "23EEE031",
+    "department": "EEE",
+    "year": "1st",
+    "date": "2025-07-04",
+    "status": "Pending"
+  },
+  {
+    "id": "REG006",
+    "eventId": "EVT081",
+    "studentName": "Aishwarya Menon",
+    "rollNo": "21CSE089",
+    "department": "CSE",
+    "year": "3rd",
+    "date": "2025-07-05",
+    "status": "Rejected"
+  },
+  {
+    "id": "REG007",
+    "eventId": "EVT082",
+    "studentName": "Rahul Gupta",
+    "rollNo": "22ME015",
+    "department": "ME",
+    "year": "2nd",
+    "date": "2025-07-03",
+    "status": "Pending"
+  },
+  {
+    "id": "REG008",
+    "eventId": "EVT082",
+    "studentName": "Vikram Singh",
+    "rollNo": "23EEE031",
+    "department": "EEE",
+    "year": "1st",
+    "date": "2025-07-04",
+    "status": "Approved"
+  }
+]

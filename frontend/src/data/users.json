@@ -1,0 +1,35 @@
+[
+  {
+    "id": 1,
+    "name": "Super Admin",
+    "email": "jnikumbh69@gmail.com",
+    "password": "admin123",
+    "role": "admin",
+    "avatar": "SA",
+    "department": "Administration",
+    "phone": "+91 98765 43210",
+    "joinedAt": "2024-01-15"
+  },
+  {
+    "id": 2,
+    "name": "Priya Sharma",
+    "email": "organizer@campus.edu",
+    "password": "org123",
+    "role": "organizer",
+    "avatar": "PS",
+    "department": "Computer Science",
+    "phone": "+91 87654 32109",
+    "joinedAt": "2024-03-10"
+  },
+  {
+    "id": 3,
+    "name": "Rahul Verma",
+    "email": "student@campus.edu",
+    "password": "stu123",
+    "role": "student",
+    "avatar": "RV",
+    "department": "Mechanical Engineering",
+    "phone": "+91 76543 21098",
+    "joinedAt": "2024-07-01"
+  }
+]

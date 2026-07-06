@@ -1,0 +1,107 @@
+{
+  "summary": {
+    "totalEvents": 8,
+    "attended": 6,
+    "percentage": "75%",
+    "pending": 1,
+    "analyticsChange": "↑ 87.5%",
+    "analyticsMonthly": [
+      { "month": "Jul", "value": 4 },
+      { "month": "Aug", "value": 6 },
+      { "month": "Sep", "value": 3 },
+      { "month": "Oct", "value": 5 },
+      { "month": "Nov", "value": 4 },
+      { "month": "Dec", "value": 2 }
+    ]
+  },
+  "records": [
+    {
+      "id": "ATT001",
+      "event": "National Hackathon 2024",
+      "eventType": "Team",
+      "teamName": "Code Ninjas",
+      "scanTime": "09:15 AM",
+      "status": "Present",
+      "venue": "Tech Hub, Block A",
+      "date": "2024-11-15",
+      "registration": "Registered"
+    },
+    {
+      "id": "ATT002",
+      "event": "AI/ML Workshop",
+      "eventType": "Solo",
+      "teamName": null,
+      "scanTime": "10:30 AM",
+      "status": "Present",
+      "venue": "Seminar Hall 2",
+      "date": "2024-11-10",
+      "registration": "Registered"
+    },
+    {
+      "id": "ATT003",
+      "event": "Cultural Fest 2024",
+      "eventType": "Team",
+      "teamName": "Rhythm Warriors",
+      "scanTime": "-",
+      "status": "Absent",
+      "venue": "Main Auditorium",
+      "date": "2024-10-28",
+      "registration": "Registered"
+    },
+    {
+      "id": "ATT004",
+      "event": "Design Sprint Challenge",
+      "eventType": "Team",
+      "teamName": "Pixel Crafters",
+      "scanTime": "02:15 PM",
+      "status": "Pending",
+      "venue": "Design Studio 3",
+      "date": "2024-12-01",
+      "registration": "Registered"
+    },
+    {
+      "id": "ATT005",
+      "event": "Annual Sports Meet",
+      "eventType": "Solo",
+      "teamName": null,
+      "scanTime": "08:00 AM",
+      "status": "Present",
+      "venue": "Campus Sports Complex",
+      "date": "2024-09-14",
+      "registration": "Registered"
+    },
+    {
+      "id": "ATT006",
+      "event": "Web Dev Summit",
+      "eventType": "Solo",
+      "teamName": null,
+      "scanTime": "09:45 AM",
+      "status": "Present",
+      "venue": "Auditorium B",
+      "date": "2024-08-20",
+      "registration": "Registered"
+    },
+    {
+      "id": "ATT007",
+      "event": "CyberSecurity Seminar",
+      "eventType": "Team",
+      "teamName": "Cyber Shield",
+      "scanTime": "11:15 AM",
+      "status": "Present",
+      "venue": "IT Lab 4",
+      "date": "2024-08-05",
+      "registration": "Registered"
+    },
+    {
+      "id": "ATT008",
+      "event": "Alumni Meet 2024",
+      "eventType": "Solo",
+      "teamName": null,
+      "scanTime": "04:00 PM",
+      "status": "Present",
+      "venue": "Grand Hall",
+      "date": "2024-07-12",
+      "registration": "Registered"
+    }
+  ]
+}
