@@ -4,12 +4,16 @@ Notification database model.
 """
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
 from app.core.constants import NotificationType
+
+if TYPE_CHECKING:
+    from app.models.user import User
 
 
 class Notification(Base):

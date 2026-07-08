@@ -16,7 +16,6 @@ from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from app.repositories.event_repository import EventRepository
-from app.repositories.organizer_repository import OrganizerRepository
 from app.core.exceptions import NotFoundException, ForbiddenException, BadRequestException, ConflictException
 from app.core.constants import EventStatus, ApprovalStatus, UserRole
 from app.models.event import Event
@@ -29,16 +28,6 @@ class EventService:
     def __init__(self, db: Session):
         self.db = db
         self.event_repo = EventRepository(db)
-        self.organizer_repo = OrganizerRepository(db)
-
-    def _get_organizer_for_user(self, user: User):
-        """Get the organizer record for a user, raise error if not organizer."""
-        if user.role == UserRole.ADMIN:
-            return None  # Admins can do everything without being an organizer
-        organizer = self.organizer_repo.get_by_user_id(user.user_id)
-        if not organizer:
-            raise ForbiddenException("You must be an organizer to perform this action")
-        return organizer
 
     def _check_event_ownership(self, event: Event, user: User) -> None:
         """Verify the user owns this event (or is admin)."""
@@ -51,7 +40,8 @@ class EventService:
         self, data: CreateEventRequest, current_user: User
     ) -> Event:
         """Create a new event (organizer or admin)."""
-        organizer = self._get_organizer_for_user(current_user)
+        if current_user.role not in [UserRole.ORGANIZER, UserRole.ADMIN]:
+            raise ForbiddenException("You must be an organizer to perform this action")
 
         # Validate dates
         if data.start_datetime <= datetime.utcnow():
@@ -59,7 +49,6 @@ class EventService:
 
         event = Event(
             organizer_id=current_user.user_id,
-            club_id=organizer.club_id if organizer else None,
             title=data.title,
             description=data.description,
             category=data.category,

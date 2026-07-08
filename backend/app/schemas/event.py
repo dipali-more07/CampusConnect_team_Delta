@@ -47,7 +47,6 @@ class ApproveEventRequest(BaseModel):
 class EventResponse(BaseModel):
     event_id: str
     organizer_id: str
-    club_id: Optional[str] = None
     title: str
     description: Optional[str] = None
     category: str

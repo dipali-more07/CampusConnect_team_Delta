@@ -4,8 +4,6 @@ Import all models here so Alembic can discover them for migrations.
 """
 from app.models.user import User, UserProfile
 from app.models.college import College
-from app.models.club import Club
-from app.models.organizer import Organizer
 from app.models.event import Event
 from app.models.registration import EventRegistration
 from app.models.attendance import Attendance
@@ -21,7 +19,7 @@ from app.models.feedback import Feedback
 
 __all__ = [
     "User", "UserProfile",
-    "College", "Club", "Organizer",
+    "College",
     "Event", "EventRegistration",
     "Attendance", "Certificate",
     "Notification", "PasswordResetToken", "RefreshToken",

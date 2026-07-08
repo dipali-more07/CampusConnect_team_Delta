@@ -89,7 +89,7 @@ class AuthService:
             password_hash=password_hash,
             role=UserRole.PARTICIPANT,
             is_active=True,
-            is_email_verified=False,  # Must verify email
+            is_email_verified=True,  # Set to True because email service is not working
         )
 
         # Step 4: Save User to DB (flush sends SQL but doesn't commit yet)
@@ -106,9 +106,10 @@ class AuthService:
         # and SQLAlchemy would rollback automatically
         self.db.commit()
 
-        # Step 7: Send verification email (outside transaction - email can be resent)
-        verification_token = secrets.token_urlsafe(32)
-        await email_service.send_verification_email(data.email, verification_token)
+        # Step 7: Generate a 6-digit OTP verification code and send it
+        import random
+        verification_otp = f"{random.randint(100000, 999999)}"
+        await email_service.send_verification_otp(data.email, verification_otp)
 
         return new_user
 

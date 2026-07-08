@@ -4,13 +4,19 @@ EventRegistration database model.
 """
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, DateTime, ForeignKey, UniqueConstraint, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
 from app.core.constants import RegistrationStatus, PaymentStatus
+
+if TYPE_CHECKING:
+    from app.models.event import Event
+    from app.models.user import User
+    from app.models.team import Team
+    from app.models.attendance import Attendance
 
 
 class EventRegistration(Base):
@@ -59,9 +65,16 @@ class EventRegistration(Base):
     # ER Diagram columns
     registration_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     qr_code: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    team_id: Mapped[Optional[str]] = mapped_column(
+        UUID(as_uuid=False),
+        ForeignKey("teams.team_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     event: Mapped["Event"] = relationship("Event", back_populates="registrations")
     user: Mapped["User"] = relationship("User", foreign_keys=[participant_id], back_populates="registrations")
+    team: Mapped[Optional["Team"]] = relationship("Team")
     attendance: Mapped[Optional["Attendance"]] = relationship(
         "Attendance", back_populates="registration", uselist=False, cascade="all, delete-orphan"
     )

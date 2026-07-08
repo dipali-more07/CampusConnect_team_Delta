@@ -23,6 +23,8 @@ def _reg_to_dict(reg) -> dict:
         "registration_status": reg.registration_status,
         "payment_status": reg.payment_status,
         "registered_at": reg.registered_at.isoformat(),
+        "registration_type": reg.registration_type,
+        "team_id": reg.team_id,
     }
 
 
@@ -33,13 +35,13 @@ async def register_for_event(
     db: Session = Depends(get_db),
 ):
     """
-    Register the current user for an event.
+    Register the current user (or a team) for an event.
     - Checks for duplicate registration
     - Checks capacity (adds to waitlist if full)
     - Sends confirmation email
     """
     service = RegistrationService(db)
-    registration = await service.register_for_event(data.event_id, current_user)
+    registration = await service.register_for_event(data, current_user)
     return success_response(
         message="Registration successful",
         data=_reg_to_dict(registration),

@@ -4,12 +4,15 @@ College database model.
 """
 import uuid
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import String, Boolean, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
+
+if TYPE_CHECKING:
+    from app.models.user import UserProfile
 
 
 class College(Base):
@@ -26,7 +29,6 @@ class College(Base):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
-    clubs: Mapped[List["Club"]] = relationship("Club", back_populates="college", cascade="all, delete-orphan")
     students: Mapped[List["UserProfile"]] = relationship("UserProfile", back_populates="college")
 
     def __repr__(self) -> str:

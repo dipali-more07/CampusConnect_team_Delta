@@ -18,13 +18,11 @@ from datetime import datetime
 
 from app.models.user import User
 from app.models.college import College
-from app.models.club import Club
-from app.models.organizer import Organizer
 from app.models.event import Event
 from app.models.registration import EventRegistration
 from app.models.attendance import Attendance
 from app.models.certificate import Certificate
-from app.core.constants import EventStatus, AttendanceStatus, RegistrationStatus
+from app.core.constants import EventStatus, AttendanceStatus, RegistrationStatus, UserRole
 from app.schemas.analytics import PlatformStats, EventStats, MonthlyStats, PopularEvent
 
 
@@ -45,7 +43,9 @@ class AnalyticsService:
 
         return PlatformStats(
             total_users=count(User),
-            total_organizers=count(Organizer),
+            total_organizers=self.db.execute(
+                select(func.count()).select_from(User).where(User.role == UserRole.ORGANIZER)
+            ).scalar() or 0,
             total_events=count(Event),
             upcoming_events=count_events_by_status(EventStatus.PUBLISHED),
             completed_events=count_events_by_status(EventStatus.COMPLETED),
@@ -57,7 +57,6 @@ class AnalyticsService:
             ).scalar() or 0,
             total_certificates=count(Certificate),
             total_colleges=count(College),
-            total_clubs=count(Club),
         )
 
     def get_event_stats(self, event_id: str) -> EventStats:

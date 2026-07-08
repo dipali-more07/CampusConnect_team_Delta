@@ -17,7 +17,6 @@ class PlatformStats(BaseModel):
     total_attendance: int
     total_certificates: int
     total_colleges: int
-    total_clubs: int
 
 
 class EventStats(BaseModel):

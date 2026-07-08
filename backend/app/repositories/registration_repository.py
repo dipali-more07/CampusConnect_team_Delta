@@ -30,7 +30,7 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
             select(EventRegistration).where(
                 and_(
                     EventRegistration.event_id == event_id,
-                    EventRegistration.user_id == user_id,
+                    EventRegistration.participant_id == user_id,
                 )
             )
         ).scalar_one_or_none()
@@ -53,7 +53,7 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
         """Get all events a user has registered for."""
         query = (
             select(EventRegistration)
-            .where(EventRegistration.user_id == user_id)
+            .where(EventRegistration.participant_id == user_id)
             .order_by(EventRegistration.registered_at.desc())
             .offset(skip)
             .limit(limit)
@@ -76,5 +76,5 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
     def count_by_user(self, user_id: str) -> int:
         return self.db.execute(
             select(func.count()).select_from(EventRegistration)
-            .where(EventRegistration.user_id == user_id)
+            .where(EventRegistration.participant_id == user_id)
         ).scalar() or 0

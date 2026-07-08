@@ -7,6 +7,8 @@
 # --- Web Framework ---
 fastapi>=0.111.0          # Our main web framework - handles HTTP requests
 uvicorn[standard]>=0.30.1  # ASGI server - runs our FastAPI app
+gunicorn>=22.0.0           # WSGI HTTP Server for production deployment
+
 
 # --- Database ---
 sqlalchemy>=2.0.30         # ORM - lets us write Python instead of raw SQL

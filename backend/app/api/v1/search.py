@@ -11,7 +11,6 @@ from app.database.deps import get_current_user
 from app.models.user import User, UserProfile
 from app.models.event import Event
 from app.models.college import College
-from app.models.organizer import Organizer
 from app.core.constants import EventStatus
 from app.core.responses import success_response
 
@@ -23,7 +22,7 @@ def global_search(
     q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
     search_type: str = Query(
         default="all",
-        description="What to search: 'all', 'events', 'users', 'colleges', 'organizers'"
+        description="What to search: 'all', 'events', 'users', 'colleges'"
     ),
     limit: int = Query(default=10, ge=1, le=50),
     db: Session = Depends(get_db),
