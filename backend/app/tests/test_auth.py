@@ -8,11 +8,15 @@ from app.tests.conftest import auth_headers
 
 
 class TestRegister:
-    def test_register_success(self, client):
+    def test_register_success(self, client, test_college):
         response = client.post("/api/v1/auth/register", json={
             "email": "newuser@test.com",
             "password": "NewUser@123",
             "confirm_password": "NewUser@123",
+            "full_name": "New User",
+            "phone": "+919876543210",
+            "course": "B.Tech Computer Science",
+            "college_id": test_college.college_id,
         })
         assert response.status_code == 201
         data = response.json()
@@ -21,24 +25,29 @@ class TestRegister:
         assert data["data"]["email"] == "newuser@test.com"
         assert data["data"]["role"] == "participant"
 
-    def test_register_duplicate_email_returns_409(self, client):
-        client.post("/api/v1/auth/register", json={
+    def test_register_duplicate_email_returns_409(self, client, test_college):
+        payload = {
             "email": "dup@test.com",
             "password": "Test@123456",
             "confirm_password": "Test@123456",
-        })
-        response = client.post("/api/v1/auth/register", json={
-            "email": "dup@test.com",
-            "password": "Test@123456",
-            "confirm_password": "Test@123456",
-        })
+            "full_name": "Duplicate User",
+            "phone": "+919876543211",
+            "course": "B.Tech",
+            "college_id": test_college.college_id,
+        }
+        client.post("/api/v1/auth/register", json=payload)
+        response = client.post("/api/v1/auth/register", json=payload)
         assert response.status_code == 409
 
-    def test_register_invalid_email_returns_422(self, client):
+    def test_register_invalid_email_returns_422(self, client, test_college):
         response = client.post("/api/v1/auth/register", json={
             "email": "not-an-email",
             "password": "Test@123456",
             "confirm_password": "Test@123456",
+            "full_name": "Invalid Email User",
+            "phone": "+919876543212",
+            "course": "B.Tech",
+            "college_id": test_college.college_id,
         })
         assert response.status_code == 422
 
