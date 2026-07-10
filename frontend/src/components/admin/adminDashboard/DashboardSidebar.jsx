@@ -76,11 +76,13 @@ export default function DashboardSidebar({
             <span
               className="text-[15px] font-extrabold leading-none"
               style={{
-                color: logoHover ? BRAND : undefined,
+                color: logoHover ? BRAND : '#0F172A',
                 transition: 'color 0.25s ease',
               }}
-            >EventHub</span>
-            <span className="text-[11px] font-medium leading-none text-slate-400 dark:text-[#4a6a8a]">Admin Portal</span>
+            >CampusConnect</span>
+            <span className="text-[11px] font-medium leading-none text-slate-400 dark:text-[#4a6a8a]">
+              {(user?.role || user?.userType || '').toLowerCase() === 'organizer' ? 'Organizer Portal' : 'Admin Portal'}
+            </span>
           </div>
         </div>
         {!collapsed && !isMobile && (
@@ -116,11 +118,16 @@ export default function DashboardSidebar({
           </button>
         )}
 
-        {NAV.map(({ icon: Icon, label, badge }) => {
-          const active = activeNav === label
-          const displayBadge = label === 'Notifications' ? unreadCount : badge
-          const isCollapsedView = collapsed && !isMobile
-          return (
+        {(() => {
+          const filteredNav = NAV.filter(item => {
+            if (user?.role === 'organizer' && item.label === 'Organizers') return false
+            return true
+          })
+          return filteredNav.map(({ icon: Icon, label, badge }) => {
+            const active = activeNav === label
+            const displayBadge = label === 'Notifications' ? unreadCount : badge
+            const isCollapsedView = collapsed && !isMobile
+            return (
             <button
               key={label}
               onClick={() => {
@@ -158,7 +165,8 @@ export default function DashboardSidebar({
               )}
             </button>
           )
-        })}
+        })
+      })()}
       </nav>
 
       {/* Profile / Logout Footer */}

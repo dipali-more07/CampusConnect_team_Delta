@@ -37,7 +37,8 @@ export default function DashboardTopBar({
     setDropdownOpen(false)
     if (setActiveNav) {
       setActiveNav('Settings')
-      // Optional: Store tab name in sessionStorage so SettingsPage can auto-switch to it
+      // Store tab name in both localStorage and sessionStorage so SettingsPage can auto-switch to it
+      localStorage.setItem('settings_active_tab', tabName)
       sessionStorage.setItem('settings_active_tab', tabName)
       // Trigger event or fast state change so SettingsPage updates if already mounted
       window.dispatchEvent(new Event('settings_tab_change'))
@@ -91,7 +92,7 @@ export default function DashboardTopBar({
                 transition: 'color 0.25s ease',
               }}
             >
-              EventHub
+              CampusConnect
             </span>
           </div>
         </div>
@@ -99,7 +100,7 @@ export default function DashboardTopBar({
 
       {/* Breadcrumb */}
       <div className="hidden sm:flex items-center gap-1.5 text-[13px] text-slate-500 dark:text-[#4a6a8a] font-medium">
-        <span>EventHub</span>
+        <span>CampusConnect</span>
         <ChevronRight size={12} className="text-slate-300 dark:text-[#2a4060]" />
         <span className="text-slate-900 dark:text-[#e8f0fe] font-bold">{activeNav}</span>
       </div>

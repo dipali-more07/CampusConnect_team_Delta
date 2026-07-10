@@ -1,7 +1,7 @@
 import users from '../data/users.json'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 const MOCK_USERS_KEY = 'campus_connect_mock_users'
 
@@ -57,6 +57,11 @@ async function mockRegister(payload) {
     return { success: false, message: 'Email address is already registered.' }
   }
 
+  // Generate a mock code and save it in sessionStorage for verification
+  const mockCode = String(Math.floor(100000 + Math.random() * 900000))
+  sessionStorage.setItem(`mock_otp_${email.toLowerCase()}`, mockCode)
+  console.log(`Mock OTP for ${email}: ${mockCode}`)
+
   // Add user
   const newUser = {
     id: userList.length + 1,
@@ -68,7 +73,8 @@ async function mockRegister(payload) {
     password,
     role,
     avatar: name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
-    joinedAt: new Date().toISOString().split('T')[0]
+    joinedAt: new Date().toISOString().split('T')[0],
+    verified: false
   }
 
   userList.push(newUser)
@@ -77,7 +83,30 @@ async function mockRegister(payload) {
   // Strip password
   const { password: _pwd, ...safeUser } = newUser
 
-  return { success: true, user: safeUser, message: 'Registration successful! You can now log in.' }
+  return { success: true, user: safeUser, message: `Verification code sent to ${email}! (Mock Code: ${mockCode})` }
+}
+
+/* ── MOCK VERIFY EMAIL ──────────────────────────────────── */
+async function mockVerifyEmail(email, code) {
+  await new Promise(r => setTimeout(r, 600))
+  if (!code) {
+    return { success: false, message: 'Verification code is required.' }
+  }
+
+  const expectedCode = sessionStorage.getItem(`mock_otp_${email.toLowerCase()}`)
+  if (expectedCode && code !== expectedCode) {
+    return { success: false, message: 'Incorrect verification code. Please try again.' }
+  }
+
+  // Mark mock user as verified
+  const userList = getMockUsers()
+  const idx = userList.findIndex(u => u.email.toLowerCase() === email.toLowerCase())
+  if (idx !== -1) {
+    userList[idx].verified = true
+    saveMockUsers(userList)
+  }
+
+  return { success: true, message: 'Email verified successfully! You can now log in.' }
 }
 
 /* ── MOCK FORGOT PASSWORD ────────────────────────────────── */
@@ -110,43 +139,90 @@ async function apiLogin(email, password) {
     }
 
     // Support flexible backend user & token formats
-    const rawUser = data.user || data.data?.user || (data.data && typeof data.data === 'object' ? data.data : data)
-    const token = data.token || data.accessToken || data.data?.token || ''
+    const token = data.data?.access_token || data.token || data.accessToken || data.data?.token || ''
 
-    // Normalize user object fields
-    const user = rawUser && typeof rawUser === 'object' ? {
-      ...rawUser,
-      name: rawUser.name || rawUser.fullName || rawUser.username || rawUser.email?.split('@')[0] || 'User',
-      role: (rawUser.role || rawUser.userType || rawUser.roleName || 'admin').toString().toLowerCase(),
-    } : null
+    let user = null
+    if (token) {
+      try {
+        const meRes = await fetch(`${API_BASE}/auth/me`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'ngrok-skip-browser-warning': 'true',
+          }
+        })
+        if (meRes.ok) {
+          const meData = await meRes.json()
+          const profile = meData.data || meData
+          let role = (profile.role || profile.userType || profile.roleName || 'student').toString().toLowerCase()
+          if (role === 'participant') {
+            role = 'student'
+          }
+          user = {
+            ...profile,
+            name: profile.full_name || profile.name || profile.fullName || profile.username || profile.email?.split('@')[0] || 'User',
+            role,
+          }
+        }
+      } catch (meErr) {
+        console.error('Error fetching user profile:', meErr)
+      }
+    }
+
+    // Fallback user object if /me failed or returned nothing
+    if (!user) {
+      user = {
+        email,
+        name: email.split('@')[0] || 'User',
+        role: 'student'
+      }
+    }
 
     return { success: true, user, token }
   } catch (err) {
     console.error('API Login Error:', err)
-    return { success: false, message: 'Unable to process server response. Check console for details.' }
+    return { success: false, message: `API Login Error: ${err.message || err}` }
   }
 }
 
 /* ── REAL API REGISTER ──────────────────────────────────── */
 async function apiRegister(payload) {
   try {
+    const apiPayload = {
+      email: payload.email,
+      password: payload.password,
+      confirm_password: payload.confirmPassword || payload.password,
+      full_name: payload.name,
+      phone: payload.mobile,
+      course: payload.course,
+      college_id: payload.college,
+    }
+
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'ngrok-skip-browser-warning': 'true',
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(apiPayload),
     })
 
     const data = await res.json()
 
     if (!res.ok) {
-      return { success: false, message: data.message || 'Registration failed.' }
+      let errMsg = data.message || data.error || 'Registration failed.'
+      if (Array.isArray(data.data) && data.data.length > 0) {
+        errMsg = data.data.map(err => err.message).join(', ')
+      } else if (data.errors && typeof data.errors === 'object') {
+        errMsg = Object.values(data.errors).join(', ')
+      }
+      return { success: false, message: errMsg }
     }
 
-    return { success: true, user: data.user, message: data.message || 'Registration successful!' }
-  } catch {
+    const rawUser = data.user || data.data?.user || (data.data && typeof data.data === 'object' ? data.data : data)
+    return { success: true, user: rawUser, message: data.message || 'Registration successful!' }
+  } catch (err) {
+    console.error('API Register Error:', err)
     return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
@@ -175,6 +251,56 @@ async function apiForgotPassword(email) {
   }
 }
 
+/* ── REAL API VERIFY EMAIL ───────────────────────────────── */
+async function apiVerifyEmail(email, code) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/verify-email`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify({ email, code }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Verification failed.' }
+    }
+
+    return { success: true, message: data.message || 'Email verified successfully!' }
+  } catch (err) {
+    console.error('API Verify Email Error:', err)
+    return { success: false, message: 'Unable to reach server. Check your connection.' }
+  }
+}
+
+/* ── REAL API RESEND CODE ────────────────────────────────── */
+async function apiResendCode(email) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/resend-code`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      body: JSON.stringify({ email }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to resend verification code.' }
+    }
+
+    return { success: true, message: data.message || 'Verification code resent successfully!' }
+  } catch (err) {
+    console.error('API Resend Code Error:', err)
+    return { success: false, message: 'Unable to reach server. Check your connection.' }
+  }
+}
+
 /* ── PUBLIC API ─────────────────────────────────────────── */
 const authService = {
   /**
@@ -185,11 +311,14 @@ const authService = {
   login: (email, password) =>
     USE_MOCK ? mockLogin(email, password) : apiLogin(email, password),
 
-  register: (payload) =>
-    USE_MOCK ? mockRegister(payload) : apiRegister(payload),
+  register: (payload) => apiRegister(payload),
 
   forgotPassword: (email) =>
     USE_MOCK ? mockForgotPassword(email) : apiForgotPassword(email),
+
+  verifyEmail: (email, code) => apiVerifyEmail(email, code),
+
+  resendCode: (email) => apiResendCode(email),
 }
 
 export default authService

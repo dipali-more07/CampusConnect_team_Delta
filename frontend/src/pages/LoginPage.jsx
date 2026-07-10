@@ -218,11 +218,13 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const result = await authService.login(email, password)
+      console.log('Login Response Result:', result)
       if (result.success && result.user) {
         login(result.user, result.token)
         const userName = result.user?.name || result.user?.fullName || result.user?.email || 'User'
-        showToast(`Welcome back, ${userName}!`, 'success')
+        showToast(`Logged in successfully! User: ${userName}, Role: ${result.user.role}`, 'success')
       } else {
+        console.error('Login failed result:', result)
         showToast(result.message || 'Login failed. Please try again.', 'error')
       }
     } catch (err) {

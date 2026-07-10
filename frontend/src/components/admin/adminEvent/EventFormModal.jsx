@@ -133,24 +133,23 @@ export default function EventFormModal({
             </div>
           </div>
 
-          {/* Grid: Participation Type & Assign Organizer */}
+          {/* Grid: Event Type & Participation Type */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-                Participation Type (Individual / Team / Group)
+                Event Type (Online / Offline)
               </label>
               <div className="relative">
                 <select
-                  value={formState.eventType || 'Individual'}
+                  value={formState.eventType || 'offline'}
                   onChange={e => setFormState(p => ({ ...p, eventType: e.target.value }))}
                   className="w-full pl-4 pr-10 py-3 rounded-xl text-[13.5px] outline-none cursor-pointer border appearance-none transition-all duration-200 font-semibold"
                   style={inputStyle}
                   onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
                   onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
                 >
-                  {eventTypes.map(t => (
-                    <option key={t} value={t}>{t} Event</option>
-                  ))}
+                  <option value="offline">Offline</option>
+                  <option value="online">Online</option>
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
                   <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
@@ -160,6 +159,33 @@ export default function EventFormModal({
               </div>
             </div>
 
+            <div>
+              <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
+                Participation Type
+              </label>
+              <div className="relative">
+                <select
+                  value={formState.participationType || 'individual'}
+                  onChange={e => setFormState(p => ({ ...p, participationType: e.target.value }))}
+                  className="w-full pl-4 pr-10 py-3 rounded-xl text-[13.5px] outline-none cursor-pointer border appearance-none transition-all duration-200 font-semibold"
+                  style={inputStyle}
+                  onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+                  onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+                >
+                  <option value="individual">Individual</option>
+                  <option value="team">Team</option>
+                </select>
+                <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                  <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+                    <path d="M1 1.5L5 4.5L9 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Grid: Assign Organizer & Fees */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
                 Assign Organizer
@@ -179,46 +205,69 @@ export default function EventFormModal({
               />
               {formErrors.organizer && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.organizer}</span>}
             </div>
-          </div>
 
-          {/* Grid: Date & Time */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-                Date
+                Fees (₹)
               </label>
               <input
-                type="date"
-                value={formState.date}
-                onChange={e => setFormState(p => ({ ...p, date: e.target.value }))}
+                type="number"
+                min="0"
+                placeholder="0"
+                value={formState.fees}
+                onChange={e => setFormState(p => ({ ...p, fees: parseInt(e.target.value, 10) || 0 }))}
                 className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
                 style={{
                   ...inputStyle,
-                  borderColor: formErrors.date ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0',
+                  borderColor: formErrors.fees ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0'
+                }}
+                onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+                onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+              />
+              {formErrors.fees && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.fees}</span>}
+            </div>
+          </div>
+
+          {/* Grid: Start Date & End Date Pickers */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+              <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
+                Start Date & Time
+              </label>
+              <input
+                type="datetime-local"
+                value={formState.startDateTime}
+                onChange={e => setFormState(p => ({ ...p, startDateTime: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
+                style={{
+                  ...inputStyle,
+                  borderColor: formErrors.startDateTime ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0',
                   colorScheme: dark ? 'dark' : 'light'
                 }}
                 onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
                 onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
               />
-              {formErrors.date && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.date}</span>}
+              {formErrors.startDateTime && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.startDateTime}</span>}
             </div>
 
             <div>
               <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-                Time
+                End Date & Time
               </label>
               <input
-                type="time"
-                value={formState.time}
-                onChange={e => setFormState(p => ({ ...p, time: e.target.value }))}
+                type="datetime-local"
+                value={formState.endDateTime}
+                onChange={e => setFormState(p => ({ ...p, endDateTime: e.target.value }))}
                 className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
                 style={{
                   ...inputStyle,
+                  borderColor: formErrors.endDateTime ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0',
                   colorScheme: dark ? 'dark' : 'light'
                 }}
                 onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
                 onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
               />
+              {formErrors.endDateTime && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.endDateTime}</span>}
             </div>
           </div>
 
@@ -247,10 +296,10 @@ export default function EventFormModal({
 
             <div>
               <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-                Registration Deadline
+                Registration Deadline (Date & Time)
               </label>
               <input
-                type="date"
+                type="datetime-local"
                 value={formState.registrationDeadline}
                 onChange={e => setFormState(p => ({ ...p, registrationDeadline: e.target.value }))}
                 className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
@@ -281,40 +330,6 @@ export default function EventFormModal({
               onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
               onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
             />
-          </div>
-
-          {/* Enable QR Attendance Switch */}
-          <div 
-            className="flex items-center gap-4 p-4 rounded-xl transition-all duration-200"
-            style={{
-              background: dark ? '#091526' : '#f0f4f8',
-              border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`,
-            }}
-          >
-            <button
-              type="button"
-              onClick={() => setFormState(p => ({ ...p, qrAttendance: p.qrAttendance === 'Enabled' ? 'Disabled' : 'Enabled' }))}
-              className="w-11 h-6 rounded-full relative transition-colors duration-200 cursor-pointer outline-none border-none shrink-0"
-              style={{
-                backgroundColor: formState.qrAttendance === 'Enabled' ? BRAND : (dark ? '#162640' : '#cbd5e1'),
-              }}
-            >
-              <div 
-                className="w-4.5 h-4.5 rounded-full bg-white absolute top-0.75 transition-transform duration-200 shadow"
-                style={{
-                  transform: formState.qrAttendance === 'Enabled' ? 'translateX(22px)' : 'translateX(4px)',
-                }}
-              />
-            </button>
-
-            <div className="flex flex-col gap-0.5 text-left">
-              <span className="text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#1e293b' }}>
-                Enable QR Attendance
-              </span>
-              <span className="text-[11.5px] leading-tight font-medium" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                Generate QR code for contactless attendance marking
-              </span>
-            </div>
           </div>
 
           {/* Image Drag and Drop Upload */}

@@ -7,7 +7,7 @@ import {
   Award,
 } from 'lucide-react'
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK 
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL 
 
 export const STATS_CONFIG = {
@@ -80,7 +80,10 @@ async function mockFetchStats() {
 async function apiFetchStats() {
   try {
     const res = await fetch(`${API_BASE}/dashboard/stats`, {
-      headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      },
     })
     const data = await res.json()
     if (!res.ok) return { success: false, stats: [] }

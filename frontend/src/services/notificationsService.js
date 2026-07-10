@@ -1,10 +1,9 @@
-
 import {
   UserPlus, CheckSquare, Calendar, Award, Bell,
   AlertTriangle, Users, RefreshCw, Star, XCircle,
 } from 'lucide-react'
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK 
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL 
 
 // ─── Helper — get auth token from sessionStorage ───────────────────
@@ -16,7 +15,8 @@ function getToken() {
 function authHeaders(extra = {}) {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${getToken()}`,
+    'Authorization': `Bearer ${getToken()}`,
+    'ngrok-skip-browser-warning': 'true',
     ...extra,
   }
 }
@@ -116,7 +116,7 @@ async function apiFetchNotifications() {
   try {
     const res = await fetch(`${API_BASE}/notifications`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: authHeaders(),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
@@ -163,7 +163,7 @@ async function apiDelete(id) {
   try {
     const res = await fetch(`${API_BASE}/notifications/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: authHeaders(),
     })
     const data = await parseJSON(res)
     if (!res.ok) {

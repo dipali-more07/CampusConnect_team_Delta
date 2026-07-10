@@ -41,7 +41,7 @@ export default function EventsHeader({
             onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#7a98bb' : '#64748b' }}
           >
-            <Upload size={14} /> Import
+            <Download size={14} /> Import
           </button>
           
           <button
@@ -51,7 +51,7 @@ export default function EventsHeader({
             onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#7a98bb' : '#64748b' }}
           >
-            <Download size={14} /> Export
+            <Upload size={14} /> Export
           </button>
 
           <button
