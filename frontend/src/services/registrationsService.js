@@ -1,5 +1,5 @@
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true
-const API_BASE = import.meta.env.VITE_API_BASE_URL 
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+const API_BASE = import.meta.env.VITE_API_BASE_URL
 import defaultRegistrations from '../data/registrations.json'
 import defaultEvents from '../data/events.json'
 
@@ -7,7 +7,8 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token')
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    'Authorization': `Bearer ${token}`,
+    'ngrok-skip-browser-warning': 'true'
   }
 }
 

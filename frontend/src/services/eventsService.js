@@ -1,4 +1,4 @@
-const USE_MOCK = import.meta.env.VITE_USE_MOCK 
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL 
 import defaultRegistrations from '../data/registrations.json'
 import defaultEvents from '../data/events.json'
@@ -13,7 +13,8 @@ function getToken() {
 function authHeaders(extra = {}) {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${getToken()}`,
+    'Authorization': `Bearer ${getToken()}`,
+    'ngrok-skip-browser-warning': 'true',
     ...extra,
   }
 }
@@ -188,6 +189,45 @@ async function mockImportEvents(importedList) {
   return { success: true, count: newItems.length }
 }
 
+async function mockApproveEvent(eventId, approvalStatus) {
+  await new Promise(r => setTimeout(r, 300))
+  const events = getMockEvents()
+  const idx = events.findIndex(e => e.id === eventId)
+  if (idx !== -1) {
+    events[idx].approvalStatus = approvalStatus
+    saveMockEvents(events)
+  }
+  return { success: true }
+}
+
+// Helper to map backend event fields to frontend expected fields
+function mapEvent(e) {
+  if (!e) return null
+  return {
+    id: e.event_id || e.id,
+    name: e.event_name || e.name || e.title || '',
+    organizer: e.organizer || '',
+    category: e.category ? (e.category.charAt(0).toUpperCase() + e.category.slice(1)) : 'General',
+    eventType: e.event_type || e.eventType || 'offline',
+    participationType: e.participation_type || e.participationType || 'individual',
+    venue: e.venue || 'TBD',
+    date: e.event_date || (e.start_datetime ? e.start_datetime.split('T')[0] : ''),
+    time: e.start_datetime ? e.start_datetime.split('T')[1]?.substring(0, 5) : '09:00',
+    start_datetime: e.start_datetime,
+    end_datetime: e.end_datetime,
+    capacity: e.capacity || e.max_participants || 500,
+    registrationsCount: e.registrationsCount || e.registrations_count || 0,
+    status: e.status || 'Upcoming',
+    approvalStatus: (() => {
+      const raw = e.approval_status || e.approvalStatus || 'Approved'
+      return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
+    })(),
+    description: e.description || '',
+    registrationDeadline: e.registration_deadline || e.reg_deadline || e.registrationDeadline || '',
+    banner: e.poster || e.banner || null,
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // REAL API FUNCTIONS
 // ─────────────────────────────────────────────────────────────────
@@ -195,14 +235,16 @@ async function apiFetchEvents() {
   try {
     const res = await fetch(`${API_BASE}/events`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: authHeaders(),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
       console.error('[eventsService] fetchEvents failed:', res.status, data)
       return { success: false, events: [] }
     }
-    return { success: true, events: data.events ?? [] }
+    const eventsArray = Array.isArray(data.data) ? data.data : Array.isArray(data.events) ? data.events : []
+    const mapped = eventsArray.map(e => mapEvent(e))
+    return { success: true, events: mapped }
   } catch (err) {
     console.error('[eventsService] fetchEvents network error:', err)
     return { success: false, events: [], message: 'Server unreachable.' }
@@ -221,7 +263,8 @@ async function apiCreateEvent(payload) {
       console.error('[eventsService] createEvent failed:', res.status, data)
       return { success: false, message: data.message || 'Failed to create event.' }
     }
-    return { success: true, event: data.event }
+    const rawEvent = data.data || data.event || data
+    return { success: true, event: mapEvent(rawEvent) }
   } catch (err) {
     console.error('[eventsService] createEvent network error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -240,7 +283,8 @@ async function apiUpdateEvent(id, payload) {
       console.error('[eventsService] updateEvent failed:', res.status, data)
       return { success: false, message: data.message || 'Failed to update event.' }
     }
-    return { success: true, event: data.event }
+    const rawEvent = data.data || data.event || data
+    return { success: true, event: mapEvent(rawEvent) }
   } catch (err) {
     console.error('[eventsService] updateEvent network error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -251,7 +295,7 @@ async function apiDeleteEvent(id) {
   try {
     const res = await fetch(`${API_BASE}/events/${id}`, {
       method: 'DELETE',
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: authHeaders(),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
@@ -372,7 +416,7 @@ async function mockFetchAttendance(eventId) {
 async function apiFetchRegistrations(eventId) {
   try {
     const res = await fetch(`${API_BASE}/events/${eventId}/registrations`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
+      headers: authHeaders(),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
@@ -406,16 +450,38 @@ async function apiUpdateRegistrationStatus(id, status) {
 /* ── REAL API ATTENDANCE ─────────────────────────────────────── */
 async function apiFetchAttendance(eventId) {
   try {
-    const res = await fetch(`${API_BASE}/events/${eventId}/attendance`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
+    const res = await fetch(`${API_BASE}/attendance/event/${eventId}`, {
+      headers: authHeaders(),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
       return { success: false, message: data.message || 'Failed to fetch attendance.' }
     }
-    return { success: true, attendance: data.attendance || [] }
+    return { success: true, attendance: data.attendance || data.data || data || [] }
   } catch (err) {
     console.error('[eventsService] fetchAttendance error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+/* ── REAL API APPROVAL ───────────────────────────────────────── */
+async function apiApproveEvent(eventId, approvalStatus, rejectionReason = null) {
+  try {
+    const res = await fetch(`${API_BASE}/events/${eventId}/approve`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        approval_status: approvalStatus.toLowerCase(),
+        rejection_reason: rejectionReason,
+      }),
+    })
+    const data = await parseJSON(res)
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to update event approval status.' }
+    }
+    return { success: true, message: data.message }
+  } catch (err) {
+    console.error('[eventsService] approveEvent error:', err)
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -447,6 +513,9 @@ const eventsService = {
 
   fetchAttendance: (eventId) =>
     USE_MOCK ? mockFetchAttendance(eventId) : apiFetchAttendance(eventId),
+
+  approve: (eventId, approvalStatus, rejectionReason) =>
+    USE_MOCK ? Promise.resolve({ success: true }) : apiApproveEvent(eventId, approvalStatus, rejectionReason),
 }
 
 export default eventsService

@@ -1,4 +1,4 @@
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 import defaultAttendance from '../data/attendance.json'
 import { ATTENDANCE_EVENTS, RECENT_SCANS as DEFAULT_SCANS, LIVE_CHART_DATA as DEFAULT_CHART, DEPT_ATTENDANCE_DATA as DEFAULT_DEPT } from '../data/attendanceData'
@@ -7,7 +7,8 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token')
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    'Authorization': `Bearer ${token}`,
+    'ngrok-skip-browser-warning': 'true'
   }
 }
 
@@ -128,12 +129,12 @@ async function mockGenerateQR(eventId, session) {
 async function apiFetchAll(eventId) {
   try {
     const url = eventId && eventId !== 'ALL'
-      ? `${API_BASE}/attendance?eventId=${eventId}`
-      : `${API_BASE}/attendance`
+      ? `${API_BASE}/attendance/event/${eventId}`
+      : `${API_BASE}/attendance/event/ALL`
     const res = await fetch(url, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch attendance.' }
-    return { success: true, records: data.records || [] }
+    return { success: true, records: data.records || data.data || data || [] }
   } catch (err) {
     console.error('[attendanceService] fetchAll error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -142,14 +143,17 @@ async function apiFetchAll(eventId) {
 
 async function apiUpdateStatus(id, status) {
   try {
-    const res = await fetch(`${API_BASE}/attendance/${id}/status`, {
-      method: 'PUT',
+    const endpoint = (status === 'Present' || status === 'Late')
+      ? `${API_BASE}/attendance/check-in`
+      : `${API_BASE}/attendance/check-out`
+    const res = await fetch(endpoint, {
+      method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ status }),
+      body: JSON.stringify({ id, attendanceId: id, status }),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update attendance.' }
-    return { success: true, record: data.record }
+    return { success: true, record: data.record || data.data || data }
   } catch (err) {
     console.error('[attendanceService] updateStatus error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -158,13 +162,14 @@ async function apiUpdateStatus(id, status) {
 
 async function apiMarkPresent(id) {
   try {
-    const res = await fetch(`${API_BASE}/attendance/${id}/checkin`, {
+    const res = await fetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
       headers: authHeaders(),
+      body: JSON.stringify({ id, attendanceId: id }),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to mark present.' }
-    return { success: true, record: data.record }
+    return { success: true, record: data.record || data.data || data }
   } catch (err) {
     console.error('[attendanceService] markPresent error:', err)
     return { success: false, message: 'Server unreachable.' }

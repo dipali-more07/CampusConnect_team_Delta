@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { User, Mail, Phone, GraduationCap, Lock, Eye, EyeOff } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
 import authService from '../services/authService'
@@ -8,7 +8,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
   const [email, setEmail] = useState('')
   const [mobile, setMobile] = useState('')
   const [college, setCollege] = useState('')
-  const [course, setCourse] = useState('B.Tech')
+  const [course, setCourse] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -18,10 +18,21 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
   // Verification popup states
   const [showVerifyModal, setShowVerifyModal] = useState(false)
   const [verificationCode, setVerificationCode] = useState('')
-  const [sentCode, setSentCode] = useState('')
+  const [registerLoading, setRegisterLoading] = useState(false)
   const [verifyLoading, setVerifyLoading] = useState(false)
+  const [resendCountdown, setResendCountdown] = useState(0)
+  const [resendLoading, setResendLoading] = useState(false)
 
   const showToast = useToast()
+
+  // Countdown timer for resending OTP code
+  useEffect(() => {
+    if (resendCountdown <= 0) return
+    const timer = setInterval(() => {
+      setResendCountdown(prev => prev - 1)
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [resendCountdown])
 
   const handleSignUpSubmit = async (e) => {
     e.preventDefault()
@@ -42,11 +53,9 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       newErrors.mobile = 'Please enter a valid mobile number.'
     }
 
-    // Password validation
+    // Password validation (relaxed rules, only checking minimum length)
     if (password.length < 8) {
       newErrors.password = 'Password must be at least 8 characters.'
-    } else if (!/^[a-zA-Z0-9]+$/.test(password)) {
-      newErrors.password = 'Password must contain only letters and numbers (no spaces or special chars).'
     }
 
     // Confirm password validation
@@ -60,54 +69,73 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
     }
 
     setErrors({})
+    setRegisterLoading(true)
 
-    // Generate mock 6-digit code
-    const code = String(Math.floor(100000 + Math.random() * 900000))
-    setSentCode(code)
-
-    // Alert the user with the mock verification code
-    showToast(`Verification code sent to ${email}! (Mock Code: ${code})`, 'success')
-    setShowVerifyModal(true)
-  }
-
-  const handleVerifyAndRegister = async (e) => {
-    e.preventDefault()
-
-    if (verificationCode !== sentCode) {
-      showToast('Incorrect verification code. Please try again.', 'error')
-      return
+    const payload = {
+      name,
+      email,
+      mobile,
+      college,
+      course,
+      password,
+      role: 'student', // default role
     }
 
-    setVerifyLoading(true)
     try {
-      const payload = {
-        name,
-        email,
-        mobile,
-        college,
-        course,
-        password,
-        role: 'student', // default role
-      }
-
       const res = await authService.register(payload)
       if (res.success) {
-        showToast(res.message || 'Registration successful!', 'success')
-        setShowVerifyModal(false)
-        if (onSignUpSuccess) {
-          onSignUpSuccess(email)
-        }
+        showToast(res.message || 'Verification code sent to your email!', 'success')
+        setShowVerifyModal(true)
       } else {
         showToast(res.message || 'Registration failed.', 'error')
         if (res.message && res.message.toLowerCase().includes('email')) {
           setErrors({ email: res.message })
-          setShowVerifyModal(false)
         }
       }
     } catch (err) {
       showToast('Something went wrong during registration.', 'error')
     } finally {
+      setRegisterLoading(false)
+    }
+  }
+
+  const handleVerifyEmail = async (e) => {
+    e.preventDefault()
+
+    setVerifyLoading(true)
+    try {
+      const res = await authService.verifyEmail(email, verificationCode)
+      if (res.success) {
+        showToast(res.message || 'Email verified successfully!', 'success')
+        setShowVerifyModal(false)
+        if (onSignUpSuccess) {
+          onSignUpSuccess(email)
+        }
+      } else {
+        showToast(res.message || 'Verification failed.', 'error')
+      }
+    } catch (err) {
+      showToast('Something went wrong during verification.', 'error')
+    } finally {
       setVerifyLoading(false)
+    }
+  }
+
+  const handleResendCode = async () => {
+    if (resendCountdown > 0 || resendLoading) return
+    setResendLoading(true)
+    try {
+      const res = await authService.resendCode(email)
+      if (res.success) {
+        showToast(res.message || 'Verification code resent successfully!', 'success')
+        setResendCountdown(60) // Start 60-second countdown
+      } else {
+        showToast(res.message || 'Failed to resend verification code.', 'error')
+      }
+    } catch (err) {
+      showToast('Something went wrong. Please try again.', 'error')
+    } finally {
+      setResendLoading(false)
     }
   }
 
@@ -205,32 +233,22 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
           </div>
         </div>
 
-        {/* Course Dropdown */}
+        {/* Course Input */}
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1 block">
-            Select Course
+            Course Name
           </label>
           <div className="relative">
             <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <select
+            <input
+              type="text"
+              placeholder="e.g. B.Tech"
               value={course}
               onChange={e => setCourse(e.target.value)}
               required
-              className="w-full pl-10 pr-8 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white
-              focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition cursor-pointer appearance-none"
-            >
-              <option value="B.Tech">B.Tech</option>
-              <option value="M.Tech">M.Tech</option>
-              <option value="BCA">BCA</option>
-              <option value="MCA">MCA</option>
-              <option value="MBA">MBA</option>
-              <option value="B.Sc">B.Sc</option>
-              <option value="M.Sc">M.Sc</option>
-              <option value="BBA">BBA</option>
-              <option value="B.Com">B.Com</option>
-            </select>
-            {/* Custom arrow */}
-            <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 font-bold text-[10px]">▼</div>
+              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
+              focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
+            />
           </div>
         </div>
 
@@ -297,13 +315,22 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
         {/* Submit */}
         <button
           type="submit"
-          className="w-full py-3 rounded-lg text-sm font-bold text-white transition-all duration-200 relative overflow-hidden mt-2 cursor-pointer"
+          disabled={registerLoading}
+          className="w-full py-3 rounded-lg text-sm font-bold text-white transition-all duration-200 relative overflow-hidden mt-2 cursor-pointer flex items-center justify-center gap-2"
           style={{
-            background: 'linear-gradient(90deg, #4f46e5, #6d28d9)',
-            boxShadow: '0 4px 18px rgba(99,102,241,0.35)',
+            background: registerLoading ? '#a5b4fc' : 'linear-gradient(90deg, #4f46e5, #6d28d9)',
+            boxShadow: registerLoading ? 'none' : '0 4px 18px rgba(99,102,241,0.35)',
           }}
         >
-          Register
+          {registerLoading ? (
+            <>
+              <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z" />
+              </svg>
+              Registering…
+            </>
+          ) : 'Register'}
         </button>
 
         {/* Switch link */}
@@ -338,37 +365,84 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
           >
             <h2 className="text-xl font-black text-slate-900 mb-2">Verify your email</h2>
             <p className="text-sm text-slate-500 mb-6 leading-relaxed">
-              We have sent a verification code to <strong>{email}</strong>. Please enter the code below to verify your email.
+              Please enter the verification code sent to your email to activate your account.
             </p>
 
-            <form onSubmit={handleVerifyAndRegister} className="flex flex-col gap-4">
-              <input
-                type="text"
-                maxLength="6"
-                placeholder="Enter 6-digit code"
-                value={verificationCode}
-                onChange={e => setVerificationCode(e.target.value)}
-                required
-                autoFocus
-                className="w-full text-center tracking-widest text-lg font-bold py-2.5 rounded-lg border border-slate-200 text-slate-700 placeholder-slate-400 placeholder:text-sm placeholder:tracking-normal focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
-              />
+            <form onSubmit={handleVerifyEmail} className="flex flex-col gap-5">
+              {/* Autofilled Email Address */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  disabled
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100/80 text-sm text-slate-500 font-semibold cursor-not-allowed"
+                />
+              </div>
+
+              {/* Verification Code */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                  Verification Code
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter code"
+                  value={verificationCode}
+                  onChange={e => setVerificationCode(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 transition font-semibold"
+                />
+              </div>
+
+              {/* Resend Code Link */}
+              <div className="flex justify-between items-center text-xs mt-1">
+                <span className="text-slate-500">Didn't receive the code?</span>
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={resendCountdown > 0 || resendLoading}
+                  className={`font-bold transition-colors cursor-pointer border-none bg-transparent outline-none p-0 ${
+                    resendCountdown > 0 || resendLoading
+                      ? 'text-slate-400 cursor-not-allowed'
+                      : 'text-indigo-600 hover:text-indigo-800 hover:underline'
+                  }`}
+                >
+                  {resendLoading
+                    ? 'Sending…'
+                    : resendCountdown > 0
+                    ? `Resend Code (${resendCountdown}s)`
+                    : 'Resend Code'}
+                </button>
+              </div>
 
               <button
                 type="submit"
                 disabled={verifyLoading}
-                className="w-full py-2.5 rounded-lg text-sm font-bold text-white transition-all duration-200 cursor-pointer"
+                className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
                 style={{
                   background: verifyLoading ? '#a5b4fc' : 'linear-gradient(90deg,#4f46e5,#6d28d9)',
                   boxShadow: verifyLoading ? 'none' : '0 4px 14px rgba(99,102,241,0.35)',
                 }}
               >
-                {verifyLoading ? 'Verifying & Registering…' : 'Verify & Register'}
+                {verifyLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                      <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Verifying…
+                  </>
+                ) : 'Verify Email'}
               </button>
 
               <button
                 type="button"
                 onClick={() => setShowVerifyModal(false)}
-                className="text-sm text-slate-500 hover:text-slate-700 text-center transition-colors border-none bg-transparent cursor-pointer"
+                className="text-sm text-slate-500 hover:text-slate-700 text-center transition-colors border-none bg-transparent cursor-pointer font-bold"
               >
                 Cancel
               </button>

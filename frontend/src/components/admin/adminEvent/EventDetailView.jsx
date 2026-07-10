@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { 
-  ChevronLeft, Pencil, Clock, MapPin, Users, Loader2, Check, XCircle, BarChart2, Award, Image 
+  ChevronLeft, Search, ChevronRight, Pencil, Clock, MapPin, Users, Loader2, Check, XCircle, BarChart2, Award, Image 
 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 import eventsService from '../../../services/eventsService'
@@ -8,11 +8,28 @@ import eventsService from '../../../services/eventsService'
 export default function EventDetailView({ event, onBack, onEdit, tokens, showToast }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
-  const [activeTab, setActiveTab] = useState('Overview')
+  const [activeTab, setActiveTab] = useState(() => {
+    return localStorage.getItem('cc_event_detail_active_tab') || 'Overview'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('cc_event_detail_active_tab', activeTab)
+  }, [activeTab])
+
   const [registrations, setRegistrations] = useState([])
   const [loadingRegs, setLoadingRegs] = useState(false)
   const [attendance, setAttendance] = useState([])
   const [loadingAtt, setLoadingAtt] = useState(false)
+
+  // Search and Pagination states for Registrations
+  const [regSearch, setRegSearch] = useState('')
+  const [regPage, setRegPage] = useState(1)
+  const [regPerPage, setRegPerPage] = useState(5)
+
+  // Search and Pagination states for Attendance
+  const [attSearch, setAttSearch] = useState('')
+  const [attPage, setAttPage] = useState(1)
+  const [attPerPage, setAttPerPage] = useState(5)
 
   const loadRegistrations = async () => {
     setLoadingRegs(true)
@@ -106,6 +123,47 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   const regPercent = isApproved && event.capacity ? Math.min(Math.round((effectiveRegs / event.capacity) * 100), 100) : 0
   const remaining = isApproved ? Math.max(event.capacity - effectiveRegs, 0) : event.capacity
 
+  // Filtered & Paginated Registrations
+  const filteredRegs = registrations.filter(r => {
+    const q = regSearch.toLowerCase().trim()
+    if (!q) return true
+    return (
+      (r.studentName || '').toLowerCase().includes(q) ||
+      (r.rollNo || '').toLowerCase().includes(q) ||
+      (r.department || '').toLowerCase().includes(q) ||
+      (r.year || '').toLowerCase().includes(q) ||
+      (r.status || '').toLowerCase().includes(q) ||
+      (r.date || '').toLowerCase().includes(q)
+    )
+  })
+
+  const totalRegItems = filteredRegs.length
+  const totalRegPages = Math.ceil(totalRegItems / regPerPage)
+  const currentRegPage = Math.min(regPage, totalRegPages || 1)
+  const regStartIndex = (currentRegPage - 1) * regPerPage
+  const regEndIndex = Math.min(regStartIndex + regPerPage, totalRegItems)
+  const paginatedRegs = filteredRegs.slice(regStartIndex, regEndIndex)
+
+  // Filtered & Paginated Attendance
+  const filteredAtt = attendance.filter(a => {
+    const q = attSearch.toLowerCase().trim()
+    if (!q) return true
+    return (
+      (a.studentName || '').toLowerCase().includes(q) ||
+      (a.rollNo || '').toLowerCase().includes(q) ||
+      (a.status || '').toLowerCase().includes(q) ||
+      (a.checkIn || '').toLowerCase().includes(q) ||
+      (a.checkOut || '').toLowerCase().includes(q)
+    )
+  })
+
+  const totalAttItems = filteredAtt.length
+  const totalAttPages = Math.ceil(totalAttItems / attPerPage)
+  const currentAttPage = Math.min(attPage, totalAttPages || 1)
+  const attStartIndex = (currentAttPage - 1) * attPerPage
+  const attEndIndex = Math.min(attStartIndex + attPerPage, totalAttItems)
+  const paginatedAtt = filteredAtt.slice(attStartIndex, attEndIndex)
+
   // Sub-tabs list
   const tabs = ['Overview', 'Registrations', 'Attendance', 'Analytics', 'Certificates', 'Gallery']
 
@@ -116,7 +174,10 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
       <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <div className="flex items-center gap-3">
           <button 
-            onClick={onBack}
+            onClick={() => {
+              localStorage.removeItem('cc_event_detail_active_tab')
+              onBack()
+            }}
             className="w-9 h-9 rounded-xl border flex items-center justify-center cursor-pointer transition-all duration-200"
             style={{ 
               borderColor: dark ? '#1a3050' : '#e2e8f0', 
@@ -360,19 +421,58 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
         {activeTab === 'Registrations' && (
           <div 
-            className="rounded-2xl p-6 border overflow-x-auto"
+            className="rounded-2xl p-6 border"
             style={{ 
               borderColor: dark ? '#1a3050' : '#e2e8f0', 
               background: dark ? '#0f1e30' : '#ffffff' 
             }}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-extrabold m-0" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-                Registered Students List
-              </h3>
-              <span className="px-3 py-1 rounded-full text-[11.5px] font-bold" style={{ background: `${BRAND}15`, color: BRAND }}>
-                {registrations.length} registrations
-              </span>
+            {/* Header controls with Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+              <div>
+                <h3 className="text-[16px] font-extrabold m-0" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                  Registered Students List
+                </h3>
+                <span className="text-[12px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                  {registrations.length} registrations total
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <Search size={15} />
+                  </span>
+                  <input
+                    type="text"
+                    value={regSearch}
+                    onChange={e => {
+                      setRegSearch(e.target.value)
+                      setRegPage(1)
+                    }}
+                    placeholder="Search registrations..."
+                    className="pl-9 pr-8 py-2 rounded-xl text-[12.5px] font-semibold outline-none w-56 transition-all duration-200 border"
+                    style={{
+                      background: dark ? '#0f1e30' : '#f8fafc',
+                      borderColor: dark ? '#1a3050' : '#cbd5e1',
+                      color: dark ? '#e8f0fe' : '#0f172a',
+                    }}
+                    onFocus={e => e.currentTarget.style.borderColor = BRAND}
+                    onBlur={e => e.currentTarget.style.borderColor = dark ? '#1a3050' : '#cbd5e1'}
+                  />
+                  {regSearch && (
+                    <button
+                      onClick={() => {
+                        setRegSearch('')
+                        setRegPage(1)
+                      }}
+                      className="absolute inset-y-0 right-0 pr-2.5 flex items-center cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-transparent border-none"
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             
             {loadingRegs ? (
@@ -384,61 +484,162 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 No registrations found for this event.
               </div>
             ) : (
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr style={{ borderBottom: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}>
-                    <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STUDENT NAME</th>
-                    <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>ROLL NO</th>
-                    <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DEPARTMENT</th>
-                    <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>YEAR</th>
-                    <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DATE</th>
-                    <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STATUS</th>
-                    <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>ACTION</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y" style={{ divideColor: dark ? '#1a3050' : '#e2e8f0' }}>
-                  {registrations.map((att, i) => {
-                    const statusBadge = getRegStatusStyle(att.status)
-                    return (
-                      <tr key={att.id} style={{ borderBottom: i < registrations.length - 1 ? `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` : 'none' }}>
-                        <td className="py-3.5 text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{att.studentName}</td>
-                        <td className="py-3.5 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.rollNo}</td>
-                        <td className="py-3.5 text-[13px] font-semibold text-slate-600 dark:text-[#7a98bb]">{att.department}</td>
-                        <td className="py-3.5 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.year}</td>
-                        <td className="py-3.5 text-[13px] font-medium text-slate-500 dark:text-[#7a98bb]">{att.date}</td>
-                        <td className="py-3.5 text-[13px]">
-                          <span 
-                            className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
-                            style={{ background: statusBadge.bg, color: statusBadge.text }}
-                          >
-                            {att.status}
-                          </span>
-                        </td>
-                        <td className="py-3.5 text-[13px]">
-                          <div className="flex gap-2 items-center">
-                            <button
-                              onClick={() => handleStatusChange(att.id, 'Approved')}
-                              className="w-7 h-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center transition-all duration-150 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                              style={{ color: dark ? '#7a98bb' : '#64748b' }}
-                              title="Approve"
-                            >
-                              <Check size={16} className="hover:text-emerald-500 transition-colors" />
-                            </button>
-                            <button
-                              onClick={() => handleStatusChange(att.id, 'Rejected')}
-                              className="w-7 h-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center transition-all duration-150 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                              style={{ color: dark ? '#7a98bb' : '#64748b' }}
-                              title="Reject"
-                            >
-                              <XCircle size={16} className="hover:text-rose-500 transition-colors" />
-                            </button>
-                          </div>
-                        </td>
+              <>
+                <div className="overflow-x-auto transition-height" style={{ minHeight: '325px' }}>
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}>
+                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STUDENT NAME</th>
+                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>ROLL NO</th>
+                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DEPARTMENT</th>
+                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>YEAR</th>
+                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DATE</th>
+                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STATUS</th>
+                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>ACTION</th>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    </thead>
+                    <tbody key={`${regPage}-${regSearch}`} className="divide-y" style={{ divideColor: dark ? '#1a3050' : '#e2e8f0' }}>
+                      {paginatedRegs.length === 0 ? (
+                        <tr className="animate-slide-up-fade">
+                          <td colSpan="7" className="p-12 text-center text-[13.5px]" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                            No matching registrations found.
+                          </td>
+                        </tr>
+                      ) : (
+                        paginatedRegs.map((att, i) => {
+                          const statusBadge = getRegStatusStyle(att.status)
+                          return (
+                            <tr 
+                              key={att.id} 
+                              className="animate-slide-up-fade" 
+                              style={{ 
+                                borderBottom: i < paginatedRegs.length - 1 ? `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` : 'none',
+                                animationDelay: `${i * 40}ms`
+                              }}
+                            >
+                              <td className="py-3.5 text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{att.studentName}</td>
+                              <td className="py-3.5 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.rollNo}</td>
+                              <td className="py-3.5 text-[13px] font-semibold text-slate-600 dark:text-[#7a98bb]">{att.department}</td>
+                              <td className="py-3.5 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.year}</td>
+                              <td className="py-3.5 text-[13px] font-medium text-slate-500 dark:text-[#7a98bb]">{att.date}</td>
+                              <td className="py-3.5 text-[13px]">
+                                <span 
+                                  className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
+                                  style={{ background: statusBadge.bg, color: statusBadge.text }}
+                                >
+                                  {att.status}
+                                </span>
+                              </td>
+                              <td className="py-3.5 text-[13px]">
+                                <div className="flex gap-2 items-center">
+                                  <button
+                                    onClick={() => handleStatusChange(att.id, 'Approved')}
+                                    className="w-7 h-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center transition-all duration-150 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                                    style={{ color: dark ? '#7a98bb' : '#64748b' }}
+                                    title="Approve"
+                                  >
+                                    <Check size={16} className="hover:text-emerald-500 transition-colors" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleStatusChange(att.id, 'Rejected')}
+                                    className="w-7 h-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center transition-all duration-150 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                    style={{ color: dark ? '#7a98bb' : '#64748b' }}
+                                    title="Reject"
+                                  >
+                                    <XCircle size={16} className="hover:text-rose-500 transition-colors" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* ── Table Pagination Bar ── */}
+                <div 
+                  className="flex items-center justify-between flex-wrap gap-4 pt-5 mt-4"
+                  style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}
+                >
+                  {/* Showing status & Items per page */}
+                  <div className="flex items-center gap-4">
+                    <span className="text-[12.5px] font-medium" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                      Showing <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{totalRegItems > 0 ? regStartIndex + 1 : 0}</strong> to{' '}
+                      <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{regEndIndex}</strong> of{' '}
+                      <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{totalRegItems}</strong> entries
+                    </span>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-[12px] font-semibold text-slate-400 dark:text-slate-500">Per page:</span>
+                      <select
+                        value={regPerPage}
+                        onChange={e => {
+                          setRegPerPage(Number(e.target.value))
+                          setRegPage(1)
+                        }}
+                        className="px-2.5 py-1 rounded-lg text-[12px] font-bold outline-none cursor-pointer border"
+                        style={{
+                          background: dark ? '#0f1e30' : '#ffffff',
+                          borderColor: dark ? '#1a3050' : '#cbd5e1',
+                          color: dark ? '#e8f0fe' : '#334155'
+                        }}
+                      >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={20}>20</option>
+                        <option value={50}>50</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Pagination Page Controls */}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setRegPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentRegPage === 1}
+                      className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      style={{
+                        borderColor: dark ? '#1a3050' : '#e2e8f0',
+                        color: dark ? '#e8f0fe' : '#475569'
+                      }}
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    {Array.from({ length: totalRegPages }, (_, i) => i + 1).map(page => {
+                      const active = page === currentRegPage
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setRegPage(page)}
+                          className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"
+                          style={{
+                            background: active ? BRAND : (dark ? '#0f1e30' : '#f1f5f9'),
+                            color: active ? '#ffffff' : (dark ? '#7a98bb' : '#475569'),
+                            boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none'
+                          }}
+                        >
+                          {page}
+                        </button>
+                      )
+                    })}
+
+                    <button
+                      onClick={() => setRegPage(prev => Math.min(prev + 1, totalRegPages))}
+                      disabled={currentRegPage === totalRegPages || totalRegPages === 0}
+                      className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      style={{
+                        borderColor: dark ? '#1a3050' : '#e2e8f0',
+                        color: dark ? '#e8f0fe' : '#475569'
+                      }}
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         )}
@@ -525,67 +726,211 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
                 {/* ── ATTENDANCE TABLE ── */}
                 <div 
-                  className="rounded-2xl border overflow-x-auto"
+                  className="rounded-2xl border"
                   style={{
                     borderColor: dark ? '#1a3050' : '#e2e8f0', 
                     background: dark ? '#0f1e30' : '#ffffff' 
                   }}
                 >
-                  <table className="w-full text-left border-collapse min-w-[600px]">
-                    <thead>
-                      <tr style={{ background: dark ? '#060e1c' : '#f8fafc', borderBottom: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}>
-                        <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Student</th>
-                        <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Roll No</th>
-                        <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Check-in</th>
-                        <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Check-out</th>
-                        <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {attendance.map((row) => {
-                        let statusColor = { bg: '#e2e8f0', text: '#475569' }
-                        if (row.status === 'Present') {
-                          statusColor = {
-                            bg: dark ? 'rgba(16, 185, 129, 0.15)' : '#e6fbf2',
-                            text: '#00BC7D',
-                          }
-                        } else if (row.status === 'Late') {
-                          statusColor = {
-                            bg: dark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb',
-                            text: '#d97706',
-                          }
-                        } else if (row.status === 'Absent') {
-                          statusColor = {
-                            bg: dark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2',
-                            text: '#ef4444',
-                          }
-                        }
+                  {/* Table Header controls with Search Bar */}
+                  <div 
+                    className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b"
+                    style={{ borderColor: dark ? '#1a3050' : '#e2e8f0' }}
+                  >
+                    <div>
+                      <h3 className="text-[16px] font-extrabold m-0" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                        Attendance Records
+                      </h3>
+                      <span className="text-[12px] font-semibold text-slate-400 dark:text-slate-500 mt-1 block">
+                        {attendance.length} total check-ins
+                      </span>
+                    </div>
 
-                        return (
-                          <tr 
-                            key={row.id} 
-                            className="border-b last:border-b-0 transition-colors"
-                            style={{ 
-                              borderColor: dark ? '#1a3050' : '#e2e8f0',
+                    <div className="flex items-center gap-3">
+                      <div className="relative">
+                        <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                          <Search size={15} />
+                        </span>
+                        <input
+                          type="text"
+                          value={attSearch}
+                          onChange={e => {
+                            setAttSearch(e.target.value)
+                            setAttPage(1)
+                          }}
+                          placeholder="Search attendance..."
+                          className="pl-9 pr-8 py-2 rounded-xl text-[12.5px] font-semibold outline-none w-56 transition-all duration-200 border"
+                          style={{
+                            background: dark ? '#0f1e30' : '#f8fafc',
+                            borderColor: dark ? '#1a3050' : '#cbd5e1',
+                            color: dark ? '#e8f0fe' : '#0f172a',
+                          }}
+                          onFocus={e => e.currentTarget.style.borderColor = BRAND}
+                          onBlur={e => e.currentTarget.style.borderColor = dark ? '#1a3050' : '#cbd5e1'}
+                        />
+                        {attSearch && (
+                          <button
+                            onClick={() => {
+                              setAttSearch('')
+                              setAttPage(1)
                             }}
+                            className="absolute inset-y-0 right-0 pr-2.5 flex items-center cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 bg-transparent border-none"
                           >
-                            <td className="p-4 text-[13.5px] font-bold text-slate-900 dark:text-slate-100">{row.studentName}</td>
-                            <td className="p-4 text-[13.5px] font-semibold text-slate-500 dark:text-slate-400">{row.rollNo}</td>
-                            <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-300">{row.checkIn}</td>
-                            <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-300">{row.checkOut}</td>
-                            <td className="p-4 text-[13.5px]">
-                              <span 
-                                className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
-                                style={{ background: statusColor.bg, color: statusColor.text }}
-                              >
-                                {row.status}
-                              </span>
+                            <XCircle size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto transition-height" style={{ minHeight: '325px' }}>
+                    <table className="w-full text-left border-collapse min-w-[600px]">
+                      <thead>
+                        <tr style={{ background: dark ? '#060e1c' : '#f8fafc', borderBottom: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}>
+                          <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Student</th>
+                          <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Roll No</th>
+                          <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Check-in</th>
+                          <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Check-out</th>
+                          <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody key={`${attPage}-${attSearch}`}>
+                        {paginatedAtt.length === 0 ? (
+                          <tr className="animate-slide-up-fade">
+                            <td colSpan="5" className="p-12 text-center text-[13.5px]" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                              No matching attendance records found.
                             </td>
                           </tr>
+                        ) : (
+                          paginatedAtt.map((row, i) => {
+                            let statusColor = { bg: '#e2e8f0', text: '#475569' }
+                            if (row.status === 'Present') {
+                              statusColor = {
+                                bg: dark ? 'rgba(16, 185, 129, 0.15)' : '#e6fbf2',
+                                text: '#00BC7D',
+                              }
+                            } else if (row.status === 'Late') {
+                              statusColor = {
+                                bg: dark ? 'rgba(245, 158, 11, 0.15)' : '#fffbeb',
+                                text: '#d97706',
+                              }
+                            } else if (row.status === 'Absent') {
+                              statusColor = {
+                                bg: dark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2',
+                                text: '#ef4444',
+                              }
+                            }
+
+                            return (
+                              <tr 
+                                key={row.id} 
+                                className="border-b last:border-b-0 transition-colors animate-slide-up-fade"
+                                style={{ 
+                                  borderColor: dark ? '#1a3050' : '#e2e8f0',
+                                  animationDelay: `${i * 40}ms`
+                                }}
+                              >
+                                <td className="p-4 text-[13.5px] font-bold text-slate-900 dark:text-slate-100">{row.studentName}</td>
+                                <td className="p-4 text-[13.5px] font-semibold text-slate-500 dark:text-slate-400">{row.rollNo}</td>
+                                <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-300">{row.checkIn}</td>
+                                <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-300">{row.checkOut}</td>
+                                <td className="p-4 text-[13.5px]">
+                                  <span 
+                                    className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+                                    style={{ background: statusColor.bg, color: statusColor.text }}
+                                  >
+                                    {row.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* ── Table Pagination Bar ── */}
+                  <div 
+                    className="flex items-center justify-between flex-wrap gap-4 px-6 py-4"
+                    style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}
+                  >
+                    {/* Showing status & Items per page */}
+                    <div className="flex items-center gap-4">
+                      <span className="text-[12.5px] font-medium" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                        Showing <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{totalAttItems > 0 ? attStartIndex + 1 : 0}</strong> to{' '}
+                        <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{attEndIndex}</strong> of{' '}
+                        <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{totalAttItems}</strong> entries
+                      </span>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-[12px] font-semibold text-slate-400 dark:text-slate-500">Per page:</span>
+                        <select
+                          value={attPerPage}
+                          onChange={e => {
+                            setAttPerPage(Number(e.target.value))
+                            setAttPage(1)
+                          }}
+                          className="px-2.5 py-1 rounded-lg text-[12px] font-bold outline-none cursor-pointer border"
+                          style={{
+                            background: dark ? '#0f1e30' : '#ffffff',
+                            borderColor: dark ? '#1a3050' : '#cbd5e1',
+                            color: dark ? '#e8f0fe' : '#334155'
+                          }}
+                        >
+                          <option value={5}>5</option>
+                          <option value={10}>10</option>
+                          <option value={20}>20</option>
+                          <option value={50}>50</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Pagination Page Controls */}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setAttPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentAttPage === 1}
+                        className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{
+                          borderColor: dark ? '#1a3050' : '#e2e8f0',
+                          color: dark ? '#e8f0fe' : '#475569'
+                        }}
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+
+                      {Array.from({ length: totalAttPages }, (_, i) => i + 1).map(page => {
+                        const active = page === currentAttPage
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setAttPage(page)}
+                            className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"
+                            style={{
+                              background: active ? BRAND : (dark ? '#0f1e30' : '#f1f5f9'),
+                              color: active ? '#ffffff' : (dark ? '#7a98bb' : '#475569'),
+                              boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none'
+                            }}
+                          >
+                            {page}
+                          </button>
                         )
                       })}
-                    </tbody>
-                  </table>
+
+                      <button
+                        onClick={() => setAttPage(prev => Math.min(prev + 1, totalAttPages))}
+                        disabled={currentAttPage === totalAttPages || totalAttPages === 0}
+                        className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{
+                          borderColor: dark ? '#1a3050' : '#e2e8f0',
+                          color: dark ? '#e8f0fe' : '#475569'
+                        }}
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </>
             )}

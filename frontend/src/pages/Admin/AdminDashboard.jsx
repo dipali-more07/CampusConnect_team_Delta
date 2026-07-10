@@ -1,5 +1,6 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { useTheme } from '../../context/ThemeContext'
@@ -28,7 +29,43 @@ export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const showToast = useToast()
   const { dark, toggleDark, accentColor } = useTheme()
-  const [activeNav, setActiveNav] = useState('Dashboard')
+  
+  const location = useLocation()
+  const navigate = useNavigate()
+
+  const getActiveNavFromPath = (pathname) => {
+    const segment = pathname.split('/').pop()?.toLowerCase()
+    switch (segment) {
+      case 'events':
+        return 'Events'
+      case 'results':
+        return 'Results'
+      case 'attendance':
+        return 'Attendance'
+      case 'analytics':
+        return 'Analytics'
+      case 'certificates':
+        return 'Certificates'
+      case 'students':
+        return 'Students'
+      case 'organizers':
+        return 'Organizers'
+      case 'settings':
+        return 'Settings'
+      case 'notifications':
+        return 'Notifications'
+      case 'dashboard':
+      default:
+        return 'Dashboard'
+    }
+  }
+
+  const activeNav = getActiveNavFromPath(location.pathname)
+
+  const setActiveNav = (label) => {
+    navigate(`/admin/${label.toLowerCase()}`)
+  }
+
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -114,6 +151,11 @@ export default function AdminDashboard() {
 
   const confirmLogout = () => {
     setShowLogoutModal(false)
+    localStorage.removeItem('cc_admin_active_nav')
+    localStorage.removeItem('cc_attendance_active_tab')
+    localStorage.removeItem('settings_active_tab')
+    localStorage.removeItem('cc_viewing_event')
+    localStorage.removeItem('cc_event_detail_active_tab')
     logout()
     showToast('Logged out successfully.', 'info')
   }
@@ -251,10 +293,11 @@ export default function AdminDashboard() {
                     <button
                       onClick={() => setActiveNav('Events')}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px"
-                      style={{ background: BRAND, boxShadow: '0 4px 12px rgba(97,95,255,0.25)' }}
+                      style={{ background: tokens.brand, boxShadow: `0 4px 12px ${tokens.brand}40` }}
                     >
                       <Plus size={15} /> Create Event
                     </button>
+                    
                     <button
                       onClick={() => setActiveNav('Attendance')}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-white dark:bg-[#1a2236] text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-[#1e2d45] cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-[#1e2d45]"

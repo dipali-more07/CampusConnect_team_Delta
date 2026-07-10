@@ -4,8 +4,8 @@ import studentEventsData from '../data/student/studentEventsData.json'
 import studentCertificatesData from '../data/student/studentCertificatesData.json'
 import studentNotificationsData from '../data/student/studentNotificationsData.json'
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK !== 'false'
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
+const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 // Local in-memory store for notifications, attendance & user profile
 let notificationsStore = [...studentNotificationsData]
@@ -137,7 +137,10 @@ async function mockScanAttendanceQR(qrCodeContent) {
 async function apiFetchAttendanceData() {
   try {
     const res = await fetch(`${API_BASE}/student/attendance`, {
-      headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      }
     })
     const data = await res.json()
     if (!res.ok) return mockFetchAttendanceData()
@@ -149,19 +152,150 @@ async function apiFetchAttendanceData() {
 
 async function apiScanAttendanceQR(qrCodeContent) {
   try {
-    const res = await fetch(`${API_BASE}/student/attendance/scan-qr`, {
+    const res = await fetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${sessionStorage.getItem('token')}`
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
       },
-      body: JSON.stringify({ qrCode: qrCodeContent })
+      body: JSON.stringify({ qrCode: qrCodeContent, qrCodeContent })
     })
     const data = await res.json()
     if (!res.ok) return mockScanAttendanceQR(qrCodeContent)
     return { success: true, data }
   } catch {
     return mockScanAttendanceQR(qrCodeContent)
+  }
+}
+
+async function apiFetchEventsData() {
+  try {
+    const res = await fetch(`${API_BASE}/events/`, {
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      }
+    })
+    const data = await res.json()
+    if (!res.ok) return mockFetchEventsData()
+    return { success: true, data: data.data || data }
+  } catch {
+    return mockFetchEventsData()
+  }
+}
+
+async function apiFetchCertificatesData() {
+  try {
+    const res = await fetch(`${API_BASE}/certificates/my`, {
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      }
+    })
+    const data = await res.json()
+    if (!res.ok) return mockFetchCertificatesData()
+    return { success: true, data: data.data || data }
+  } catch {
+    return mockFetchCertificatesData()
+  }
+}
+
+async function apiFetchNotifications() {
+  try {
+    const res = await fetch(`${API_BASE}/notifications/`, {
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      }
+    })
+    const data = await res.json()
+    if (!res.ok) return mockFetchNotifications()
+    const rawData = data.data || data
+    const list = Array.isArray(rawData) ? rawData : (rawData?.notifications || [])
+    return { success: true, data: list }
+  } catch {
+    return mockFetchNotifications()
+  }
+}
+
+async function apiMarkNotificationAsRead(id) {
+  try {
+    const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      }
+    })
+    const data = await res.json()
+    if (!res.ok) return mockMarkNotificationAsRead(id)
+    const rawData = data.data || data
+    const list = Array.isArray(rawData) ? rawData : (rawData?.notifications || [])
+    return { success: true, data: list }
+  } catch {
+    return mockMarkNotificationAsRead(id)
+  }
+}
+
+async function apiMarkAllNotificationsAsRead() {
+  try {
+    const res = await fetch(`${API_BASE}/notifications/read-all`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      }
+    })
+    const data = await res.json()
+    if (!res.ok) return mockMarkAllNotificationsAsRead()
+    const rawData = data.data || data
+    const list = Array.isArray(rawData) ? rawData : (rawData?.notifications || [])
+    return { success: true, data: list }
+  } catch {
+    return mockMarkAllNotificationsAsRead()
+  }
+}
+
+async function apiUpdateStudentProfile(updatedData) {
+  try {
+    const res = await fetch(`${API_BASE}/users/profile`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      },
+      body: JSON.stringify(updatedData)
+    })
+    const data = await res.json()
+    if (!res.ok) return mockUpdateStudentProfile(updatedData)
+    return { success: true, message: data.message || 'Profile updated successfully!', data: data.data || data }
+  } catch {
+    return mockUpdateStudentProfile(updatedData)
+  }
+}
+
+async function apiChangeStudentPassword(payload) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+        'ngrok-skip-browser-warning': 'true'
+      },
+      body: JSON.stringify({
+        current_password: payload.currentPassword || payload.oldPassword,
+        new_password: payload.newPassword,
+        confirm_password: payload.confirmPassword
+      })
+    })
+    const data = await res.json()
+    if (!res.ok) return mockChangeStudentPassword(payload)
+    return { success: true, message: data.message || 'Password changed successfully!' }
+  } catch {
+    return mockChangeStudentPassword(payload)
   }
 }
 

@@ -1,4 +1,4 @@
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 import defaultOrganizers from '../data/organizers.json'
@@ -7,7 +7,8 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token')
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    'Authorization': `Bearer ${token}`,
+    'ngrok-skip-browser-warning': 'true'
   }
 }
 
@@ -76,13 +77,31 @@ async function mockDelete(id) {
   return { success: true }
 }
 
+function mapOrganizer(o) {
+  if (!o) return null
+  return {
+    id: o.user_id || o.id,
+    name: o.full_name || o.name || '',
+    email: o.email || '',
+    phone: o.phone || '',
+    department: o.department || '',
+    collegeId: o.college_id || o.collegeId || '',
+    office: o.office || o.office_location || '',
+    role: o.role || 'Organizer',
+    eventsManaged: o.events_managed || o.eventsManaged || 0,
+    avatarColor: o.avatarColor || '#615FFF'
+  }
+}
+
 /* ── REAL API HANDLERS ─────────────────────────────────────────── */
 async function apiFetchAll() {
   try {
-    const res = await fetch(`${API_BASE}/organizers`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/users/organizers`, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch organizers.' }
-    return { success: true, organizers: data.organizers || [] }
+    const orgsArray = Array.isArray(data.data) ? data.data : Array.isArray(data.organizers) ? data.organizers : []
+    const mapped = orgsArray.map(o => mapOrganizer(o))
+    return { success: true, organizers: mapped }
   } catch (err) {
     console.error('[organizersService] fetchAll error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -91,14 +110,23 @@ async function apiFetchAll() {
 
 async function apiCreate(payload) {
   try {
-    const res = await fetch(`${API_BASE}/organizers`, {
+    const backendPayload = {
+      email: payload.email,
+      password: payload.password,
+      full_name: payload.name,
+      phone: payload.phone,
+      department: payload.department,
+      college_id: payload.collegeId
+    }
+    const res = await fetch(`${API_BASE}/users/organizer`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(backendPayload),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to create organizer.' }
-    return { success: true, organizer: data.organizer }
+    const rawOrganizer = data.data || data.organizer || data
+    return { success: true, organizer: mapOrganizer(rawOrganizer) }
   } catch (err) {
     console.error('[organizersService] create error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -107,14 +135,22 @@ async function apiCreate(payload) {
 
 async function apiUpdate(id, payload) {
   try {
+    const backendPayload = {
+      email: payload.email,
+      full_name: payload.name,
+      phone: payload.phone,
+      department: payload.department,
+      college_id: payload.collegeId
+    }
     const res = await fetch(`${API_BASE}/organizers/${id}`, {
       method: 'PUT',
       headers: authHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(backendPayload),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update organizer.' }
-    return { success: true, organizer: data.organizer }
+    const rawOrganizer = data.data || data.organizer || data
+    return { success: true, organizer: mapOrganizer(rawOrganizer) }
   } catch (err) {
     console.error('[organizersService] update error:', err)
     return { success: false, message: 'Server unreachable.' }

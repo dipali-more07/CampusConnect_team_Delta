@@ -1,4 +1,4 @@
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true' || import.meta.env.VITE_USE_MOCK === true
+const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 import defaultStudents from '../data/students.json'
@@ -7,7 +7,8 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token')
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
+    'Authorization': `Bearer ${token}`,
+    'ngrok-skip-browser-warning': 'true'
   }
 }
 
@@ -92,7 +93,7 @@ async function mockDelete(id) {
 /* ── REAL API HANDLERS ─────────────────────────────────────────── */
 async function apiFetchAll() {
   try {
-    const res = await fetch(`${API_BASE}/students`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/users/`, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch students.' }
     return { success: true, students: data.students || [], stats: data.stats || {} }

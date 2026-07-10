@@ -9,8 +9,10 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
   const BRAND = accentColor || '#615FFF'
   const showToast = useToast()
 
+  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [showCurrentPass, setShowCurrentPass] = useState(false)
   const [showNewPass, setShowNewPass] = useState(false)
   const [showConfirmPass, setShowConfirmPass] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -19,6 +21,11 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+
+    if (!currentPassword.trim()) {
+      showToast('Current password is required.', 'error')
+      return
+    }
 
     if (newPassword.length < 8) {
       showToast('Password must be at least 8 characters long.', 'error')
@@ -31,11 +38,12 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
     }
 
     setSubmitting(true)
-    const res = await studentService.changeStudentPassword({ newPassword, confirmPassword })
+    const res = await studentService.changeStudentPassword({ currentPassword, newPassword, confirmPassword })
     setSubmitting(false)
 
     if (res.success) {
       showToast('Password changed successfully!', 'success')
+      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
       onClose()
@@ -71,6 +79,31 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-5">
+          {/* Current Password */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+              Current Password <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type={showCurrentPass ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                required
+                className="w-full pl-10 pr-10 py-2.5 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-[#111f36] border border-slate-200 dark:border-[#1d304d] text-slate-900 dark:text-white outline-none focus:border-indigo-500 transition-colors"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPass(!showCurrentPass)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white bg-transparent border-none cursor-pointer"
+              >
+                {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
+
           {/* New Password */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
