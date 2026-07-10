@@ -115,3 +115,13 @@ class ChangePasswordRequest(BaseModel):
         if "new_password" in info.data and v != info.data["new_password"]:
             raise ValueError("Passwords do not match")
         return v
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
+
+
+class ResendCodeRequest(BaseModel):
+    email: EmailStr
+

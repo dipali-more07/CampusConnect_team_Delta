@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     MAIL_SERVER: str = "smtp.gmail.com"
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
+    MOCK_EMAIL: bool = False
 
     # --- File Storage ---
     UPLOAD_DIR: str = "uploads"

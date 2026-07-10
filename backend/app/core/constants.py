@@ -123,6 +123,16 @@ class NotificationType(str, Enum):
 
 
 # ---------------------------------------------------------------
+# PARTICIPATION TYPE
+# ---------------------------------------------------------------
+class ParticipationType(str, Enum):
+    """How users can participate in the event."""
+    TEAM = "team"
+    INDIVIDUAL = "individual"
+    BOTH = "both"
+
+
+# ---------------------------------------------------------------
 # GENDER
 # ---------------------------------------------------------------
 class Gender(str, Enum):

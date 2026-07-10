@@ -39,9 +39,9 @@ class EmailService:
 
     def _should_mock(self) -> bool:
         """
-        Check if SMTP credentials are missing, indicating we should mock sending.
+        Check if SMTP credentials are missing or if MOCK_EMAIL is configured to True.
         """
-        return not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD
+        return settings.MOCK_EMAIL or not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD
 
     async def _send(self, email: str, subject: str, body: str) -> bool:
         """
@@ -100,12 +100,15 @@ class EmailService:
         )
         return await self._send(email, subject, body)
 
-    async def send_password_reset_email(self, email: str, token: str) -> bool:
+    async def send_password_reset_email(self, email: str, token: str, base_url: Optional[str] = None) -> bool:
         """
         Send password reset link to user's email.
         Link format: /reset-password?token=<token>
         """
-        reset_url = f"{settings.APP_URL}/reset-password?token={token}"
+        app_url = base_url or settings.APP_URL
+        if app_url.endswith("/"):
+            app_url = app_url[:-1]
+        reset_url = f"{app_url}/reset-password?token={token}"
         subject = "Reset your CampusConnect password"
         body = (
             f"You requested to reset your password for your CampusConnect account.\n\n"

@@ -12,15 +12,24 @@ from app.services.file_service import file_service
 from app.schemas.event import CreateEventRequest, UpdateEventRequest, ApproveEventRequest
 from app.core.responses import success_response, paginated_response
 from app.models.user import User
+from app.core.constants import EventStatus, ApprovalStatus
 
 router = APIRouter()
 
 
 def _event_to_dict(event) -> dict:
     """Convert event model to a dict for API responses."""
+    status_val = event.status.value if hasattr(event.status, "value") else event.status
+    if event.status == EventStatus.DRAFT:
+        if event.approval_status == ApprovalStatus.APPROVED:
+            status_val = "approved"
+        elif event.approval_status == ApprovalStatus.REJECTED:
+            status_val = "rejected"
+
     return {
         "event_id": event.event_id,
         "organizer_id": event.organizer_id,
+        "event_name": event.title,
         "title": event.title,
         "description": event.description,
         "category": event.category,
@@ -29,9 +38,15 @@ def _event_to_dict(event) -> dict:
         "start_datetime": event.start_datetime.isoformat(),
         "end_datetime": event.end_datetime.isoformat(),
         "max_participants": event.max_participants,
+        "capacity": event.capacity,
+        "participation_type": event.participation_type.value if hasattr(event.participation_type, "value") else event.participation_type,
+        "reg_date_time": event.reg_date_time.isoformat() if event.reg_date_time else None,
+        "fees": float(event.fees) if event.fees is not None else None,
+        "reg_deadline": event.registration_deadline.isoformat() if event.registration_deadline else None,
         "registration_deadline": event.registration_deadline.isoformat() if event.registration_deadline else None,
+        "event_date": event.event_date.isoformat() if event.event_date else None,
         "poster": event.poster,
-        "status": event.status,
+        "status": status_val,
         "approval_status": event.approval_status,
         "qr_code": event.qr_code,
         "created_at": event.created_at.isoformat(),
@@ -110,6 +125,7 @@ def get_event(event_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{event_id}", summary="Update event (Organizer who owns it, or Admin)")
+@router.put("/{event_id}", summary="Update event (Organizer who owns it, or Admin)")
 def update_event(
     event_id: str,
     data: UpdateEventRequest,
@@ -166,6 +182,8 @@ def complete_event(
 
 
 @router.post("/{event_id}/approve", summary="Approve or reject event (Admin only)")
+@router.patch("/{event_id}/approve", summary="Approve or reject event (Admin only)")
+@router.put("/{event_id}/approve", summary="Approve or reject event (Admin only)")
 def approve_event(
     event_id: str,
     data: ApproveEventRequest,

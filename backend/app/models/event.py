@@ -10,7 +10,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
-from app.core.constants import EventStatus, ApprovalStatus, EventType, EventCategory
+from app.core.constants import EventStatus, ApprovalStatus, EventType, EventCategory, ParticipationType
 
 if TYPE_CHECKING:
     from app.models.user import User
@@ -69,7 +69,11 @@ class Event(Base):
     start_time: Mapped[Optional[datetime]] = mapped_column(Time, nullable=True)
     end_time: Mapped[Optional[datetime]] = mapped_column(Time, nullable=True)
     capacity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    registered_fee: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    fees: Mapped[Optional[float]] = mapped_column(Numeric(10, 2), nullable=True)
+    participation_type: Mapped[ParticipationType] = mapped_column(
+        SAEnum(ParticipationType, name="participationtype"), nullable=False, default=ParticipationType.INDIVIDUAL
+    )
+    reg_date_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     poster_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     rulebook_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
     schedule_url: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)

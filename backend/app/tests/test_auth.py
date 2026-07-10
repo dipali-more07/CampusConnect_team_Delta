@@ -51,6 +51,34 @@ class TestRegister:
         })
         assert response.status_code == 422
 
+    def test_register_with_existing_college_name(self, client, test_college):
+        response = client.post("/api/v1/auth/register", json={
+            "email": "nameuser@test.com",
+            "password": "NameUser@123",
+            "confirm_password": "NameUser@123",
+            "full_name": "Name User",
+            "phone": "+919876543213",
+            "course": "B.Tech Computer Science",
+            "college_id": test_college.college_name,
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is True
+
+    def test_register_with_new_college_name(self, client):
+        response = client.post("/api/v1/auth/register", json={
+            "email": "newcollegeuser@test.com",
+            "password": "NewCollegeUser@123",
+            "confirm_password": "NewCollegeUser@123",
+            "full_name": "New College User",
+            "phone": "+919876543214",
+            "course": "B.Tech Computer Science",
+            "college_id": "Completely New College Name",
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert data["success"] is True
+
 
 class TestLogin:
     def test_login_success(self, client, participant_user):
@@ -84,3 +112,82 @@ class TestProtectedRoutes:
             headers=auth_headers(participant_token)
         )
         assert response.status_code == 403
+
+
+class TestEmailVerification:
+    def test_registration_and_verification_flow(self, client, test_college, db):
+        # 1. Register a new user
+        reg_resp = client.post("/api/v1/auth/register", json={
+            "email": "verifyuser@test.com",
+            "password": "VerifyUser@123",
+            "confirm_password": "VerifyUser@123",
+            "full_name": "Verify User",
+            "phone": "+919876543215",
+            "course": "B.Tech Computer Science",
+            "college_id": test_college.college_id,
+        })
+        assert reg_resp.status_code == 201
+
+        # 2. Try to login (should fail because email is not verified)
+        login_resp = client.post("/api/v1/auth/login", json={
+            "email": "verifyuser@test.com",
+            "password": "VerifyUser@123"
+        })
+        assert login_resp.status_code == 401
+        assert "verify your email" in login_resp.json()["message"].lower()
+
+        # 3. Retrieve code from DB
+        from app.models.user import User
+        user = db.query(User).filter(User.email == "verifyuser@test.com").first()
+        assert user.verification_code is not None
+
+        # 4. Verify with invalid code (should fail)
+        verify_resp = client.post("/api/v1/auth/verify-email", json={
+            "email": "verifyuser@test.com",
+            "code": "000000"
+        })
+        assert verify_resp.status_code == 400
+
+        # 5. Verify with correct code
+        verify_resp = client.post("/api/v1/auth/verify-email", json={
+            "email": "verifyuser@test.com",
+            "code": user.verification_code
+        })
+        assert verify_resp.status_code == 200
+        assert verify_resp.json()["success"] is True
+
+        # 6. Now try to login (should succeed)
+        login_resp = client.post("/api/v1/auth/login", json={
+            "email": "verifyuser@test.com",
+            "password": "VerifyUser@123"
+        })
+        assert login_resp.status_code == 200
+        assert "access_token" in login_resp.json()["data"]
+
+    def test_resend_verification_code(self, client, test_college, db):
+        # Register a new user
+        client.post("/api/v1/auth/register", json={
+            "email": "resenduser@test.com",
+            "password": "ResendUser@123",
+            "confirm_password": "ResendUser@123",
+            "full_name": "Resend User",
+            "phone": "+919876543216",
+            "course": "B.Tech",
+            "college_id": test_college.college_id,
+        })
+
+        from app.models.user import User
+        user = db.query(User).filter(User.email == "resenduser@test.com").first()
+        old_code = user.verification_code
+        assert old_code is not None
+
+        # Resend code
+        resend_resp = client.post("/api/v1/auth/resend-code", json={
+            "email": "resenduser@test.com"
+        })
+        assert resend_resp.status_code == 200
+        
+        # Refresh user and check code changed
+        db.refresh(user)
+        assert user.verification_code != old_code
+

@@ -51,3 +51,14 @@ class UserProfileResponse(BaseModel):
 class UserWithProfileResponse(UserResponse):
     profile: Optional[UserProfileResponse] = None
     model_config = {"from_attributes": True}
+
+
+from pydantic import EmailStr
+
+class CreateOrganizerRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(..., min_length=8)
+    full_name: str = Field(..., min_length=3, max_length=255)
+    phone: str = Field(..., min_length=10, max_length=20)
+    department: Optional[str] = Field(None, max_length=255)
+    college_id: str

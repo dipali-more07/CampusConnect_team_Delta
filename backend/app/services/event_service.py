@@ -58,6 +58,11 @@ class EventService:
             end_datetime=data.end_datetime,
             max_participants=data.max_participants,
             registration_deadline=data.registration_deadline,
+            capacity=data.capacity,
+            participation_type=data.participation_type,
+            reg_date_time=data.reg_date_time,
+            fees=data.fees,
+            event_date=data.event_date,
             status=EventStatus.DRAFT,
             approval_status=ApprovalStatus.PENDING,
         )
@@ -98,11 +103,11 @@ class EventService:
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
 
-        # Can only edit events in DRAFT status
-        if event.status == EventStatus.PUBLISHED:
-            raise BadRequestException("Cannot edit a published event. Cancel it first.")
-
         update_data = data.model_dump(exclude_none=True)
+        # Remove schema-only fields to avoid setting non-DB columns
+        update_data.pop("event_name", None)
+        update_data.pop("reg_deadline", None)
+
         for field, value in update_data.items():
             setattr(event, field, value)
 

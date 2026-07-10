@@ -9,7 +9,7 @@ from app.database.base import get_db
 from app.database.deps import get_current_user, require_admin
 from app.services.user_service import UserService
 from app.services.file_service import file_service
-from app.schemas.user import UpdateProfileRequest
+from app.schemas.user import UpdateProfileRequest, CreateOrganizerRequest
 from app.core.responses import success_response, paginated_response
 from app.models.user import User
 
@@ -59,6 +59,37 @@ async def upload_profile_picture(
         message="Profile picture uploaded successfully",
         data={"profile_picture": file_path},
     )
+
+
+@router.get(
+    "/organizers",
+    summary="List all organizers",
+)
+def list_organizers(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Fetch all users who have the role of ORGANIZER."""
+    from app.models.user import User
+    from app.core.constants import UserRole
+    from sqlalchemy import select
+
+    query = select(User).where(User.role == UserRole.ORGANIZER, User.is_active == True)
+    organizers = db.execute(query).scalars().all()
+
+    data = [
+        {
+            "user_id": u.user_id,
+            "email": u.email,
+            "full_name": u.full_name or (u.profile.full_name if u.profile else None) or u.email.split("@")[0],
+            "mobile": u.mobile or (u.profile.phone if u.profile else None),
+            "college_name": u.college_name or (u.profile.college.college_name if u.profile and u.profile.college else None),
+            "department": u.department or (u.profile.department if u.profile else None),
+            "profile_image": u.profile_image or (u.profile.profile_picture if u.profile else None),
+        }
+        for u in organizers
+    ]
+    return success_response(message="Organizers fetched successfully", data=data)
 
 
 @router.get(
@@ -128,3 +159,29 @@ def activate_user(
     service = UserService(db)
     user = service.activate_user(user_id)
     return success_response(message=f"User {user.email} activated")
+
+
+@router.post(
+    "/organizer",
+    status_code=201,
+    summary="Create an organizer user (Admin only)",
+    description="Allows administrators to register a new organizer user along with their profile information.",
+)
+def create_organizer(
+    data: CreateOrganizerRequest,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    service = UserService(db)
+    user = service.create_organizer(data)
+    return success_response(
+        message="Organizer user created successfully",
+        data={
+            "user_id": user.user_id,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+            "is_email_verified": user.is_email_verified,
+        },
+        status_code=201,
+    )

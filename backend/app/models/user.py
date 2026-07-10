@@ -17,23 +17,21 @@ UUID PRIMARY KEYS:
   WHY: Integers are predictable - a hacker can guess IDs.
        UUIDs are random - impossible to guess other users' IDs.
 """
+from app.models.college import College
+from app.models.registration import EventRegistration
+from app.models.token import PasswordResetToken
+from app.models.token import RefreshToken
+from app.models.certificate import Certificate
+from app.models.notification import Notification
 import uuid
 from datetime import datetime
-from typing import Optional, List, TYPE_CHECKING
-
+from typing import Optional, List
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
 from app.core.constants import UserRole, Gender
-
-if TYPE_CHECKING:
-    from app.models.registration import EventRegistration
-    from app.models.notification import Notification
-    from app.models.certificate import Certificate
-    from app.models.token import RefreshToken, PasswordResetToken
-
 
 
 class User(Base):
@@ -65,6 +63,8 @@ class User(Base):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    verification_code: Mapped[Optional[str]] = mapped_column(String(6), nullable=True)
+    verification_code_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
