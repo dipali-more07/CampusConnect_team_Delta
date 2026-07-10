@@ -80,6 +80,13 @@ class AuthService:
         if self.user_repo.email_exists(data.email):
             raise ConflictException(f"Email '{data.email}' is already registered")
 
+        # Step 1.5: Validate college exists
+        from app.repositories.college_repository import CollegeRepository
+        college_repo = CollegeRepository(self.db)
+        college = college_repo.get_by_id(data.college_id)
+        if not college:
+            raise NotFoundException(f"College with ID '{data.college_id}' not found")
+
         # Step 2: Hash the password
         password_hash = hash_password(data.password)
 
@@ -89,7 +96,11 @@ class AuthService:
             password_hash=password_hash,
             role=UserRole.PARTICIPANT,
             is_active=True,
-            is_email_verified=False,  # Must verify email
+            is_email_verified=True,  # Set to True because email service is not working
+            full_name=data.full_name,
+            mobile=data.phone,
+            course=data.course,
+            college_name=college.college_name,
         )
 
         # Step 4: Save User to DB (flush sends SQL but doesn't commit yet)
@@ -98,6 +109,10 @@ class AuthService:
         # Step 5: Create empty UserProfile linked to the User
         new_profile = UserProfile(
             user_id=new_user.user_id,
+            college_id=data.college_id,
+            full_name=data.full_name,
+            phone=data.phone,
+            course=data.course,
         )
         self.profile_repo.create(new_profile)
 
@@ -106,9 +121,10 @@ class AuthService:
         # and SQLAlchemy would rollback automatically
         self.db.commit()
 
-        # Step 7: Send verification email (outside transaction - email can be resent)
-        verification_token = secrets.token_urlsafe(32)
-        await email_service.send_verification_email(data.email, verification_token)
+        # Step 7: Generate a 6-digit OTP verification code and send it
+        import random
+        verification_otp = f"{random.randint(100000, 999999)}"
+        await email_service.send_verification_otp(data.email, verification_otp)
 
         return new_user
 

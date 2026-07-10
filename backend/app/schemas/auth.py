@@ -13,6 +13,18 @@ class RegisterRequest(BaseModel):
     email: EmailStr = Field(..., description="Valid email address")
     password: str = Field(..., min_length=8, description="Password (min 8 chars)")
     confirm_password: str = Field(..., description="Must match password")
+    full_name: str = Field(..., min_length=1, max_length=255, description="User's full name")
+    phone: str = Field(..., min_length=10, max_length=20, description="Mobile / phone number")
+    course: str = Field(..., min_length=1, max_length=255, description="Course / degree program")
+    college_id: str = Field(..., description="College identifier UUID")
+
+    @field_validator("phone")
+    @classmethod
+    def validate_phone_number(cls, v: str) -> str:
+        from app.utils.validators import is_valid_phone
+        if not is_valid_phone(v):
+            raise ValueError("Invalid phone number format")
+        return v
 
     @field_validator("password")
     @classmethod

@@ -21,7 +21,6 @@ def _event_to_dict(event) -> dict:
     return {
         "event_id": event.event_id,
         "organizer_id": event.organizer_id,
-        "club_id": event.club_id,
         "title": event.title,
         "description": event.description,
         "category": event.category,

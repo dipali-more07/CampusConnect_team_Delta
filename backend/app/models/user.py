@@ -19,13 +19,21 @@ UUID PRIMARY KEYS:
 """
 import uuid
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
+
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
 from app.core.constants import UserRole, Gender
+
+if TYPE_CHECKING:
+    from app.models.registration import EventRegistration
+    from app.models.notification import Notification
+    from app.models.certificate import Certificate
+    from app.models.token import RefreshToken, PasswordResetToken
+
 
 
 class User(Base):

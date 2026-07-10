@@ -118,3 +118,20 @@ def participant_token(client, participant_user):
 def auth_headers(token: str) -> dict:
     """Helper to create auth header."""
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture
+def test_college(db):
+    """Create a default college for testing."""
+    from app.models.college import College
+    college = College(
+        college_name="Test Engineering College",
+        city="Mumbai",
+        state="Maharashtra",
+        is_verified=True,
+    )
+    db.add(college)
+    db.commit()
+    db.refresh(college)
+    return college
+
