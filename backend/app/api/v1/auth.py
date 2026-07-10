@@ -18,7 +18,7 @@ SWAGGER DOCUMENTATION:
   - response_model: What the response looks like
   - status_code: HTTP status code for success
 """
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 
 from app.database.base import get_db
@@ -27,7 +27,8 @@ from app.services.auth_service import AuthService
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse,
     RefreshTokenRequest, ForgotPasswordRequest,
-    ResetPasswordRequest, ChangePasswordRequest
+    ResetPasswordRequest, ChangePasswordRequest,
+    VerifyEmailRequest, ResendCodeRequest
 )
 from app.schemas.user import UserWithProfileResponse
 from app.core.responses import success_response
@@ -117,10 +118,12 @@ def refresh_token(
 )
 async def forgot_password(
     data: ForgotPasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     service = AuthService(db)
-    await service.forgot_password(data.email)
+    base_url = str(request.base_url)
+    await service.forgot_password(data.email, base_url)
     # Always return success (don't reveal if email exists)
     return success_response(
         message="If an account with this email exists, a reset link has been sent."
@@ -194,3 +197,31 @@ def get_me(
             "profile": profile_data,
         },
     )
+
+
+@router.post(
+    "/verify-email",
+    summary="Verify email using code",
+    description="Verify a newly registered user's email using the 6-digit OTP code sent to their email.",
+)
+def verify_email(
+    data: VerifyEmailRequest,
+    db: Session = Depends(get_db)
+):
+    service = AuthService(db)
+    service.verify_email(data.email, data.code)
+    return success_response(message="Email verified successfully. You can now login.")
+
+
+@router.post(
+    "/resend-code",
+    summary="Resend verification code",
+    description="Resend a new 6-digit OTP code to the user's email.",
+)
+async def resend_code(
+    data: ResendCodeRequest,
+    db: Session = Depends(get_db)
+):
+    service = AuthService(db)
+    await service.resend_verification_code(data.email)
+    return success_response(message="Verification code resent successfully. Please check your email.")

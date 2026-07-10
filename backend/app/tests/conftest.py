@@ -135,3 +135,32 @@ def test_college(db):
     db.refresh(college)
     return college
 
+
+@pytest.fixture
+def organizer_user(db):
+    """Create an organizer user for testing."""
+    from app.models.user import User, UserProfile
+    user = User(
+        email="organizer@test.com",
+        password_hash=hash_password("Organizer@123"),
+        role=UserRole.ORGANIZER,
+        is_active=True,
+        is_email_verified=True,
+    )
+    db.add(user)
+    db.flush()
+    profile = UserProfile(user_id=user.user_id, full_name="Test Organizer")
+    db.add(profile)
+    db.commit()
+    return user
+
+
+@pytest.fixture
+def organizer_token(client, organizer_user):
+    """Get a JWT token for the organizer user."""
+    response = client.post("/api/v1/auth/login", json={
+        "email": "organizer@test.com",
+        "password": "Organizer@123"
+    })
+    return response.json()["data"]["access_token"]
+
