@@ -5,7 +5,7 @@ Event registration tests.
 import pytest
 from datetime import datetime, timedelta
 from app.tests.conftest import auth_headers
-from app.core.constants import UserRole
+from app.core.constants import UserRole, ParticipationType
 from app.core.security import hash_password
 from app.models.user import User, UserProfile
 from app.models.event import Event
@@ -23,6 +23,7 @@ def test_event(db, admin_user):
         max_participants=10,
         status="published",
         approval_status="approved",
+        participation_type=ParticipationType.BOTH,
     )
     db.add(event)
     db.commit()
