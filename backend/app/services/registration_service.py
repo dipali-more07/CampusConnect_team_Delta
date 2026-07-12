@@ -9,6 +9,7 @@ KEY BUSINESS RULES:
   4. Cannot register for a cancelled event
   5. Only the user themselves can cancel their registration
 """
+from app.schemas.registration import RegisterForEventRequest
 from typing import List, Optional
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -19,7 +20,7 @@ from app.repositories.notification_repository import NotificationRepository
 from app.core.exceptions import (
     ConflictException, BadRequestException, NotFoundException, ForbiddenException
 )
-from app.core.constants import RegistrationStatus, EventStatus, NotificationType
+from app.core.constants import RegistrationStatus, EventStatus, NotificationType, ParticipationType
 from app.models.registration import EventRegistration
 from app.models.user import User
 from app.services.email_service import email_service
@@ -52,11 +53,17 @@ class RegistrationService:
         if event.status != EventStatus.PUBLISHED:
             raise BadRequestException("This event is not accepting registrations")
 
+        registration_type = data.registration_type or "individual"
+
+        # Check event participation type compatibility
+        if event.participation_type == ParticipationType.INDIVIDUAL and registration_type != "individual":
+            raise BadRequestException("This event only allows individual registrations")
+        elif event.participation_type == ParticipationType.TEAM and registration_type != "team":
+            raise BadRequestException("This event only allows team registrations")
+
         # Rule 2: Registration deadline
         if event.registration_deadline and datetime.utcnow() > event.registration_deadline:
             raise BadRequestException("Registration deadline has passed")
-
-        registration_type = data.registration_type or "individual"
 
         if registration_type == "individual":
             # Rule 3: Check for duplicate registration

@@ -16,12 +16,15 @@ from app.models.team_member import TeamMember
 from app.models.payment import Payment
 from app.models.result import Result
 from app.models.feedback import Feedback
+from app.models.organizer import Organizer
 
 __all__ = [
     "User", "UserProfile",
     "College",
+    "Organizer",
     "Event", "EventRegistration",
     "Attendance", "Certificate",
     "Notification", "PasswordResetToken", "RefreshToken",
     "EventCategoryModel", "Team", "TeamMember", "Payment", "Result", "Feedback",
 ]
+

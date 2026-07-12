@@ -183,13 +183,18 @@ app.add_middleware(LoggingMiddleware)
 # CORS = Cross-Origin Resource Sharing
 # Without this, browsers block requests from localhost:3000 to localhost:8000
 # Added after LoggingMiddleware so it is the outermost middleware.
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.get_allowed_origins_list(), 
-    allow_credentials=True,        # Allow cookies/auth headers
-    allow_methods=["*"],           # Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],           # Allow all headers
-)
+cors_args = {
+    "allow_credentials": True,        # Allow cookies/auth headers
+    "allow_methods": ["*"],           # Allow all HTTP methods (GET, POST, etc.)
+    "allow_headers": ["*"],           # Allow all headers
+}
+
+if settings.DEBUG:
+    cors_args["allow_origin_regex"] = r"https?://.*"
+else:
+    cors_args["allow_origins"] = settings.get_allowed_origins_list()
+
+app.add_middleware(CORSMiddleware, **cors_args)
 
 # ---------------------------------------------------------------
 # STATIC FILES (for serving uploaded files)

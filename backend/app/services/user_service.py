@@ -193,6 +193,16 @@ class UserService:
             department=data.department,
         )
         self.profile_repo.create(profile)
+
+        # 6. Create Organizer record
+        from app.models.organizer import Organizer
+        organizer = Organizer(
+            user_id=user.user_id,
+            designation="Organizer",
+            permissions=["create_event", "manage_attendance"]
+        )
+        self.db.add(organizer)
+
         self.db.commit()
         self.db.refresh(user)
         return user
