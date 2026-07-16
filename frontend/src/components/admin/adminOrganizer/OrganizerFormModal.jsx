@@ -129,7 +129,7 @@ export default function OrganizerFormModal({
               <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Phone</label>
               <input
                 value={form.phone}
-                onChange={e => setForm(p => ({ ...p, phone: e.target.value }))}
+                onChange={e => setForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
                 placeholder="e.g. 9876543210"
                 className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
                 style={inputStyle}

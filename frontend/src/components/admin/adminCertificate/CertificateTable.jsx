@@ -98,7 +98,7 @@ export default function CertificateTable({
                       <div className="flex items-center gap-1.5">
                         {cert.status === 'Pending' && (
                           <button
-                            onClick={() => handleGenerate([cert.id])}
+                            onClick={() => handleGenerate(cert)}
                             title="Generate Certificate"
                             className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border-none cursor-pointer transition-all duration-150 text-white"
                             style={{ background: BRAND }}

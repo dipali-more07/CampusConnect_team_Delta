@@ -1,6 +1,8 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Clock, CheckCheck, Send, Calendar } from 'lucide-react'
+import { X, CheckCheck, Send, Loader2 } from 'lucide-react'
+import studentsService from '../../../services/studentsService'
+import organizersService from '../../../services/organizersService'
 
 export default function NotificationFormModal({
   sendOpen,
@@ -19,11 +21,73 @@ export default function NotificationFormModal({
   BRAND,
   inputStyle
 }) {
+  const [usersList, setUsersList] = useState([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+  const [recipientType, setRecipientType] = useState('select') // 'select' or 'custom'
+  const [customUserId, setCustomUserId] = useState('')
+
+  useEffect(() => {
+    if (!sendOpen) return
+    
+    setLoadingUsers(true)
+    setRecipientType('select')
+    setCustomUserId('')
+    
+    Promise.all([
+      studentsService.fetchAll(),
+      organizersService.fetchAll()
+    ]).then(([stuRes, orgRes]) => {
+      const list = []
+      if (stuRes.success && Array.isArray(stuRes.students)) {
+        list.push(...stuRes.students.map(s => ({
+          id: s.id,
+          name: s.name,
+          detail: s.rollNo || s.email,
+          role: 'Student'
+        })))
+      }
+      if (orgRes.success && Array.isArray(orgRes.organizers)) {
+        list.push(...orgRes.organizers.map(o => ({
+          id: o.id,
+          name: o.name,
+          detail: o.email,
+          role: 'Organizer'
+        })))
+      }
+      setUsersList(list)
+      // Default to the first user ID if there is one
+      if (list.length > 0) {
+        setSendForm(p => ({ ...p, user_id: list[0].id }))
+      }
+    }).catch(err => {
+      console.error('[NotificationFormModal] Error loading users:', err)
+    }).finally(() => {
+      setLoadingUsers(false)
+    })
+  }, [sendOpen])
+
+  const handleRecipientChange = (e) => {
+    const val = e.target.value
+    if (val === 'custom') {
+      setRecipientType('custom')
+      setSendForm(p => ({ ...p, user_id: customUserId }))
+    } else {
+      setRecipientType('select')
+      setSendForm(p => ({ ...p, user_id: val }))
+    }
+  }
+
+  const handleCustomUserIdChange = (e) => {
+    const val = e.target.value
+    setCustomUserId(val)
+    setSendForm(p => ({ ...p, user_id: val }))
+  }
+
   if (!sendOpen) return null
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-5"
+      className="fixed inset-0 z-9999 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5"
       onClick={e => { if (e.target === e.currentTarget) { setSendOpen(false); resetForm() } }}
     >
       <div
@@ -56,59 +120,93 @@ export default function NotificationFormModal({
 
           {/* Notification Type */}
           <div>
-            <label className="text-[12px] font-bold block mb-3" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+            <label className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
               Notification Type
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
-              {NOTIF_TYPES.map(({ key, label, Icon }) => {
-                const selected = sendForm.notifTypes.includes(key)
-                return (
-                  <button
-                    key={key}
-                    onClick={() => toggleNotifType(key)}
-                    className="flex items-center gap-2.5 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all duration-150 border"
-                    style={{
-                      background: selected ? `${BRAND}12` : (dark ? '#060e1c' : '#f8fafc'),
-                      borderColor: selected ? `${BRAND}60` : (dark ? '#1a3050' : '#e2e8f0'),
-                      color: selected ? BRAND : (dark ? '#7a98bb' : '#64748b'),
-                      boxShadow: selected ? `0 0 0 3px ${BRAND}14` : 'none',
-                    }}
-                  >
-                    <Icon size={15} />
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
+            <select
+              value={sendForm.notification_type}
+              onChange={e => setSendForm(p => ({ ...p, notification_type: e.target.value }))}
+              className="w-full px-3.5 py-2.5 rounded-[10px] text-[13px] outline-none cursor-pointer transition-all duration-200"
+              style={inputStyle}
+            >
+              <option value="system">System Alert</option>
+              <option value="event">Event Update</option>
+              <option value="registration">Registration Alert</option>
+              <option value="attendance">Attendance Update</option>
+              <option value="certificate">Certificate Update</option>
+              <option value="warning">Warning Alert</option>
+              <option value="cancelled">Event Cancelled</option>
+              <option value="trending">Trending Update</option>
+            </select>
           </div>
 
           {/* Recipients */}
           <div>
             <label className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Recipients
+              Recipient User
             </label>
-            <select
-              value={sendForm.sendTo}
-              onChange={e => setSendForm(p => ({ ...p, sendTo: e.target.value }))}
-              className="w-full px-3.5 py-2.5 rounded-[10px] text-[13px] outline-none cursor-pointer transition-all duration-200"
-              style={inputStyle}
-            >
-              <option value="all">All Students</option>
-              <option value="registered">Registered Students</option>
-              <option value="organizers">Organizers Only</option>
-              <option value="admins">Admins Only</option>
-            </select>
+            {loadingUsers ? (
+              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-[#7a98bb] py-2">
+                <Loader2 size={14} className="animate-spin text-indigo-500" />
+                <span>Loading users list...</span>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <select
+                  value={recipientType === 'custom' ? 'custom' : sendForm.user_id}
+                  onChange={handleRecipientChange}
+                  className="w-full px-3.5 py-2.5 rounded-[10px] text-[13px] outline-none cursor-pointer transition-all duration-200"
+                  style={inputStyle}
+                >
+                  <optgroup label="Students">
+                    {usersList.filter(u => u.role === 'Student').map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.detail})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Organizers">
+                    {usersList.filter(u => u.role === 'Organizer').map(u => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.detail})
+                      </option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="Custom">
+                    <option value="custom">Enter Custom User ID (UUID)...</option>
+                  </optgroup>
+                </select>
+
+                {recipientType === 'custom' && (
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold block mb-1" style={{ color: dark ? '#5f7b9e' : '#94a3b8' }}>
+                      Custom User ID (UUID)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 123e4567-e89b-12d3-a456-426614174000"
+                      value={customUserId}
+                      onChange={handleCustomUserIdChange}
+                      className="w-full px-3.5 py-2.5 rounded-[10px] text-[13px] outline-none box-border transition-all duration-200"
+                      style={inputStyle}
+                      onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+                      onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Subject */}
+          {/* Title */}
           <div>
             <label className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Subject
+              Title
             </label>
             <input
               placeholder="e.g. TechFest 2025 — Important Update"
-              value={sendForm.subject}
-              onChange={e => setSendForm(p => ({ ...p, subject: e.target.value }))}
+              value={sendForm.title}
+              onChange={e => setSendForm(p => ({ ...p, title: e.target.value }))}
               className="w-full px-3.5 py-2.5 rounded-[10px] text-[13px] outline-none box-border transition-all duration-200"
               style={inputStyle}
               onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
@@ -132,50 +230,14 @@ export default function NotificationFormModal({
               onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
             />
           </div>
-
-          {/* Schedule */}
-          <div>
-            <label className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Schedule
-              <span className="ml-1.5 font-medium normal-case" style={{ color: dark ? '#3d5470' : '#94a3b8' }}>(optional)</span>
-            </label>
-            <div className="relative">
-              <Calendar size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: dark ? '#3d5470' : '#94a3b8' }} />
-              <input
-                type="datetime-local"
-                value={sendForm.schedule}
-                onChange={e => setSendForm(p => ({ ...p, schedule: e.target.value }))}
-                className="w-full pl-9 pr-3.5 py-2.5 rounded-[10px] text-[13px] outline-none box-border transition-all duration-200"
-                style={{
-                  ...inputStyle,
-                  color: sendForm.schedule ? (dark ? '#e8f0fe' : '#0f172a') : (dark ? '#3d5470' : '#94a3b8'),
-                  colorScheme: dark ? 'dark' : 'light',
-                }}
-                onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
-                onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
-              />
-            </div>
-          </div>
         </div>
 
-        {/* Footer — Schedule + Send Now */}
+        {/* Footer — Send Now */}
         <div className="flex gap-3 px-6 py-4" style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e8edf5'}` }}>
           <button
-            onClick={() => handleSend(true)}
-            disabled={sending || sent || scheduling || !sendForm.schedule}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[10px] text-[13px] font-semibold cursor-pointer transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, background: 'transparent', color: dark ? '#7a98bb' : '#64748b' }}
-            onMouseEnter={e => { if (sendForm.schedule && !sending && !sent) { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND } }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#7a98bb' : '#64748b' }}
-          >
-            <Clock size={14} />
-            {scheduling ? 'Scheduling...' : 'Schedule'}
-          </button>
-
-          <button
-            onClick={() => handleSend(false)}
-            disabled={sending || sent || scheduling}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-[10px] text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-300 disabled:cursor-default disabled:opacity-70"
+            onClick={() => handleSend()}
+            disabled={sending || sent}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-[10px] text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-300 disabled:cursor-default disabled:opacity-70"
             style={{
               background: sent ? '#00BC7D' : BRAND,
               boxShadow: `0 4px 14px ${sent ? 'rgba(0,188,125,0.4)' : 'rgba(97,95,255,0.4)'}`,

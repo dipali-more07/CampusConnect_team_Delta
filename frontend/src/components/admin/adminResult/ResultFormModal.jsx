@@ -1,293 +1,364 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Trophy, X, Loader2 } from 'lucide-react'
+import { Trophy, X, Loader2, Users, User } from 'lucide-react'
+import eventsService from '../../../services/eventsService'
+import studentsService from '../../../services/studentsService'
 
+/**
+ * ResultFormModal — Declare result using POST /api/v1/results/declare
+ * Fetches registrations dynamically for the selected event to present options.
+ */
 export default function ResultFormModal({
   formOpen,
   setFormOpen,
-  editingResult,
-  eventId,
-  setEventId,
-  setEventName,
-  type,
-  setType,
-  rank,
-  setRank,
-  participantName,
-  setParticipantName,
-  membersInput,
-  setMembersInput,
-  rollNo,
-  setRollNo,
-  department,
-  setDepartment,
-  year,
-  setYear,
-  score,
-  setScore,
-  resultTitle,
-  setResultTitle,
-  date,
-  setDate,
-  handleFormSubmit,
+  selectedEventId,
+  events = [],
+  handleDeclare,
   submitting,
   inputStyle,
   dark,
-  BRAND
+  BRAND,
 }) {
+  const [localEventId, setLocalEventId] = useState('')
+  const [type, setType] = useState('Solo')
+  const [participantId, setParticipantId] = useState('')
+  const [teamId, setTeamId] = useState('')
+  const [rank, setRank] = useState(1)
+  const [score, setScore] = useState('')
+
+  const [registrations, setRegistrations] = useState([])
+  const [regsLoading, setRegsLoading] = useState(false)
+
+  // Reset / initialize state when modal opens
+  useEffect(() => {
+    if (formOpen) {
+      setLocalEventId(selectedEventId || (events[0]?.id || ''))
+      setType('Solo')
+      setParticipantId('')
+      setTeamId('')
+      setRank(1)
+      setScore('')
+    }
+  }, [formOpen, selectedEventId, events])
+
+  // Fetch registrations whenever selected event changes inside the modal
+  useEffect(() => {
+    if (!formOpen || !localEventId) return
+
+    const loadRegs = async () => {
+      setRegsLoading(true)
+      setRegistrations([])
+      try {
+        const [regRes, stuRes] = await Promise.all([
+          eventsService.fetchRegistrations(localEventId),
+          studentsService.fetchAll()
+        ])
+        if (regRes.success) {
+          const studentsList = stuRes.success ? (stuRes.students || []) : []
+          const enriched = (regRes.registrations || []).map(r => {
+            const student = studentsList.find(s => s.id === r.userId || s.id === r.user_id)
+            return {
+              ...r,
+              studentName: student?.name || r.studentName || r.student_name || r.full_name || '',
+              rollNo: student?.rollNo || r.rollNo || r.roll_no || ''
+            }
+          })
+          setRegistrations(enriched)
+        }
+      } catch (err) {
+        console.error('[ResultFormModal] Load registrations error:', err)
+      }
+      setRegsLoading(false)
+    }
+
+    loadRegs()
+  }, [localEventId, formOpen])
+
   if (!formOpen) return null
 
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    const payload = {
+      event_id: localEventId,
+      rank: Number(rank),
+      score: score !== '' ? Number(score) : 0,
+      team_id: type === 'Team' ? teamId.trim() : null,
+      participant_id: type === 'Solo' ? participantId.trim() : null,
+    }
+    await handleDeclare(payload)
+  }
+
+  // Figure out participant display name from registration object
+  const getParticipantLabel = (r) => {
+    const name = r.studentName || r.student_name || r.full_name || r.name || ''
+    const roll = r.rollNo || r.roll_no || ''
+    return name ? `${name}${roll ? ` (${roll})` : ''}` : r.user_id || r.participant_id || r.id
+  }
+
+  // Get participant_id value from registration object
+  const getParticipantId = (r) =>
+    r.user_id || r.participant_id || r.student_id || r.id || ''
+
+  const soloRegistrations = registrations.filter(r => !r.teamId && !r.team_id)
+  const hasSoloRegistrations = soloRegistrations.length > 0
+
+  const teamRegistrations = registrations.filter(r => !!(r.teamId || r.team_id))
+  // Group or unique by teamId
+  const uniqueTeams = []
+  const seenTeams = new Set()
+  teamRegistrations.forEach(r => {
+    const tId = r.teamId || r.team_id
+    if (!seenTeams.has(tId)) {
+      seenTeams.add(tId)
+      uniqueTeams.push({
+        teamId: tId,
+        teamName: r.teamName || r.team_name || `Team ${tId}`
+      })
+    }
+  })
+  const hasTeams = uniqueTeams.length > 0
+
+  const fieldLabel = (text) => (
+    <label
+      className="text-[11.5px] font-bold uppercase block mb-1.5"
+      style={{ color: dark ? '#7a98bb' : '#64748b' }}
+    >
+      {text}
+    </label>
+  )
+
   return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fadeIn"
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={() => setFormOpen(false)}
       />
 
-      {/* Modal Container */}
+      {/* Modal */}
       <div
-        className="relative z-10 w-full max-w-lg rounded-2xl shadow-2xl p-6 overflow-y-auto max-h-[90vh]"
+        className="relative z-10 w-full max-w-md rounded-2xl shadow-2xl p-6"
         style={{
           background: dark ? '#0c1829' : '#ffffff',
           border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`,
-          animation: 'modalIn .2s ease-out'
+          animation: 'modalIn .2s ease-out',
         }}
       >
-        {/* Modal Header */}
-        <div className="flex items-center justify-between pb-4 mb-4 border-b" style={{ borderColor: dark ? '#1a3050' : '#e2e8f0' }}>
+        {/* Header */}
+        <div
+          className="flex items-center justify-between pb-4 mb-5 border-b"
+          style={{ borderColor: dark ? '#1a3050' : '#e2e8f0' }}
+        >
           <h3 className="text-[17px] font-black m-0 flex items-center gap-2">
             <Trophy size={18} className="text-amber-500" />
-            {editingResult ? 'Edit Event Result' : 'Publish New Event Result'}
+            Declare Event Result
           </h3>
           <button
             onClick={() => setFormOpen(false)}
-            className="w-7 h-7 rounded-lg border-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer"
+            className="w-7 h-7 rounded-lg border-none bg-transparent hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
           >
             <X size={16} />
           </button>
         </div>
 
-        {/* Modal Form */}
-        <form onSubmit={handleFormSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+
+          {/* Select Event */}
+          <div>
+            {fieldLabel('Select Event')}
+            <select
+              value={localEventId}
+              onChange={e => {
+                setLocalEventId(e.target.value)
+                setParticipantId('')
+                setTeamId('')
+              }}
+              className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none font-semibold cursor-pointer"
+              style={inputStyle}
+              required
+            >
+              <option value="">— Select Event —</option>
+              {events.map(ev => (
+                <option key={ev.id} value={ev.id}>
+                  {ev.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Solo / Team toggle */}
+          <div>
+            {fieldLabel('Participation Type')}
+            <div className="flex gap-2">
+              {[
+                { label: 'Solo / Individual', value: 'Solo', Icon: User },
+                { label: 'Team', value: 'Team', Icon: Users },
+              ].map(({ label, value, Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => { setType(value); setParticipantId(''); setTeamId('') }}
+                  className="flex-1 py-2.5 rounded-xl text-[12px] font-bold border-none cursor-pointer transition-all flex items-center justify-center gap-1.5"
+                  style={{
+                    background: type === value ? BRAND : (dark ? '#162640' : '#f1f5f9'),
+                    color: type === value ? '#fff' : (dark ? '#7a98bb' : '#475569'),
+                    boxShadow: type === value ? `0 4px 12px ${BRAND}40` : 'none',
+                  }}
+                >
+                  <Icon size={13} /> {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Participant (Solo) */}
+          {type === 'Solo' && (
+            <div>
+              {fieldLabel('Select Participant')}
+              {regsLoading ? (
+                <div className="flex items-center gap-2 py-2 text-[13px]"
+                  style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                  <Loader2 size={14} className="animate-spin" /> Loading registered participants…
+                </div>
+              ) : hasSoloRegistrations ? (
+                <select
+                  value={participantId}
+                  onChange={e => setParticipantId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none font-semibold cursor-pointer"
+                  style={inputStyle}
+                  required
+                >
+                  <option value="">— Select registered participant —</option>
+                  {soloRegistrations.map(r => (
+                    <option key={r.id || r.user_id} value={getParticipantId(r)}>
+                      {getParticipantLabel(r)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div>
+                  <p className="text-[11.5px] mb-2 px-1" style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>
+                    No solo registrations found for this event. Enter ID manually:
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Participant ID (UUID)"
+                    value={participantId}
+                    onChange={e => setParticipantId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none"
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Team Select */}
+          {type === 'Team' && (
+            <div>
+              {fieldLabel('Select Team')}
+              {regsLoading ? (
+                <div className="flex items-center gap-2 py-2 text-[13px]"
+                  style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                  <Loader2 size={14} className="animate-spin" /> Loading registered teams…
+                </div>
+              ) : hasTeams ? (
+                <select
+                  value={teamId}
+                  onChange={e => setTeamId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none font-semibold cursor-pointer"
+                  style={inputStyle}
+                  required
+                >
+                  <option value="">— Select registered team —</option>
+                  {uniqueTeams.map(t => (
+                    <option key={t.teamId} value={t.teamId}>
+                      {t.teamName} ({t.teamId})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div>
+                  <p className="text-[11.5px] mb-2 px-1" style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>
+                    No team registrations found. Enter Team ID manually:
+                  </p>
+                  <input
+                    type="text"
+                    placeholder="Enter team_id from backend"
+                    value={teamId}
+                    onChange={e => setTeamId(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none"
+                    style={inputStyle}
+                    required
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Rank + Score */}
           <div className="grid grid-cols-2 gap-3">
-            
-            {/* Event Dropdown/Select */}
-            <div className="col-span-2">
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Event</label>
-              <select
-                value={eventId}
-                onChange={e => {
-                  setEventId(e.target.value)
-                  const evList = {
-                    'EVT081': 'TechFest 2025',
-                    'EVT082': 'Annual Cultural Fest',
-                    'EVT083': 'National Hackathon',
-                    'EVT084': 'Industry Connect Summit',
-                    'EVT085': 'Sports Meet 2025',
-                    'EVT086': 'Research Symposium'
-                  }
-                  setEventName(evList[e.target.value] || 'TechFest 2025')
-                }}
-                className="w-full px-3 py-2 rounded-lg text-[13px] outline-none font-semibold cursor-pointer"
-                style={inputStyle}
-                required
-              >
-                <option value="EVT081">TechFest 2025</option>
-                <option value="EVT082">Annual Cultural Fest</option>
-                <option value="EVT083">National Hackathon</option>
-                <option value="EVT084">Industry Connect Summit</option>
-                <option value="EVT085">Sports Meet 2025</option>
-                <option value="EVT086">Research Symposium</option>
-              </select>
-            </div>
-
-            {/* Type Selection */}
             <div>
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Category Type</label>
-              <div className="flex gap-2">
-                {['Solo', 'Team'].map(t => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setType(t)}
-                    className="flex-1 py-2 rounded-lg text-[12px] font-bold border-none cursor-pointer transition"
-                    style={{
-                      background: type === t ? BRAND : (dark ? '#162640' : '#f1f5f9'),
-                      color: type === t ? '#fff' : (dark ? '#7a98bb' : '#475569')
-                    }}
-                  >
-                    {t}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Rank Selection */}
-            <div>
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Rank Position</label>
+              {fieldLabel('Rank Position')}
               <input
                 type="number"
                 min="1"
-                max="100"
+                max="999"
                 value={rank}
                 onChange={e => setRank(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg text-[13px] outline-none"
+                className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none"
                 style={inputStyle}
                 required
               />
             </div>
-
-            {/* Participant / Team Name */}
-            <div className="col-span-2">
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">
-                {type === 'Team' ? 'Team Name' : 'Participant Name'}
-              </label>
+            <div>
+              {fieldLabel('Score (Optional)')}
               <input
-                type="text"
-                placeholder={type === 'Team' ? 'e.g. Code Crafters' : 'e.g. Arjun Patel'}
-                value={participantName}
-                onChange={e => setParticipantName(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-                style={inputStyle}
-                required
-              />
-            </div>
-
-            {/* Members list if Team */}
-            {type === 'Team' && (
-              <div className="col-span-2">
-                <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">
-                  Team Members (Comma separated)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Arjun Patel, Sneha Krishnan, Amit Shah"
-                  value={membersInput}
-                  onChange={e => setMembersInput(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-                  style={inputStyle}
-                />
-              </div>
-            )}
-
-            {/* Roll No */}
-            <div>
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">
-                {type === 'Team' ? 'Lead Roll No' : 'Roll Number'}
-              </label>
-              <input
-                type="text"
-                placeholder="e.g. 21CS001"
-                value={rollNo}
-                onChange={e => setRollNo(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg text-[13px] outline-none"
-                style={inputStyle}
-                required
-              />
-            </div>
-
-            {/* Department */}
-            <div>
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Department</label>
-              <select
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-[13px] outline-none font-semibold cursor-pointer"
-                style={inputStyle}
-              >
-                <option value="CSE">CSE</option>
-                <option value="ECE">ECE</option>
-                <option value="ME">ME</option>
-                <option value="EEE">EEE</option>
-                <option value="Civil">Civil</option>
-                <option value="MBA">MBA</option>
-              </select>
-            </div>
-
-            {/* Year */}
-            <div>
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Year</label>
-              <select
-                value={year}
-                onChange={e => setYear(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-[13px] outline-none font-semibold cursor-pointer"
-                style={inputStyle}
-              >
-                <option value="1st">1st Year</option>
-                <option value="2nd">2nd Year</option>
-                <option value="3rd">3rd Year</option>
-                <option value="4th">4th Year</option>
-              </select>
-            </div>
-
-            {/* Score */}
-            <div>
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Score / Points (Optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. 96/100 or 9.5/10"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="e.g. 95"
                 value={score}
                 onChange={e => setScore(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg text-[13px] outline-none"
+                className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none"
                 style={inputStyle}
               />
             </div>
-
-            {/* Result Title */}
-            <div className="col-span-2">
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Award / Result Title (Optional)</label>
-              <input
-                type="text"
-                placeholder="e.g. Winner (1st Rank) or Best Research Paper"
-                value={resultTitle}
-                onChange={e => setResultTitle(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-                style={inputStyle}
-              />
-            </div>
-
-            {/* Date */}
-            <div className="col-span-2">
-              <label className="text-[11.5px] font-bold text-slate-400 dark:text-[#7a98bb] uppercase block mb-1.5">Announcement Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={e => setDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
-                style={inputStyle}
-                required
-              />
-            </div>
-
           </div>
 
-          {/* Form Actions */}
-          <div className="flex justify-end gap-2.5 pt-4 border-t mt-2" style={{ borderColor: dark ? '#1a3050' : '#e2e8f0' }}>
+          {/* Actions */}
+          <div
+            className="flex justify-end gap-2.5 pt-4 border-t mt-1"
+            style={{ borderColor: dark ? '#1a3050' : '#e2e8f0' }}
+          >
             <button
               type="button"
               onClick={() => setFormOpen(false)}
-              className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 border-none cursor-pointer"
+              className="px-4 py-2 rounded-lg text-[13px] font-semibold text-slate-500 hover:bg-slate-100 border-none cursor-pointer transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[13px] font-bold text-white border-none cursor-pointer transition"
-              style={{ background: BRAND }}
+              className="flex items-center gap-2 px-5 py-2 rounded-lg text-[13px] font-bold text-white border-none cursor-pointer transition-all hover:-translate-y-px"
+              style={{
+                background: BRAND,
+                boxShadow: `0 4px 12px ${BRAND}40`,
+                opacity: submitting ? 0.7 : 1
+              }}
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
-              {editingResult ? 'Update Result' : 'Publish Result'}
+              Declare Result
             </button>
           </div>
         </form>
 
-        {/* CSS Animation Keyframes */}
         <style>{`
           @keyframes modalIn {
             from { opacity: 0; transform: scale(0.96) translateY(8px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
           }
         `}</style>
       </div>

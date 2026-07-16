@@ -220,7 +220,7 @@ export default function LoginPage() {
       const result = await authService.login(email, password)
       console.log('Login Response Result:', result)
       if (result.success && result.user) {
-        login(result.user, result.token)
+        login(result.user, result.token, result.refreshToken)
         const userName = result.user?.name || result.user?.fullName || result.user?.email || 'User'
         showToast(`Logged in successfully! User: ${userName}, Role: ${result.user.role}`, 'success')
       } else {
@@ -305,7 +305,7 @@ export default function LoginPage() {
                     letterSpacing: logoHover ? '0.5px' : 'normal',
                   }}
                 >
-                  EventHub
+                  CampusConnect
                 </p>
                 <p className="text-white/60 text-[11px] font-medium">University Platform</p>
               </div>

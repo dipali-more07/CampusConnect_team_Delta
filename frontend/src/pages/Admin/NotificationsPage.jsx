@@ -24,15 +24,13 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
   const [filter, setFilter] = useState('all')
   const [sendOpen, setSendOpen] = useState(false)
   const [sendForm, setSendForm] = useState({
-    notifTypes: ['email'],
-    sendTo: 'all',
-    subject: '',
+    notification_type: 'system',
+    user_id: 'all',
+    title: '',
     message: '',
-    schedule: '',
   })
   const [sending, setSending] = useState(false)
   const [sent, setSent] = useState(false)
-  const [scheduling, setScheduling] = useState(false)
 
   const unreadCount = notifications.filter(n => n.unread).length
   const statsDisplay = buildStatsDisplay(stats)
@@ -48,31 +46,21 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
     if (unreadIds.length > 0) onMarkRead(unreadIds)
   }
 
-  const toggleNotifType = (key) => {
-    setSendForm(p => ({
-      ...p,
-      notifTypes: p.notifTypes.includes(key)
-        ? p.notifTypes.filter(t => t !== key)
-        : [...p.notifTypes, key],
-    }))
-  }
-
   const resetForm = () => {
-    setSendForm({ notifTypes: ['email'], sendTo: 'all', subject: '', message: '', schedule: '' })
+    setSendForm({
+      notification_type: 'system',
+      user_id: 'all',
+      title: '',
+      message: '',
+    })
     setSending(false)
     setSent(false)
-    setScheduling(false)
   }
 
-  const handleSend = async (isSchedule = false) => {
-    if (!sendForm.subject.trim() || !sendForm.message.trim()) return
-    if (isSchedule) setScheduling(true); else setSending(true)
-    const res = await notificationsService.send({
-      ...sendForm,
-      title: sendForm.subject,
-      scheduled: isSchedule ? sendForm.schedule : null,
-    })
-    setScheduling(false)
+  const handleSend = async () => {
+    if (!sendForm.title.trim() || !sendForm.message.trim()) return
+    setSending(true)
+    const res = await notificationsService.send(sendForm)
     setSending(false)
     if (res.success) {
       setSent(true)
@@ -161,10 +149,8 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
         setSendForm={setSendForm}
         sending={sending}
         sent={sent}
-        scheduling={scheduling}
         handleSend={handleSend}
         resetForm={resetForm}
-        toggleNotifType={toggleNotifType}
         NOTIF_TYPES={NOTIF_TYPES}
         tokens={tokens}
         dark={dark}

@@ -15,6 +15,7 @@ import StudentRegisteredEventsCard from '../../components/student/StudentRegiste
 
 import AttendancePage from './AttendancePage'
 import EventsPage from './EventsPage'
+import ResultsPage from './ResultsPage'
 import CertificatesPage from './CertificatesPage'
 import PageTransition from '../../components/common/PageTransition'
 
@@ -33,6 +34,8 @@ export default function StudentDashboard() {
         return 'Attendance'
       case 'events':
         return 'Events'
+      case 'results':
+        return 'Results'
       case 'certificates':
         return 'Certificates'
       case 'dashboard':
@@ -57,9 +60,11 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    console.log('[StudentDashboard] Mounted. VITE_USE_MOCK =', import.meta.env.VITE_USE_MOCK)
     let cancelled = false
     setLoading(true)
     studentService.fetchDashboardOverview().then(res => {
+      console.log('[StudentDashboard] fetchDashboardOverview resolved:', res)
       if (cancelled) return
       if (res.success) {
         setDashboardData(res.data)
@@ -165,6 +170,8 @@ export default function StudentDashboard() {
               <AttendancePage tokens={tokens} user={user} />
             ) : activeNav === 'Events' ? (
               <EventsPage tokens={tokens} user={user} />
+            ) : activeNav === 'Results' ? (
+              <ResultsPage tokens={tokens} user={user} />
             ) : activeNav === 'Certificates' ? (
               <CertificatesPage tokens={tokens} user={user} />
             ) : (

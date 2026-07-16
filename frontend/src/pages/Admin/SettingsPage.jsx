@@ -41,8 +41,9 @@ export default function SettingsPage({ tokens }) {
     name: '',
     email: '',
     department: '',
-    employeeId: '',
     phone: '',
+    gender: '',
+    bio: '',
     avatarColor: '#7c3aed',
     avatarUrl: null
   })

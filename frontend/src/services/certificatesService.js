@@ -4,7 +4,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL
 import defaultCertificates from '../data/certificates.json'
 
 function authHeaders() {
-  const token = sessionStorage.getItem('cc_token')
+  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
@@ -48,16 +48,32 @@ async function mockFetchAll() {
   }
 }
 
-async function mockGenerate(ids) {
+async function mockGenerate(eventIdOrList, userId) {
   await new Promise(r => setTimeout(r, 600))
   const certs = getMockCerts()
-  const updated = certs.map(c =>
-    ids.includes(c.id) && c.status === 'Pending'
-      ? { ...c, status: 'Generated', issuedDate: new Date().toISOString().split('T')[0] }
-      : c
-  )
+  
+  if (Array.isArray(eventIdOrList)) {
+    const idsToGen = eventIdOrList.map(item => item.id)
+    const updated = certs.map(c =>
+      idsToGen.includes(c.id) && c.status === 'Pending'
+        ? { ...c, status: 'Generated', issuedDate: new Date().toISOString().split('T')[0] }
+        : c
+    )
+    saveMockCerts(updated)
+    return { success: true, message: `${eventIdOrList.length} certificate(s) generated.` }
+  }
+
+  // Single
+  const updated = certs.map(c => {
+    const matchEvent = c.eventId === eventIdOrList || !eventIdOrList
+    const matchUser = c.id === userId || c.rollNo === userId || c.studentName === userId || !userId
+    if (matchEvent && matchUser && c.status === 'Pending') {
+      return { ...c, status: 'Generated', issuedDate: new Date().toISOString().split('T')[0] }
+    }
+    return c
+  })
   saveMockCerts(updated)
-  return { success: true, updated: ids.length, message: `${ids.length} certificate(s) generated.` }
+  return { success: true, message: `Certificate generated successfully.` }
 }
 
 async function mockBulkGenerate(eventId) {
@@ -103,6 +119,11 @@ async function mockVerify(verifyCode) {
   return { success: true, valid: true, certificate: cert }
 }
 
+async function mockDownload(certificateNumber) {
+  await new Promise(r => setTimeout(r, 500))
+  return { success: true, message: 'Mock download started', url: '#' }
+}
+
 /* ── REAL API FUNCTIONS ────────────────────────────────────────── */
 async function apiFetchAll() {
   try {
@@ -116,16 +137,39 @@ async function apiFetchAll() {
   }
 }
 
-async function apiGenerate(ids) {
+async function apiGenerate(eventIdOrList, userId) {
+  if (Array.isArray(eventIdOrList)) {
+    try {
+      const promises = eventIdOrList.map(item =>
+        fetch(`${API_BASE}/certificates/generate`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({
+            event_id: item.eventId || item.event_id,
+            user_id: item.userId || item.user_id
+          }),
+        }).then(parseJSON)
+      )
+      await Promise.all(promises)
+      return { success: true, message: `Batch certificates processed.` }
+    } catch (err) {
+      console.error('[certificatesService] batch generate error:', err)
+      return { success: false, message: 'Server error during batch generation.' }
+    }
+  }
+
   try {
     const res = await fetch(`${API_BASE}/certificates/generate`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ ids }),
+      body: JSON.stringify({
+        event_id: eventIdOrList,
+        user_id: userId
+      }),
     })
     const data = await parseJSON(res)
-    if (!res.ok) return { success: false, message: data.message || 'Failed to generate certificates.' }
-    return { success: true, updated: data.updated, message: data.message }
+    if (!res.ok) return { success: false, message: data.message || 'Failed to generate certificate.' }
+    return { success: true, message: data.message || 'Certificate generated successfully.' }
   } catch (err) {
     console.error('[certificatesService] generate error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -134,7 +178,7 @@ async function apiGenerate(ids) {
 
 async function apiBulkGenerate(eventId) {
   try {
-    const res = await fetch(`${API_BASE}/certificates/bulk-generate`, {
+    const res = await fetch(`${API_BASE}/certificates/generate-bulk`, {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({ eventId }),
@@ -184,9 +228,55 @@ async function apiVerify(verifyCode) {
     const res = await fetch(`${API_BASE}/certificates/verify/${verifyCode}`, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, valid: false, message: data.message || 'Verification failed.' }
-    return { success: true, valid: data.valid, certificate: data.certificate }
+    
+    const valid = data.valid !== undefined ? data.valid : (data.data?.is_valid !== undefined ? data.data.is_valid : true)
+    const certificate = data.certificate || data.data || data
+    
+    return { success: true, valid, certificate }
   } catch (err) {
     console.error('[certificatesService] verify error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+async function apiDownload(certificateNumber) {
+  try {
+    const res = await fetch(`${API_BASE}/certificates/download/${certificateNumber}`, { headers: authHeaders() })
+    if (!res.ok) return { success: false, message: 'Failed to download certificate.' }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    return { success: true, url, blob }
+  } catch (err) {
+    console.error('[certificatesService] download error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+async function apiFetchTemplates() {
+  try {
+    const res = await fetch(`${API_BASE}/certificates/templates`, { headers: authHeaders() })
+    const data = await parseJSON(res)
+    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch templates.' }
+    const templates = Array.isArray(data) ? data : (data.data ? (Array.isArray(data.data) ? data.data : [data.data]) : [])
+    return { success: true, templates }
+  } catch (err) {
+    console.error('[certificatesService] fetchTemplates error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+async function apiSaveTemplate(templateData) {
+  try {
+    const res = await fetch(`${API_BASE}/certificates/templates`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify(templateData)
+    })
+    const data = await parseJSON(res)
+    if (!res.ok) return { success: false, message: data.message || 'Failed to save template.' }
+    return { success: true, template: data.data || data }
+  } catch (err) {
+    console.error('[certificatesService] save template error:', err)
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -196,8 +286,8 @@ const certificatesService = {
   fetchAll: () =>
     USE_MOCK ? mockFetchAll() : apiFetchAll(),
 
-  generate: (ids) =>
-    USE_MOCK ? mockGenerate(ids) : apiGenerate(ids),
+  generate: (ids, userId) =>
+    USE_MOCK ? mockGenerate(ids, userId) : apiGenerate(ids, userId),
 
   bulkGenerate: (eventId) =>
     USE_MOCK ? mockBulkGenerate(eventId) : apiBulkGenerate(eventId),
@@ -210,6 +300,15 @@ const certificatesService = {
 
   verify: (verifyCode) =>
     USE_MOCK ? mockVerify(verifyCode) : apiVerify(verifyCode),
+    
+  download: (certificateNumber) =>
+    USE_MOCK ? mockDownload(certificateNumber) : apiDownload(certificateNumber),
+
+  fetchTemplates: () =>
+    USE_MOCK ? Promise.resolve({ success: true, templates: [] }) : apiFetchTemplates(),
+
+  saveTemplate: (templateData) =>
+    USE_MOCK ? Promise.resolve({ success: true, template: templateData }) : apiSaveTemplate(templateData)
 }
 
 export default certificatesService

@@ -119,7 +119,7 @@ export default function CertificatesPage({ tokens, user }) {
             </div>
 
             <h3 className="text-xl font-black text-slate-900 dark:text-white m-0">Certificate of Achievement</h3>
-            <p className="text-xs text-slate-400 mt-1 mb-6">Verified by EventHub University Platform</p>
+            <p className="text-xs text-slate-400 mt-1 mb-6">Verified by CampusConnect University Platform</p>
 
             <div className="p-6 rounded-2xl bg-slate-50 dark:bg-[#162640] border border-slate-200 dark:border-[#1a3050] text-left text-xs space-y-2 mb-6">
               <p><strong className="text-slate-900 dark:text-white">Awarded to:</strong> {user?.name || 'Arjun Sharma'}</p>

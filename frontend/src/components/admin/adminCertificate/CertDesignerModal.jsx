@@ -1,6 +1,7 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Palette, X, GraduationCap, Save, Check } from 'lucide-react'
+import certificatesService from '../../../services/certificatesService'
 
 export default function CertDesignerModal({
   designerOpen,
@@ -12,6 +13,38 @@ export default function CertDesignerModal({
   BRAND,
   showToast
 }) {
+  const [saving, setSaving] = useState(false)
+
+  const handleSave = async () => {
+    setSaving(true)
+    const payload = {
+      name: tmpl.title || 'Classic Navy Template',
+      background_image: tmpl.gradFrom || '#1a1060',
+      font_color: tmpl.accentColor || '#615FFF',
+      title_font_size: 36,
+      body_font_size: 14,
+      is_active: true,
+      organisation_name: tmpl.org || 'State University',
+      certificate_title: tmpl.title || 'Certificate of Participation',
+      background_gradient_from: tmpl.gradFrom || '#1a1060',
+      background_gradient_mid: tmpl.gradMid || '#0f0a45',
+      background_gradient_to: tmpl.gradTo || '#0a0838',
+      accent_color: tmpl.accentColor || '#615FFF',
+      border_style: tmpl.borderStyle || 'none',
+      font_family: tmpl.fontFamily || 'Manrope, sans-serif',
+      show_logo: tmpl.showLogo !== undefined ? tmpl.showLogo : true,
+      show_signatures: tmpl.showSignatures !== undefined ? tmpl.showSignatures : true
+    }
+    const res = await certificatesService.saveTemplate(payload)
+    setSaving(false)
+    if (res.success) {
+      setTmpl(p => ({ ...p, templateSaved: true }))
+      showToast('Certificate template saved successfully!', 'success')
+    } else {
+      showToast(res.message || 'Failed to save template.', 'error')
+    }
+  }
+
   if (!designerOpen) return null
 
   return createPortal(
@@ -190,14 +223,12 @@ export default function CertDesignerModal({
           {/* Save Button */}
           <div className="p-5" style={{ borderTop: `1px solid ${tokens.border}` }}>
             <button
-              onClick={() => {
-                setTmpl(p => ({ ...p, templateSaved: true }))
-                showToast('Certificate template saved!', 'success')
-              }}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px"
+              onClick={handleSave}
+              disabled={saving}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px disabled:opacity-75 disabled:cursor-not-allowed"
               style={{ background: tmpl.templateSaved ? '#00BC7D' : BRAND, boxShadow: `0 4px 14px ${tmpl.templateSaved ? 'rgba(0,188,125,0.4)' : 'rgba(97,95,255,0.4)'}` }}
             >
-              {tmpl.templateSaved ? <><Check size={14} /> Template Saved</> : <><Save size={14} /> Save Template</>}
+              {saving ? 'Saving...' : (tmpl.templateSaved ? <><Check size={14} /> Template Saved</> : <><Save size={14} /> Save Template</>)}
             </button>
           </div>
         </div>

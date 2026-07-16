@@ -86,11 +86,11 @@ export default function CertVerifyModal({
                     <span className="text-[13px] font-bold" style={{ color: '#00BC7D' }}>Certificate Valid</span>
                   </div>
                   {[
-                    ['Student', verifyResult.certificate.studentName],
-                    ['Roll No', verifyResult.certificate.rollNo],
-                    ['Event', verifyResult.certificate.eventName],
-                    ['Issued', verifyResult.certificate.issuedDate],
-                    ['Status', verifyResult.certificate.status],
+                    ['Student', verifyResult.certificate.studentName || verifyResult.certificate.student_name || verifyResult.certificate.full_name || verifyResult.certificate.fullName || ''],
+                    ['Roll No', verifyResult.certificate.rollNo || verifyResult.certificate.roll_no || verifyResult.certificate.username || ''],
+                    ['Event', verifyResult.certificate.eventName || verifyResult.certificate.event_name || verifyResult.certificate.event?.name || ''],
+                    ['Issued', verifyResult.certificate.issuedDate || verifyResult.certificate.issued_date || verifyResult.certificate.created_at || verifyResult.certificate.createdAt || ''],
+                    ['Status', verifyResult.certificate.status || ''],
                   ].map(([k, v]) => (
                     <div key={k} className="flex justify-between text-[12px]">
                       <span style={{ color: tokens.txtSec }}>{k}</span>

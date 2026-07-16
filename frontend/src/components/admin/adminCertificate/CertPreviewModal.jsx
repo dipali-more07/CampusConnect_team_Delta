@@ -91,7 +91,7 @@ export default function CertPreviewModal({
 
               {/* Verify URL */}
               <p className="text-[9px] text-white/30 mt-2 m-0 font-mono">
-                Verify at: eventhub.university.edu/verify/{previewCert.verifyCode}
+                Verify at: campusconnect.university.edu/verify/{previewCert.verifyCode}
               </p>
             </div>
           </div>
@@ -110,7 +110,7 @@ export default function CertPreviewModal({
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold border cursor-pointer transition-all duration-200 hover:-translate-y-px"
             style={{ borderColor: tokens.border, color: tokens.txtPri, background: 'transparent' }}
             onClick={() => {
-              navigator.clipboard.writeText(`https://eventhub.university.edu/verify/${previewCert.verifyCode}`)
+              navigator.clipboard.writeText(`https://campusconnect.university.edu/verify/${previewCert.verifyCode}`)
               showToast('Verify link copied!', 'success')
             }}
           >

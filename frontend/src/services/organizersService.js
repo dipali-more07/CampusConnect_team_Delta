@@ -4,7 +4,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL
 import defaultOrganizers from '../data/organizers.json'
 
 function authHeaders() {
-  const token = sessionStorage.getItem('cc_token')
+  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
@@ -172,6 +172,34 @@ async function apiDelete(id) {
   }
 }
 
+async function mockGetProfile() {
+  await new Promise(r => setTimeout(r, 200))
+  const sessionRaw = sessionStorage.getItem('cc_session')
+  let email = 'priya.s@university.edu'
+  if (sessionRaw) {
+    try {
+      const s = JSON.parse(sessionRaw)
+      if (s?.user?.email) email = s.user.email
+    } catch {}
+  }
+  const organizers = getMock()
+  const currentOrg = organizers.find(o => o.email.toLowerCase() === email.toLowerCase()) || organizers[0]
+  return { success: true, organizer: mapOrganizer(currentOrg) }
+}
+
+async function apiGetProfile() {
+  try {
+    const res = await fetch(`${API_BASE}/organizers/me`, { headers: authHeaders() })
+    const data = await parseJSON(res)
+    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch organizer profile.' }
+    const rawOrganizer = data.data || data.organizer || data
+    return { success: true, organizer: mapOrganizer(rawOrganizer) }
+  } catch (err) {
+    console.error('[organizersService] getProfile error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
 /* ── SERVICE EXPORT ────────────────────────────────────────────── */
 const organizersService = {
   fetchAll: () =>
@@ -185,6 +213,9 @@ const organizersService = {
 
   delete: (id) =>
     USE_MOCK ? mockDelete(id) : apiDelete(id),
+
+  getProfile: () =>
+    USE_MOCK ? mockGetProfile() : apiGetProfile(),
 }
 
 export default organizersService

@@ -99,6 +99,7 @@ export default function EventsPage({ tokens }) {
     status: 'Upcoming',
     description: '',
     registrationDeadline: '',
+    regDateTime: '',
     banner: null,
   })
   const [formErrors, setFormErrors] = useState({})
@@ -123,7 +124,7 @@ export default function EventsPage({ tokens }) {
   }, [])
 
   // Categories & Event Types
-  const categories = ['All', 'Technical', 'Cultural', 'Seminar', 'Sports', 'Academic', 'Workshop']
+  const categories = ['All', 'Technical', 'Cultural', 'Seminar', 'Sports', 'Academic', 'Workshop', 'Other']
   const eventTypes = ['Individual', 'Team', 'Both']
   const statuses = ['All', 'Upcoming', 'Draft', 'Ongoing', 'Completed', 'Cancelled']
 
@@ -190,6 +191,7 @@ export default function EventsPage({ tokens }) {
       status: 'Upcoming',
       description: '',
       registrationDeadline: `${todayStr}T23:59`,
+      regDateTime: `${todayStr}T08:00`,
       banner: null,
     })
     setFormErrors({})
@@ -202,7 +204,7 @@ export default function EventsPage({ tokens }) {
     setSelectedEvent(event)
     setFormState({
       name: event.name || event.event_name || '',
-      organizer: event.organizer || '',
+      organizer: event.organizer || event.organizer_name || event.organized_by || '',
       category: event.category || 'Technical',
       participationType: event.participationType || event.participation_type || 'individual',
       eventType: event.eventType || event.event_type || 'offline',
@@ -216,6 +218,7 @@ export default function EventsPage({ tokens }) {
       status: event.status || 'Upcoming',
       description: event.description || '',
       registrationDeadline: formatLocalDateTimePicker(event.registration_deadline || event.reg_deadline || event.registrationDeadline),
+      regDateTime: formatLocalDateTimePicker(event.reg_date_time || event.regDateTime || ''),
       banner: event.banner || null,
     })
     setFormErrors({})
@@ -241,10 +244,10 @@ export default function EventsPage({ tokens }) {
     const res = await eventsService.delete(selectedEvent.id)
     if (res.success) {
       showToast(`Event ${selectedEvent.id} deleted successfully.`, 'success')
-      setDeleteConfirmOpen(false)
+      setDeleteConfirmOpen(false);
       loadEvents()
     } else {
-      showToast('Failed to delete event.', 'error')
+      showToast(res.message || 'Failed to delete event.', 'error')
     }
   }
 
@@ -264,7 +267,16 @@ export default function EventsPage({ tokens }) {
     if (!event) return
     const res = await eventsService.approve(event.id, targetStatus, null)
     if (res.success) {
-      showToast(`Event "${event.name}" ${targetStatus === 'Approved' ? 'approved' : 'rejected'} successfully.`, 'success')
+      let toastMsg = `Event "${event.name}" ${targetStatus === 'Approved' ? 'approved' : 'rejected'} successfully.`
+      if (targetStatus === 'Approved') {
+        const publishRes = await eventsService.publish(event.id)
+        if (publishRes.success) {
+          toastMsg += ' Event has been published automatically!'
+        } else {
+          toastMsg += ` (Auto-publishing failed: ${publishRes.message})`
+        }
+      }
+      showToast(toastMsg, 'success')
       setApprovalConfirmModal({ open: false, event: null, targetStatus: 'Approved' })
       loadEvents()
     } else {
@@ -322,7 +334,7 @@ export default function EventsPage({ tokens }) {
       max_participants: parseInt(formState.capacity, 10),
       capacity: parseInt(formState.capacity, 10),
       participation_type: formState.participationType,
-      reg_date_time: formatNaiveDateTime(new Date()),
+      reg_date_time: formatNaiveDateTime(formState.regDateTime) || formatNaiveDateTime(new Date()),
       fees: parseInt(formState.fees, 10) || 0,
       reg_deadline: reg_dl,
       registration_deadline: reg_dl,
@@ -337,6 +349,13 @@ export default function EventsPage({ tokens }) {
       res = await eventsService.update(selectedEvent.id, payload)
     } else {
       res = await eventsService.create(payload)
+      if (res.success && !isDraft) {
+        // Automatically publish newly created event if not draft
+        const createdId = res.event?.id
+        if (createdId) {
+          await eventsService.publish(createdId)
+        }
+      }
     }
 
     setSubmitting(false)
@@ -344,7 +363,7 @@ export default function EventsPage({ tokens }) {
       showToast(
         selectedEvent 
           ? `Event ${selectedEvent.id} updated successfully.` 
-          : (isDraft ? 'Draft saved successfully.' : 'New event published successfully.'), 
+          : (isDraft ? 'Draft saved successfully.' : 'New event created and published successfully.'), 
         'success'
       )
       setCreateEditOpen(false)
@@ -356,6 +375,7 @@ export default function EventsPage({ tokens }) {
       showToast(res.message || 'Failed to save event.', 'error')
     }
   }
+
 
   // Export Events (Download JSON)
   const handleExport = () => {

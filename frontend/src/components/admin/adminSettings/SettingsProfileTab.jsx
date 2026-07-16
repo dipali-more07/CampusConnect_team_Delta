@@ -82,10 +82,10 @@ export default function SettingsProfileTab({
         </div>
 
         <div>
-          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Department</label>
+          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Phone</label>
           <input
-            value={profileForm.department}
-            onChange={e => setProfileForm(p => ({ ...p, department: e.target.value }))}
+            value={profileForm.phone || ''}
+            onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
             className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
             style={inputStyle}
             onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
@@ -93,30 +93,35 @@ export default function SettingsProfileTab({
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Employee ID</label>
-            <input
-              value={profileForm.employeeId}
-              onChange={e => setProfileForm(p => ({ ...p, employeeId: e.target.value }))}
-              className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
-              style={inputStyle}
-              onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
-              onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
-            />
-          </div>
+        <div>
+          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Gender</label>
+          <select
+            value={profileForm.gender || ''}
+            onChange={e => setProfileForm(p => ({ ...p, gender: e.target.value }))}
+            className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
+            style={inputStyle}
+            onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+            onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
+          >
+            <option value="" style={{ background: tokens.card }}>Select Gender</option>
+            <option value="male" style={{ background: tokens.card }}>Male</option>
+            <option value="female" style={{ background: tokens.card }}>Female</option>
+            <option value="other" style={{ background: tokens.card }}>Other</option>
+          </select>
+        </div>
 
-          <div>
-            <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Phone</label>
-            <input
-              value={profileForm.phone}
-              onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))}
-              className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
-              style={inputStyle}
-              onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
-              onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
-            />
-          </div>
+        <div>
+          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Bio</label>
+          <textarea
+            value={profileForm.bio || ''}
+            onChange={e => setProfileForm(p => ({ ...p, bio: e.target.value }))}
+            rows={3}
+            className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all resize-none"
+            style={inputStyle}
+            onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+            onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
+            placeholder="Tell us about yourself..."
+          />
         </div>
 
         <div className="pt-2">

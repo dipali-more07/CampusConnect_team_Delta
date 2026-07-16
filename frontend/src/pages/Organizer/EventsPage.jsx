@@ -99,6 +99,7 @@ export default function EventsPage({ tokens }) {
     status: 'Upcoming',
     description: '',
     registrationDeadline: '',
+    regDateTime: '',
     banner: null,
   })
   const [formErrors, setFormErrors] = useState({})
@@ -123,7 +124,7 @@ export default function EventsPage({ tokens }) {
   }, [])
 
   // Categories & Event Types
-  const categories = ['All', 'Technical', 'Cultural', 'Seminar', 'Sports', 'Academic', 'Workshop']
+  const categories = ['All', 'Technical', 'Cultural', 'Seminar', 'Sports', 'Academic', 'Workshop', 'Other']
   const eventTypes = ['Individual', 'Team', 'Both']
   const statuses = ['All', 'Upcoming', 'Draft', 'Ongoing', 'Completed', 'Cancelled']
 
@@ -190,6 +191,7 @@ export default function EventsPage({ tokens }) {
       status: 'Upcoming',
       description: '',
       registrationDeadline: `${todayStr}T23:59`,
+      regDateTime: `${todayStr}T08:00`,
       banner: null,
     })
     setFormErrors({})
@@ -216,6 +218,7 @@ export default function EventsPage({ tokens }) {
       status: event.status || 'Upcoming',
       description: event.description || '',
       registrationDeadline: formatLocalDateTimePicker(event.registration_deadline || event.reg_deadline || event.registrationDeadline),
+      regDateTime: formatLocalDateTimePicker(event.reg_date_time || event.regDateTime || ''),
       banner: event.banner || null,
     })
     setFormErrors({})
@@ -244,7 +247,7 @@ export default function EventsPage({ tokens }) {
       setDeleteConfirmOpen(false)
       loadEvents()
     } else {
-      showToast('Failed to delete event.', 'error')
+      showToast(res.message || 'Failed to delete event.', 'error')
     }
   }
 
@@ -322,7 +325,7 @@ export default function EventsPage({ tokens }) {
       max_participants: parseInt(formState.capacity, 10),
       capacity: parseInt(formState.capacity, 10),
       participation_type: formState.participationType,
-      reg_date_time: formatNaiveDateTime(new Date()),
+      reg_date_time: formatNaiveDateTime(formState.regDateTime) || formatNaiveDateTime(new Date()),
       fees: parseInt(formState.fees, 10) || 0,
       reg_deadline: reg_dl,
       registration_deadline: reg_dl,

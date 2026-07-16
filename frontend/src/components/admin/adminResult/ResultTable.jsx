@@ -1,5 +1,5 @@
 import React from 'react'
-import { Trophy, Award, Edit3, Trash2, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
+import { Trophy, Award, Trash2, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
 
 export default function ResultTable({
   loading,
@@ -16,10 +16,9 @@ export default function ResultTable({
   BRAND,
   dark,
   cardStyle,
-  handleOpenEditModal,
   handleDeleteResult
 }) {
-  const tableHeaders = ['Participant / Team', 'Department', 'Year', 'Event', 'Rank', 'Date', 'Actions']
+  const tableHeaders = ['Participant / Team', 'Department', 'Year', 'Event', 'Rank', 'Date']
 
   const renderRankBadge = (rankNum) => {
     const num = Number(rankNum)
@@ -78,12 +77,11 @@ export default function ResultTable({
                   <td className="p-4"><div className="w-28 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
                   <td className="p-4"><div className="w-24 h-6 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
                   <td className="p-4"><div className="w-20 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
-                  <td className="p-4"><div className="w-20 h-6 ml-auto rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
                 </tr>
               ))
             ) : filteredResults.length === 0 ? (
               <tr>
-                <td colSpan="7" className="p-12 text-center">
+                <td colSpan="6" className="p-12 text-center">
                   <FileText size={40} className="block mx-auto mb-3 text-slate-400" />
                   <span className="text-[13px] font-semibold text-slate-500">No results found for current filters</span>
                 </td>
@@ -125,26 +123,6 @@ export default function ResultTable({
 
                   {/* Date */}
                   <td className="p-4 text-[13px] font-medium text-slate-500 dark:text-slate-400">{row.date}</td>
-
-                  {/* Actions */}
-                  <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <button
-                        onClick={() => handleOpenEditModal(row)}
-                        className="w-7.5 h-7.5 rounded-lg border border-slate-200 dark:border-[#1e2d45] bg-transparent flex items-center justify-center cursor-pointer transition-all hover:bg-indigo-50 dark:hover:bg-indigo-950/20 text-slate-400 hover:text-indigo-500"
-                        title="Edit Result"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteResult(row.id)}
-                        className="w-7.5 h-7.5 rounded-lg border border-slate-200 dark:border-[#1e2d45] bg-transparent flex items-center justify-center cursor-pointer transition-all hover:bg-rose-50 dark:hover:bg-rose-950/20 text-slate-400 hover:text-rose-500"
-                        title="Delete Result"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </td>
                 </tr>
               ))
             )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
-import { Sun, Moon, Bell, Menu, LogOut, Pencil, Lock, ChevronDown, ChevronUp } from 'lucide-react'
+import { Sun, Moon, Bell, Menu, LogOut, Pencil, Lock, ChevronDown, ChevronUp, CheckCheck} from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
 import studentService from '../../services/studentService'
 import EditProfileModal from './EditProfileModal'
 import ChangePasswordModal from './ChangePasswordModal'
@@ -16,6 +17,7 @@ export default function StudentTopBar({
   isMobile
 }) {
   const { accentColor } = useTheme()
+  const { updateUser } = useAuth()
   const BRAND = accentColor || '#615FFF'
   const [userDropdown, setUserDropdown] = useState(false)
   const [notifDropdown, setNotifDropdown] = useState(false)
@@ -27,13 +29,52 @@ export default function StudentTopBar({
 
   // Local user profile state
   const [profileData, setProfileData] = useState({
-    name: user?.name || 'Arjun Sharma',
-    college: user?.college || 'IIT Delhi',
+    name: user?.name || user?.full_name || 'Arjun Sharma',
+    college: user?.college || user?.college_id || 'IIT Delhi',
     course: user?.course || 'B.Tech Computer Science',
     email: user?.email || 'arjun.sharma@iitd.ac.in',
-    mobile: user?.mobile || '+91 98765 43210',
+    mobile: user?.mobile || user?.phone || '+91 98765 43210',
     avatar: user?.avatar || 'AS'
   })
+
+  // Sync profileData when user prop changes from parent
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        name: user.name || user.full_name || 'Arjun Sharma',
+        college: user.college || user.college_id || 'IIT Delhi',
+        course: user.course || 'B.Tech Computer Science',
+        email: user.email || 'arjun.sharma@iitd.ac.in',
+        mobile: user.mobile || user.phone || '+91 98765 43210',
+        avatar: user.avatar || (user.name ? user.name.substring(0, 2).toUpperCase() : (user.full_name ? user.full_name.substring(0,2).toUpperCase() : 'AS')),
+        gender: user.gender || 'male',
+        department: user.department || '',
+        yearOfStudy: user.year_of_study || user.yearOfStudy || 1,
+        bio: user.bio || '',
+      })
+    }
+  }, [user])
+
+  // Fetch fresh profile from API on mount
+  useEffect(() => {
+    studentService.fetchProfile().then(res => {
+      if (res.success && res.data) {
+        const p = res.data
+        setProfileData({
+          name: p.name || p.full_name || '',
+          college: p.college || p.college_id || '',
+          course: p.course || '',
+          email: p.email || '',
+          mobile: p.mobile || p.phone || '',
+          avatar: p.avatar || (p.name ? p.name.substring(0, 2).toUpperCase() : (p.full_name ? p.full_name.substring(0, 2).toUpperCase() : 'AS')),
+          gender: p.gender || 'male',
+          department: p.department || '',
+          yearOfStudy: p.year_of_study || p.yearOfStudy || 1,
+          bio: p.bio || '',
+        })
+      }
+    })
+  }, [])
 
   useEffect(() => {
     studentService.fetchNotifications().then(res => {
@@ -64,6 +105,7 @@ export default function StudentTopBar({
 
   const handleProfileUpdated = (updatedUser) => {
     setProfileData(prev => ({ ...prev, ...updatedUser }))
+    updateUser(updatedUser)
   }
 
   return (
@@ -136,14 +178,22 @@ export default function StudentTopBar({
                     )}
                   </div>
 
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={handleMarkAllAsRead}
-                      className="text-[11px] font-bold text-slate-400 hover:text-indigo-400 bg-transparent border-none cursor-pointer transition-colors"
-                    >
-                      Mark all read
-                    </button>
-                  )}
+                  {/* Read All button — always visible, disabled when nothing unread */}
+                  <button
+                    id="notif-read-all-btn"
+                    onClick={unreadCount > 0 ? handleMarkAllAsRead : undefined}
+                    disabled={unreadCount === 0}
+                    className="w-8 h-8 text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all bg-transparent cursor-pointer flex items-center justify-center duration-150"
+                    style={{
+                      background: unreadCount > 0 ? 'rgba(99,95,255,0.10)' : 'transparent',
+                      color: unreadCount > 0 ? '#615FFF' : (dark ? '#3d5470' : '#c0cad8'),
+                      borderColor: unreadCount > 0 ? 'rgba(99,95,255,0.25)' : (dark ? '#1a3050' : '#e2e8f0'),
+                      cursor: unreadCount > 0 ? 'pointer' : 'not-allowed',
+                    }}
+                    title='Mark all read'
+              >
+                    <CheckCheck size={14} />
+                  </button>
                 </div>
 
                 {/* Notification Items List */}
@@ -196,10 +246,8 @@ export default function StudentTopBar({
                 {/* Footer Action */}
                 <div className="px-4 py-3 border-t border-slate-100 dark:border-[#16263e] bg-slate-50/50 dark:bg-[#0f1b30] text-center">
                   <button
-                    onClick={() => {
-                      handleMarkAllAsRead()
-                      setNotifDropdown(false)
-                    }}
+                    id="notif-view-all-btn"
+                    onClick={() => setNotifDropdown(false)}
                     className="text-xs font-extrabold bg-transparent border-none cursor-pointer transition-colors"
                     style={{ color: BRAND }}
                   >

@@ -174,6 +174,7 @@ export default function EventFormModal({
                 >
                   <option value="individual">Individual</option>
                   <option value="team">Team</option>
+                  <option value="both">Both</option>
                 </select>
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
                   <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
@@ -271,8 +272,28 @@ export default function EventFormModal({
             </div>
           </div>
 
-          {/* Grid: Capacity & Registration Deadline */}
+          {/* Grid: Registration Start Time & Capacity */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+              <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
+                Registration Start Date &amp; Time
+              </label>
+              <input
+                type="datetime-local"
+                value={formState.regDateTime}
+                onChange={e => setFormState(p => ({ ...p, regDateTime: e.target.value }))}
+                className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
+                style={{
+                  ...inputStyle,
+                  borderColor: formErrors.regDateTime ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0',
+                  colorScheme: dark ? 'dark' : 'light'
+                }}
+                onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+                onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+              />
+              {formErrors.regDateTime && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.regDateTime}</span>}
+            </div>
+
             <div>
               <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
                 Capacity
@@ -293,26 +314,27 @@ export default function EventFormModal({
               />
               {formErrors.capacity && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.capacity}</span>}
             </div>
+          </div>
 
-            <div>
-              <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-                Registration Deadline (Date & Time)
-              </label>
-              <input
-                type="datetime-local"
-                value={formState.registrationDeadline}
-                onChange={e => setFormState(p => ({ ...p, registrationDeadline: e.target.value }))}
-                className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
-                style={{
-                  ...inputStyle,
-                  borderColor: formErrors.registrationDeadline ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0',
-                  colorScheme: dark ? 'dark' : 'light'
-                }}
-                onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
-                onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
-              />
-              {formErrors.registrationDeadline && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.registrationDeadline}</span>}
-            </div>
+          {/* Registration Deadline (full width) */}
+          <div>
+            <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
+              Registration Deadline (Date &amp; Time)
+            </label>
+            <input
+              type="datetime-local"
+              value={formState.registrationDeadline}
+              onChange={e => setFormState(p => ({ ...p, registrationDeadline: e.target.value }))}
+              className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
+              style={{
+                ...inputStyle,
+                borderColor: formErrors.registrationDeadline ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0',
+                colorScheme: dark ? 'dark' : 'light'
+              }}
+              onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+              onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
+            />
+            {formErrors.registrationDeadline && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.registrationDeadline}</span>}
           </div>
 
           {/* Event Description */}

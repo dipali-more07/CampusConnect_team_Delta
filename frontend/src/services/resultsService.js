@@ -1,11 +1,12 @@
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
+import { fetchWithAuth } from '../utils/apiClient'
 
 import defaultResults from '../data/results.json'
 import defaultEvents from '../data/events.json'
 
 function authHeaders() {
-  const token = sessionStorage.getItem('cc_token')
+  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
@@ -93,12 +94,27 @@ async function mockDeleteResult(id) {
   return { success: true }
 }
 
+async function mockFetchResultsByEvent(eventId) {
+  await new Promise(r => setTimeout(r, 300))
+  const results = getMockResults()
+  const events = getMockEvents()
+
+  const eventResults = results.filter(r => r.eventId === eventId)
+  const enriched = eventResults.map(res => {
+    const ev = events.find(e => e.id === res.eventId)
+    return {
+      ...res,
+      eventName: ev ? ev.name : res.eventName || 'Unknown Event'
+    }
+  })
+
+  return { success: true, results: enriched }
+}
+
 /* ── REAL API ────────────────────────────────────────────────── */
 async function apiFetchResults() {
   try {
-    const res = await fetch(`${API_BASE}/results`, {
-      headers: authHeaders(),
-    })
+    const res = await fetchWithAuth(`${API_BASE}/results`, { method: 'GET' })
     const data = await parseJSON(res)
     if (!res.ok) {
       return { success: false, message: data.message || 'Failed to fetch results.' }
@@ -163,12 +179,69 @@ async function apiDeleteResult(id) {
   }
 }
 
+async function apiFetchResultsByEvent(eventId) {
+  try {
+    const res = await fetchWithAuth(`${API_BASE}/results/event/${eventId}`, { method: 'GET' })
+    const data = await parseJSON(res)
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to fetch event results.' }
+    }
+    return { success: true, results: data.results || data.data || data || [] }
+  } catch (err) {
+    console.error('[resultsService] fetchResultsByEvent error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+/* ── REAL API DECLARE ────────────────────────────────────────── */
+async function apiDeclareResult(payload) {
+  try {
+    const res = await fetchWithAuth(`${API_BASE}/results/declare`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      return { success: false, message: data.message || data.detail || 'Failed to declare result.' }
+    }
+    return { success: true, result: data.data || data.result || data }
+  } catch (err) {
+    console.error('[resultsService] declareResult error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+async function mockDeclareResult(payload) {
+  await new Promise(r => setTimeout(r, 300))
+  const results = getMockResults()
+  const newResult = {
+    id: `RES${String(results.length + 1).padStart(3, '0')}`,
+    eventId: payload.event_id,
+    participantId: payload.participant_id || null,
+    teamId: payload.team_id || null,
+    type: payload.team_id ? 'Team' : 'Solo',
+    rank: payload.rank,
+    score: payload.score ?? '',
+    resultTitle: `${payload.rank === 1 ? '1st' : payload.rank === 2 ? '2nd' : payload.rank === 3 ? '3rd' : payload.rank + 'th'} Rank`,
+    date: new Date().toISOString().split('T')[0],
+  }
+  results.push(newResult)
+  saveMockResults(results)
+  return { success: true, result: newResult }
+}
+
 const resultsService = {
   fetchAll: () =>
     USE_MOCK ? mockFetchResults() : apiFetchResults(),
 
+  fetchByEventId: (eventId) =>
+    USE_MOCK ? mockFetchResultsByEvent(eventId) : apiFetchResultsByEvent(eventId),
+
   create: (payload) =>
     USE_MOCK ? mockCreateResult(payload) : apiCreateResult(payload),
+
+  declare: (payload) =>
+    USE_MOCK ? mockDeclareResult(payload) : apiDeclareResult(payload),
 
   update: (id, payload) =>
     USE_MOCK ? mockUpdateResult(id, payload) : apiUpdateResult(id, payload),

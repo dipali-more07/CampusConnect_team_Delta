@@ -19,9 +19,9 @@ export default function CertificateStats({ loading, stats, cardStyle, skBg, dark
   }
 
   const items = [
-    { label: 'Total Certificates', value: stats.total.toLocaleString(), icon: Award, color: '#fff', bg: `#635BFF` },
-    { label: 'Pending Generation', value: stats.pending.toLocaleString(), icon: Clock, color: '#fff', bg: '#F59E0B' },
-    { label: 'Generated & Sent', value: stats.generatedSent.toLocaleString(), icon: CheckCircle2, color: '#fff', bg: '#10B981' },
+    { label: 'Total Certificates', value: (stats?.total ?? 0).toLocaleString(), icon: Award, color: '#fff', bg: `#635BFF` },
+    { label: 'Pending Generation', value: (stats?.pending ?? 0).toLocaleString(), icon: Clock, color: '#fff', bg: '#F59E0B' },
+    { label: 'Generated & Sent', value: (stats?.generatedSent ?? 0).toLocaleString(), icon: CheckCircle2, color: '#fff', bg: '#10B981' },
   ]
 
   return (

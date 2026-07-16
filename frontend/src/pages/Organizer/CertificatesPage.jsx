@@ -4,6 +4,9 @@ import {
 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import certificatesService from '../../services/certificatesService'
+import registrationsService from '../../services/registrationsService'
+import eventsService from '../../services/eventsService'
+import studentsService from '../../services/studentsService'
 import { useToast } from '../../context/ToastContext'
 
 // Sub-components
@@ -13,6 +16,7 @@ import CertificateTable from '../../components/admin/adminCertificate/Certificat
 import CertPreviewModal from '../../components/admin/adminCertificate/CertPreviewModal'
 import CertVerifyModal from '../../components/admin/adminCertificate/CertVerifyModal'
 import CertDesignerModal from '../../components/admin/adminCertificate/CertDesignerModal'
+import CertBulkGenerateModal from '../../components/admin/adminCertificate/CertBulkGenerateModal'
 
 export default function CertificatesPage({ tokens }) {
   const { dark } = tokens
@@ -20,6 +24,12 @@ export default function CertificatesPage({ tokens }) {
   const showToast = useToast()
 
   const [certs, setCerts] = useState([])
+  const [allEvents, setAllEvents] = useState([])
+  const [registrations, setRegistrations] = useState([])
+  const [students, setStudents] = useState([])
+  const [regsLoaded, setRegsLoaded] = useState(false)
+  const [regsLoading, setRegsLoading] = useState(false)
+
   const [stats, setStats] = useState({ total: 0, pending: 0, generatedSent: 0 })
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -34,12 +44,13 @@ export default function CertificatesPage({ tokens }) {
   const [verifying, setVerifying] = useState(false)
   const [previewCert, setPreviewCert] = useState(null)
   const [designerOpen, setDesignerOpen] = useState(false)
+  const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false)
   const [tmpl, setTmpl] = useState({
     org: 'State University',
     title: 'Certificate of Participation',
     subtitle: 'This is to certify that',
     body: 'has successfully participated in',
-    footer: 'eventhub.university.edu/verify',
+    footer: 'campusconnect.university.edu/verify',
     gradFrom: '#1a1060',
     gradMid: '#0f0a45',
     gradTo: '#0a0838',
@@ -63,24 +74,151 @@ export default function CertificatesPage({ tokens }) {
     color: tokens.txtPri,
   }
 
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+
   const load = async () => {
     setLoading(true)
-    const res = await certificatesService.fetchAll()
-    if (res.success) {
-      setCerts(res.certificates)
-      setStats(res.stats)
-    } else {
-      showToast(res.message || 'Failed to load certificates.', 'error')
+    const [certRes, eventRes, tmplRes] = await Promise.all([
+      certificatesService.fetchAll(),
+      eventsService.fetchAll(),
+      certificatesService.fetchTemplates()
+    ])
+
+    if (certRes.success) {
+      setCerts(certRes.certificates || [])
+      
+      // Initial stats
+      const total = certRes.certificates?.length || 0
+      const pending = certRes.certificates?.filter(c => c.status === 'Pending').length || 0
+      const generatedSent = certRes.certificates?.filter(c => c.status === 'Generated' || c.status === 'Sent').length || 0
+      setStats({ total, pending, generatedSent })
+    }
+    if (eventRes.success) {
+      setAllEvents(eventRes.events || [])
+    }
+    if (tmplRes?.success && tmplRes.templates?.length > 0) {
+      const activeTmpl = tmplRes.templates.find(t => t.is_active) || tmplRes.templates[0]
+      if (activeTmpl) {
+        setTmpl({
+          org: activeTmpl.organisation_name || 'State University',
+          title: activeTmpl.certificate_title || 'Certificate of Participation',
+          subtitle: 'This is to certify that',
+          body: 'has successfully participated in',
+          footer: 'campusconnect.university.edu/verify',
+          gradFrom: activeTmpl.background_gradient_from || activeTmpl.background_image || '#1a1060',
+          gradMid: activeTmpl.background_gradient_mid || '#0f0a45',
+          gradTo: activeTmpl.background_gradient_to || '#0a0838',
+          accentColor: activeTmpl.accent_color || activeTmpl.font_color || '#615FFF',
+          borderStyle: activeTmpl.border_style || 'none',
+          fontFamily: activeTmpl.font_family || 'Manrope, sans-serif',
+          showLogo: activeTmpl.show_logo !== undefined ? activeTmpl.show_logo : true,
+          showSignatures: activeTmpl.show_signatures !== undefined ? activeTmpl.show_signatures : true,
+          templateSaved: true
+        })
+      }
     }
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
-  const statuses = ['All', 'Pending', 'Generated', 'Sent']
-  const events = ['All', ...Array.from(new Set(certs.map(c => c.eventName)))]
+  // Load registrations on demand when activeEvent is not 'All'
+  useEffect(() => {
+    if (activeEvent === 'All') {
+      setRegistrations([])
+      return
+    }
 
-  const filtered = certs.filter(c => {
+    const loadRegs = async () => {
+      setRegsLoading(true)
+      const selectedEv = allEvents.find(e => e.name === activeEvent)
+      const selectedEvId = selectedEv?.id || selectedEv?.event_id
+      if (selectedEvId) {
+        const [regRes, stuRes] = await Promise.all([
+          eventsService.fetchRegistrations(selectedEvId),
+          studentsService.fetchAll()
+        ])
+        if (regRes.success) setRegistrations(regRes.registrations || [])
+        if (stuRes.success) setStudents(stuRes.students || [])
+      }
+      setRegsLoading(false)
+    }
+    loadRegs()
+  }, [activeEvent, allEvents, refreshTrigger])
+
+  const statuses = ['All', 'Pending', 'Generated', 'Sent']
+  const events = ['All', ...allEvents.map(e => e.name)]
+
+  // Construct displayList dynamically based on activeEvent
+  let displayList = []
+
+  if (activeEvent === 'All') {
+    displayList = [...certs]
+  } else {
+    const selectedEv = allEvents.find(e => e.name === activeEvent)
+    const selectedEvId = selectedEv?.id || selectedEv?.event_id
+
+    registrations.forEach(reg => {
+      const regEventId = reg.eventId || reg.event_id || selectedEvId
+      const resolvedUserId = reg.user_id || reg.student_id || reg.userId || reg.studentId || reg.rollNo || reg.id
+      const student = students.find(s => String(s.id) === String(resolvedUserId) || String(s.rollNo) === String(resolvedUserId))
+      
+      const regStudentName = reg.full_name || reg.name || reg.studentName || reg.student_name || student?.name || 'Unknown Student'
+      const regRollNo = reg.college_id || reg.roll_no || reg.rollNo || student?.rollNo || 'N/A'
+      const regUserId = resolvedUserId
+
+      // Check if there is already a certificate in certs
+      const matchingCert = certs.find(c => {
+        const certEventId = c.eventId || c.event_id
+        const matchEvent = String(certEventId) === String(regEventId)
+        const matchUser = (c.userId && String(c.userId) === String(regUserId)) ||
+                          (c.user_id && String(c.user_id) === String(regUserId)) ||
+                          (c.rollNo && String(c.rollNo) === String(regRollNo)) ||
+                          (c.studentName && c.studentName.toLowerCase() === regStudentName.toLowerCase())
+        return matchEvent && matchUser
+      })
+
+      if (matchingCert) {
+        displayList.push({
+          ...matchingCert,
+          studentName: regStudentName || matchingCert.studentName,
+          rollNo: regRollNo || matchingCert.rollNo,
+          eventId: regEventId,
+          eventName: activeEvent,
+          userId: regUserId
+        })
+      } else {
+        const dept = reg.department || student?.department || 'N/A'
+        const yr = reg.course || reg.year || student?.year || 'N/A'
+        const email = reg.email || student?.email || ''
+
+        displayList.push({
+          id: `VIRT-${reg.id || reg.registration_id || Math.random()}`,
+          studentName: regStudentName,
+          rollNo: regRollNo,
+          department: dept,
+          year: yr,
+          eventId: regEventId,
+          eventName: activeEvent,
+          issuedDate: 'N/A',
+          verifyCode: 'N/A',
+          status: 'Pending',
+          email: email,
+          userId: regUserId
+        })
+      }
+    })
+  }
+
+  // Update dynamic stats based on displayList (for selected event or all certs)
+  useEffect(() => {
+    const total = displayList.length
+    const pending = displayList.filter(c => c.status === 'Pending').length
+    const generatedSent = displayList.filter(c => c.status === 'Generated' || c.status === 'Sent').length
+    setStats({ total, pending, generatedSent })
+  }, [displayList.length, activeEvent])
+
+  const filtered = displayList.filter(c => {
     const q = searchQuery.toLowerCase()
     const matchSearch = !q ||
       c.studentName.toLowerCase().includes(q) ||
@@ -88,7 +226,8 @@ export default function CertificatesPage({ tokens }) {
       c.verifyCode.toLowerCase().includes(q) ||
       c.eventName.toLowerCase().includes(q)
     const matchStatus = activeStatus === 'All' || c.status === activeStatus
-    const matchEvent = activeEvent === 'All' || c.eventName === activeEvent
+    // We already filtered by event if activeEvent !== 'All'
+    const matchEvent = activeEvent === 'All' || c.eventName === activeEvent || String(c.eventId || c.event_id) === String(allEvents.find(e => e.name === activeEvent)?.id)
     return matchSearch && matchStatus && matchEvent
   })
 
@@ -100,12 +239,13 @@ export default function CertificatesPage({ tokens }) {
   const toggleAll = () =>
     setSelected(allSelected ? [] : filtered.map(c => c.id))
 
-  const handleBulkGenerate = async () => {
+  const handleBulkGenerate = async (eventId) => {
     setBulkLoading(true)
-    const res = await certificatesService.bulkGenerate('ALL')
+    const res = await certificatesService.bulkGenerate(eventId)
     if (res.success) {
       showToast(res.message, 'success')
       setSelected([])
+      setRefreshTrigger(prev => prev + 1)
       load()
     } else {
       showToast(res.message, 'error')
@@ -113,15 +253,45 @@ export default function CertificatesPage({ tokens }) {
     setBulkLoading(false)
   }
 
-  const handleGenerate = async (ids) => {
-    if (!ids || ids.length === 0) return
-    const res = await certificatesService.generate(ids)
+  const handleGenerate = async (target) => {
+    if (!target) return
+    
+    let listToGen = []
+    if (Array.isArray(target)) {
+      // It's an array of certificate IDs (bulk selection)
+      listToGen = target.map(id => {
+        const cert = displayList.find(c => c.id === id)
+        return {
+          id: cert.id,
+          eventId: cert.eventId || cert.event_id,
+          userId: cert.userId || cert.user_id || cert.rollNo || cert.id
+        }
+      })
+    } else {
+      // It's a single certificate object
+      listToGen = [{
+        id: target.id,
+        eventId: target.eventId || target.event_id,
+        userId: target.userId || target.user_id || target.rollNo || target.id
+      }]
+    }
+
+    if (listToGen.length === 0) return
+
+    let res
+    if (listToGen.length === 1) {
+      res = await certificatesService.generate(listToGen[0].eventId, listToGen[0].userId)
+    } else {
+      res = await certificatesService.generate(listToGen)
+    }
+
     if (res.success) {
-      showToast(res.message, 'success')
+      showToast(res.message || 'Certificate(s) generated successfully.', 'success')
       setSelected([])
+      setRefreshTrigger(prev => prev + 1)
       load()
     } else {
-      showToast(res.message, 'error')
+      showToast(res.message || 'Failed to generate certificate(s).', 'error')
     }
   }
 
@@ -199,7 +369,7 @@ export default function CertificatesPage({ tokens }) {
             <Palette size={14} /> Design Template
           </button>
           <button
-            onClick={handleBulkGenerate}
+            onClick={() => setBulkGenerateOpen(true)}
             disabled={bulkLoading}
             className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px disabled:opacity-70"
             style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
@@ -297,6 +467,18 @@ export default function CertificatesPage({ tokens }) {
         dark={dark}
         BRAND={BRAND}
         showToast={showToast}
+      />
+
+      {/* ── Bulk Generate Modal ── */}
+      <CertBulkGenerateModal
+        open={bulkGenerateOpen}
+        onClose={() => setBulkGenerateOpen(false)}
+        onConfirm={handleBulkGenerate}
+        certs={certs}
+        tokens={tokens}
+        dark={dark}
+        BRAND={BRAND}
+        inputStyle={inputStyle}
       />
     </div>
   )
