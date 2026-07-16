@@ -1,5 +1,5 @@
 import React from 'react'
-import { GraduationCap, Eye, Pencil, Trash2 } from 'lucide-react'
+import { GraduationCap, Eye, Trash2, UserX, UserCheck } from 'lucide-react'
 import Avatar from './Avatar'
 
 export default function StudentTable({
@@ -93,13 +93,16 @@ export default function StudentTable({
                     <td className="px-5 py-3.5">
                       <div className="flex items-center gap-1.5">
                         {[
-                          { Icon: Eye, action: () => setViewStudent(s), hover: BRAND },
-                          { Icon: Pencil, action: () => openEdit(s), hover: BRAND },
-                          { Icon: Trash2, action: () => setDeleteTarget(s), hover: '#ef4444' },
-                        ].map(({ Icon, action, hover }) => (
+                          { Icon: Eye, action: () => setViewStudent(s), hover: BRAND, title: 'View Info' },
+                          s.status === 'Active'
+                            ? { Icon: UserX, action: () => handleToggleStatus(s), hover: '#f97316', title: 'Deactivate Student' }
+                            : { Icon: UserCheck, action: () => handleToggleStatus(s), hover: '#10b981', title: 'Activate Student' },
+                          { Icon: Trash2, action: () => setDeleteTarget(s), hover: '#ef4444', title: 'Delete Student' },
+                        ].map(({ Icon, action, hover, title }) => (
                           <button
-                            key={hover + Icon.name}
+                            key={title}
                             onClick={action}
+                            title={title}
                             className="w-[28px] h-[28px] rounded-lg border bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
                             style={{ borderColor: tokens.border, color: tokens.txtSec }}
                             onMouseEnter={e => {

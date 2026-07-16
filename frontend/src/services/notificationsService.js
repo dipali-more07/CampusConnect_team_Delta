@@ -89,17 +89,14 @@ async function mockDelete(id) {
 }
 
 async function mockSend(payload) {
-  const { notifTypes = [], sendTo, subject, message, scheduled } = payload
-  await new Promise(r => setTimeout(r, scheduled ? 400 : 600))
-  if (!subject?.trim() || !message?.trim() || notifTypes.length === 0) {
-    return { success: false, message: 'Subject, message and at least one type are required.' }
+  const { notification_type, user_id, title, message } = payload
+  await new Promise(r => setTimeout(r, 600))
+  if (!title?.trim() || !message?.trim()) {
+    return { success: false, message: 'Title and message are required.' }
   }
   return {
     success: true,
-    message: scheduled
-      ? `Notification scheduled for ${new Date(scheduled).toLocaleString()}`
-      : `Notification sent via ${notifTypes.join(', ')} to "${sendTo}".`,
-    scheduled: !!scheduled,
+    message: `Notification (${notification_type || 'system'}) sent to "${user_id || 'all'}".`,
     sentAt: new Date().toISOString(),
   }
 }
@@ -189,18 +186,11 @@ async function apiDelete(id) {
  * }} payload
  */
 async function apiSend(payload) {
-  const { notifTypes, sendTo, subject, message, scheduled } = payload
   try {
-    const res = await fetch(`${API_BASE}/notifications/send`, {
+    const res = await fetch(`${API_BASE}/notifications/broadcast`, {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({
-        notifTypes,
-        sendTo,
-        subject,
-        message,
-        scheduled: scheduled || null,
-      }),
+      body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
@@ -210,8 +200,7 @@ async function apiSend(payload) {
     }
     return {
       success: true,
-      message: data.message || 'Notification sent successfully.',
-      scheduled: data.scheduled ?? false,
+      message: data.message || 'Notification broadcasted successfully.',
       sentAt: data.sentAt || null,
     }
   } catch (err) {

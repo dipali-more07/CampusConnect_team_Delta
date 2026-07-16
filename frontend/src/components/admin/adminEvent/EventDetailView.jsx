@@ -4,22 +4,21 @@ import {
 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 import eventsService from '../../../services/eventsService'
+import studentsService from '../../../services/studentsService'
+import analyticsService from '../../../services/analyticsService'
 
 export default function EventDetailView({ event, onBack, onEdit, tokens, showToast }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
-  const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('cc_event_detail_active_tab') || 'Overview'
-  })
-
-  useEffect(() => {
-    localStorage.setItem('cc_event_detail_active_tab', activeTab)
-  }, [activeTab])
+  const [activeTab, setActiveTab] = useState('Overview')
 
   const [registrations, setRegistrations] = useState([])
   const [loadingRegs, setLoadingRegs] = useState(false)
   const [attendance, setAttendance] = useState([])
   const [loadingAtt, setLoadingAtt] = useState(false)
+  const [students, setStudents] = useState([])
+  const [analyticsData, setAnalyticsData] = useState(null)
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false)
 
   // Search and Pagination states for Registrations
   const [regSearch, setRegSearch] = useState('')
@@ -33,9 +32,15 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
   const loadRegistrations = async () => {
     setLoadingRegs(true)
-    const res = await eventsService.fetchRegistrations(event.id)
-    if (res.success) {
-      setRegistrations(res.registrations)
+    const [regRes, stuRes] = await Promise.all([
+      eventsService.fetchRegistrations(event.id),
+      studentsService.fetchAll()
+    ])
+    if (stuRes.success) {
+      setStudents(stuRes.students || [])
+    }
+    if (regRes.success) {
+      setRegistrations(regRes.registrations || [])
     }
     setLoadingRegs(false)
   }
@@ -49,25 +54,52 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
     setLoadingAtt(false)
   }
 
+  const loadAnalytics = async () => {
+    setLoadingAnalytics(true)
+    const res = await analyticsService.fetchEventAnalytics(event.id)
+    if (res.success) {
+      setAnalyticsData(res.data)
+    }
+    setLoadingAnalytics(false)
+  }
+
   useEffect(() => {
-    loadRegistrations()
-    loadAttendance()
-  }, [event.id])
+    if (activeTab === 'Overview' || activeTab === 'Registrations') {
+      loadRegistrations()
+    }
+  }, [event.id, activeTab])
+
+  useEffect(() => {
+    if (activeTab === 'Attendance') {
+      loadAttendance()
+    }
+  }, [event.id, activeTab])
+
+  useEffect(() => {
+    if (activeTab === 'Analytics') {
+      loadAnalytics()
+    }
+  }, [event.id, activeTab])
 
   const handleStatusChange = async (regId, status) => {
     const res = await eventsService.updateRegistrationStatus(regId, status)
     if (res.success) {
       showToast(`Registration status updated to ${status}.`, 'success')
       setRegistrations(prev =>
-        prev.map(r => r.id === regId ? { ...r, status } : r)
+        prev.map(r => {
+          const rId = r.id || r.registration_id
+          if (rId === regId) {
+            return { ...r, registration_status: status, status }
+          }
+          return r
+        })
       )
       
       let change = 0
-      const oldReg = registrations.find(r => r.id === regId)
-      if (oldReg) {
-        if (oldReg.status !== 'Approved' && status === 'Approved') change = 1
-        else if (oldReg.status === 'Approved' && status !== 'Approved') change = -1
-      }
+      const oldReg = registrations.find(r => (r.id === regId) || (r.registration_id === regId))
+      const oldStatus = oldReg?.registration_status || oldReg?.status
+      if (oldStatus !== 'Approved' && status === 'Approved') change = 1
+      else if (oldStatus === 'Approved' && status !== 'Approved') change = -1
       if (change !== 0) {
         event.registrationsCount = Math.max(0, (event.registrationsCount || 0) + change)
       }
@@ -93,38 +125,51 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   }
 
   const getRegStatusStyle = (status) => {
-    switch (status) {
-      case 'Approved':
-        return {
-          bg: dark ? 'rgba(16, 185, 129, 0.15)' : '#e6fbf2',
-          text: '#00BC7D',
-        }
-      case 'Pending':
-        return {
-          bg: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
-          text: '#d97706',
-        }
-      case 'Rejected':
-        return {
-          bg: dark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2',
-          text: '#ef4444',
-        }
-      default:
-        return {
-          bg: dark ? '#162640' : '#f1f5f9',
-          text: dark ? '#7a98bb' : '#64748b',
-        }
+    const norm = String(status || '').trim().toLowerCase()
+    if (norm === 'approved' || norm === 'completed' || norm === 'confirmed') {
+      return {
+        bg: dark ? 'rgba(16, 185, 129, 0.15)' : '#e6fbf2',
+        text: '#00BC7D',
+      }
+    }
+    if (norm === 'pending' || norm === 'upcoming' || norm === 'ongoing') {
+      return {
+        bg: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+        text: '#d97706',
+      }
+    }
+    if (norm === 'rejected' || norm === 'cancelled') {
+      return {
+        bg: dark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2',
+        text: '#ef4444',
+      }
+    }
+    return {
+      bg: dark ? '#162640' : '#f1f5f9',
+      text: dark ? '#7a98bb' : '#64748b',
     }
   }
 
   const badge = getStatusStyle(event.status)
   const isApproved = (event.approvalStatus || 'Approved') === 'Approved'
-  const effectiveRegs = isApproved ? (event.registrationsCount || 0) : 0
+  const regCount = registrations.length
+  const effectiveRegs = isApproved ? regCount : 0
   const regPercent = isApproved && event.capacity ? Math.min(Math.round((effectiveRegs / event.capacity) * 100), 100) : 0
   const remaining = isApproved ? Math.max(event.capacity - effectiveRegs, 0) : event.capacity
 
   // Filtered & Paginated Registrations
-  const filteredRegs = registrations.filter(r => {
+  const filteredRegs = registrations.map(r => {
+    const student = students.find(s => s.id === r.userId || s.id === r.user_id)
+    return {
+      ...r,
+      studentName: student?.name || r.studentName || r.student_name || 'N/A',
+      rollNo: student?.rollNo || r.rollNo || r.roll_no || (r.user_id ? r.user_id.slice(0, 8) : 'N/A'),
+      department: student?.department || r.department || 'N/A',
+      year: student?.year || r.year || 'N/A',
+      date: r.registeredAt || r.registered_at ? new Date(r.registeredAt || r.registered_at).toLocaleDateString() : (r.date || 'N/A'),
+      status: r.registrationStatus || r.registration_status || r.status || 'Pending'
+    }
+  }).filter(r => {
     const q = regSearch.toLowerCase().trim()
     if (!q) return true
     return (
@@ -145,7 +190,19 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   const paginatedRegs = filteredRegs.slice(regStartIndex, regEndIndex)
 
   // Filtered & Paginated Attendance
-  const filteredAtt = attendance.filter(a => {
+  const filteredAtt = attendance.map(a => {
+    const reg = registrations.find(r => (r.id === a.registrationId) || (r.registration_id === a.registrationId))
+    const student = reg ? students.find(s => s.id === reg.userId || s.id === reg.user_id) : null
+    return {
+      ...a,
+      studentName: a.studentName && a.studentName !== 'Student' && a.studentName.length < 20
+        ? a.studentName
+        : (student?.name || reg?.studentName || reg?.student_name || reg?.full_name || a.studentName),
+      rollNo: a.rollNo && a.rollNo !== 'N/A'
+        ? a.rollNo
+        : (student?.rollNo || reg?.rollNo || reg?.roll_no || a.rollNo)
+    }
+  }).filter(a => {
     const q = attSearch.toLowerCase().trim()
     if (!q) return true
     return (
@@ -260,7 +317,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
               <MapPin size={15} /> {event.venue}
             </span>
             <span className="flex items-center gap-1.5">
-              <Users size={15} /> {event.registrationsCount} / {event.capacity} registered
+              <Users size={15} /> {regCount} / {event.capacity} registered
             </span>
           </div>
         </div>
@@ -369,7 +426,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                     { label: 'Date', value: event.date },
                     { label: 'Time', value: event.time },
                     { label: 'Capacity', value: `${event.capacity} seats` },
-                    { label: 'Registered', value: `${event.registrationsCount} students` },
+                    { label: 'Registered', value: `${regCount} students` },
                     { label: 'Organizer', value: event.organizer },
                     { label: 'QR Attendance', value: event.qrAttendance || 'Enabled' }
                   ].map((row, i) => (
@@ -410,7 +467,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] font-bold" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                  <span>{event.registrationsCount} registered</span>
+                  <span>{regCount} registered</span>
                   <span>{remaining} remaining</span>
                 </div>
               </div>
@@ -495,22 +552,22 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                         <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>YEAR</th>
                         <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DATE</th>
                         <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STATUS</th>
-                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>ACTION</th>
                       </tr>
                     </thead>
                     <tbody key={`${regPage}-${regSearch}`} className="divide-y" style={{ divideColor: dark ? '#1a3050' : '#e2e8f0' }}>
                       {paginatedRegs.length === 0 ? (
                         <tr className="animate-slide-up-fade">
-                          <td colSpan="7" className="p-12 text-center text-[13.5px]" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                          <td colSpan="6" className="p-12 text-center text-[13.5px]" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
                             No matching registrations found.
                           </td>
                         </tr>
                       ) : (
                         paginatedRegs.map((att, i) => {
                           const statusBadge = getRegStatusStyle(att.status)
+                          const regId = att.id || att.registration_id
                           return (
                             <tr 
-                              key={att.id} 
+                              key={regId} 
                               className="animate-slide-up-fade" 
                               style={{ 
                                 borderBottom: i < paginatedRegs.length - 1 ? `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` : 'none',
@@ -529,26 +586,6 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                                 >
                                   {att.status}
                                 </span>
-                              </td>
-                              <td className="py-3.5 text-[13px]">
-                                <div className="flex gap-2 items-center">
-                                  <button
-                                    onClick={() => handleStatusChange(att.id, 'Approved')}
-                                    className="w-7 h-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center transition-all duration-150 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
-                                    style={{ color: dark ? '#7a98bb' : '#64748b' }}
-                                    title="Approve"
-                                  >
-                                    <Check size={16} className="hover:text-emerald-500 transition-colors" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleStatusChange(att.id, 'Rejected')}
-                                    className="w-7 h-7 rounded-lg bg-transparent border-none cursor-pointer flex items-center justify-center transition-all duration-150 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                                    style={{ color: dark ? '#7a98bb' : '#64748b' }}
-                                    title="Reject"
-                                  >
-                                    <XCircle size={16} className="hover:text-rose-500 transition-colors" />
-                                  </button>
-                                </div>
                               </td>
                             </tr>
                           )
@@ -790,7 +827,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                           <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Student</th>
                           <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Roll No</th>
                           <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Check-in</th>
-                          <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Check-out</th>
+                          <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Attendance ID</th>
                           <th className="p-4 text-[11px] font-bold uppercase tracking-wider text-slate-400">Status</th>
                         </tr>
                       </thead>
@@ -833,7 +870,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                                 <td className="p-4 text-[13.5px] font-bold text-slate-900 dark:text-slate-100">{row.studentName}</td>
                                 <td className="p-4 text-[13.5px] font-semibold text-slate-500 dark:text-slate-400">{row.rollNo}</td>
                                 <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-300">{row.checkIn}</td>
-                                <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-300">{row.checkOut}</td>
+                                <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-300">
+                                  <span className="font-mono text-[11.5px] bg-slate-100 dark:bg-slate-800/50 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700/50" title={row.id}>
+                                    {row.id ? `${row.id.slice(0, 8)}...` : '-'}
+                                  </span>
+                                </td>
                                 <td className="p-4 text-[13.5px]">
                                   <span 
                                     className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
@@ -937,23 +978,148 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
           </div>
         )}
 
-        {activeTab === 'Analytics' && (
-          <div 
-            className="rounded-2xl p-6 border text-center"
-            style={{ 
-              borderColor: dark ? '#1a3050' : '#e2e8f0', 
-              background: dark ? '#0f1e30' : '#ffffff' 
-            }}
-          >
-            <BarChart2 size={40} className="mx-auto mb-3" style={{ color: BRAND }} />
-            <h3 className="text-[16px] font-extrabold m-0 mb-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-              Event Insights & Analytics
-            </h3>
-            <p className="text-[13.5px] max-w-sm mx-auto leading-relaxed m-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Detailed registration timelines, department conversions, and post-event attendance ratios are processing.
-            </p>
-          </div>
-        )}
+        {activeTab === 'Analytics' && (() => {
+          const regs = analyticsData?.registrations || {}
+          const att = analyticsData?.attendance || {}
+          const certs = analyticsData?.certificates || {}
+          
+          const regTotal = regs.total ?? registrations.length ?? 0
+          const regConfirmed = regs.confirmed ?? registrations.filter(r => {
+            const s = String(r.status || r.registrationStatus || r.registration_status || '').trim().toLowerCase()
+            return s === 'approved' || s === 'completed' || s === 'confirmed'
+          }).length
+          const regPending = regs.pending ?? registrations.filter(r => {
+            const s = String(r.status || r.registrationStatus || r.registration_status || '').trim().toLowerCase()
+            return s === 'pending' || s === ''
+          }).length
+          const regCancelled = regs.cancelled ?? registrations.filter(r => {
+            const s = String(r.status || r.registrationStatus || r.registration_status || '').trim().toLowerCase()
+            return s === 'rejected' || s === 'cancelled'
+          }).length
+          
+          const attPresent = att.present ?? attendance.filter(a => a.status === 'Present').length
+          const attAbsent = att.absent ?? attendance.filter(a => a.status === 'Absent').length
+          const attPercentage = att.percentage ?? (attPresent + attAbsent > 0 ? ((attPresent / (attPresent + attAbsent)) * 100).toFixed(1) : 0)
+          
+          const certsGenerated = certs.generated ?? 0
+          
+          return (
+            <div className="flex flex-col gap-6 animate-fadeIn">
+              {loadingAnalytics ? (
+                <div className="flex items-center justify-center p-12">
+                  <Loader2 size={32} className="animate-spin text-indigo-600" />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  
+                  {/* Registrations Card */}
+                  <div 
+                    className="rounded-2xl p-6 border flex flex-col justify-between transition-all hover:scale-[1.01] duration-300"
+                    style={{ 
+                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
+                      background: dark ? 'linear-gradient(145deg, #0f1e30 0%, #0b1524 100%)' : '#ffffff',
+                      boxShadow: dark ? 'none' : '0 10px 25px rgba(0,0,0,0.03)'
+                    }}
+                  >
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <span className="text-[12px] font-black uppercase tracking-wider text-slate-400">Registrations</span>
+                        <Users size={18} className="text-indigo-500" />
+                      </div>
+                      <div className="text-[36px] font-black tracking-tight leading-none mb-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                        {regTotal}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2.5 border-t pt-4" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
+                      <div className="flex items-center justify-between text-[13px] font-bold">
+                        <span className="flex items-center gap-1.5 text-emerald-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Confirmed
+                        </span>
+                        <span style={{ color: dark ? '#e8f0fe' : '#475569' }}>{regConfirmed}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[13px] font-bold">
+                        <span className="flex items-center gap-1.5 text-amber-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Pending
+                        </span>
+                        <span style={{ color: dark ? '#e8f0fe' : '#475569' }}>{regPending}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[13px] font-bold">
+                        <span className="flex items-center gap-1.5 text-rose-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Cancelled
+                        </span>
+                        <span style={{ color: dark ? '#e8f0fe' : '#475569' }}>{regCancelled}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Attendance Card */}
+                  <div 
+                    className="rounded-2xl p-6 border flex flex-col justify-between transition-all hover:scale-[1.01] duration-300"
+                    style={{ 
+                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
+                      background: dark ? 'linear-gradient(145deg, #0f1e30 0%, #0b1524 100%)' : '#ffffff',
+                      boxShadow: dark ? 'none' : '0 10px 25px rgba(0,0,0,0.03)'
+                    }}
+                  >
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <span className="text-[12px] font-black uppercase tracking-wider text-slate-400">Attendance</span>
+                        <Clock size={18} className="text-emerald-500" />
+                      </div>
+                      <div className="text-[36px] font-black tracking-tight leading-none mb-4 flex items-baseline gap-1.5" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                        {attPercentage}%
+                        <span className="text-[12px] font-bold text-slate-400">ratio</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2.5 border-t pt-4" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
+                      <div className="flex items-center justify-between text-[13px] font-bold">
+                        <span className="flex items-center gap-1.5 text-emerald-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Present
+                        </span>
+                        <span style={{ color: dark ? '#e8f0fe' : '#475569' }}>{attPresent}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[13px] font-bold">
+                        <span className="flex items-center gap-1.5 text-rose-500">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" /> Absent
+                        </span>
+                        <span style={{ color: dark ? '#e8f0fe' : '#475569' }}>{attAbsent}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Certificates Card */}
+                  <div 
+                    className="rounded-2xl p-6 border flex flex-col justify-between transition-all hover:scale-[1.01] duration-300"
+                    style={{ 
+                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
+                      background: dark ? 'linear-gradient(145deg, #0f1e30 0%, #0b1524 100%)' : '#ffffff',
+                      boxShadow: dark ? 'none' : '0 10px 25px rgba(0,0,0,0.03)'
+                    }}
+                  >
+                    <div>
+                      <div className="flex justify-between items-start mb-4">
+                        <span className="text-[12px] font-black uppercase tracking-wider text-slate-400">Certificates Issued</span>
+                        <Award size={18} className="text-amber-500" />
+                      </div>
+                      <div className="text-[36px] font-black tracking-tight leading-none mb-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                        {certsGenerated}
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col gap-2 border-t pt-4" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
+                      <p className="text-[12px] font-medium m-0 leading-relaxed" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                        Digital certificates are automatically distributed upon verified event check-in and completion.
+                      </p>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {activeTab === 'Certificates' && (
           <div 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { User, Shield, Palette, Key, ShieldAlert } from 'lucide-react'
 import settingsService from '../../services/settingsService'
+import organizersService from '../../services/organizersService'
 import { useToast } from '../../context/ToastContext'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -91,22 +92,37 @@ export default function SettingsPage({ tokens }) {
 
   const loadSettings = async () => {
     setLoading(true)
-    const res = await settingsService.fetch()
-    if (res.success) {
-      if (res.settings.profile) {
-        setProfileForm(p => ({ ...p, ...res.settings.profile }))
-      }
-      const fetchedApp = res.settings.appearance || {}
+    const orgProfileRes = await organizersService.getProfile()
+    const settingsRes = await settingsService.fetch()
+
+    if (orgProfileRes.success) {
+      const org = orgProfileRes.organizer
+      setProfileForm(p => ({
+        ...p,
+        id: org.id || '',
+        name: org.name || '',
+        email: org.email || '',
+        department: org.department || '',
+        phone: org.phone || '',
+        employeeId: org.collegeId || org.id || '',
+        avatarColor: org.avatarColor || '#615FFF'
+      }))
+    } else if (settingsRes.success && settingsRes.settings.profile) {
+      setProfileForm(p => ({ ...p, ...settingsRes.settings.profile }))
+    }
+
+    if (settingsRes.success) {
+      const fetchedApp = settingsRes.settings.appearance || {}
       setAppearanceForm({
         themeMode: dark ? 'Dark' : 'Light',
         accentColor: accentColor || fetchedApp.accentColor || '#615FFF',
         fontSize: fontSize || fetchedApp.fontSize || 'medium'
       })
-      if (res.settings.permissions) {
-        setPermissions(res.settings.permissions)
+      if (settingsRes.settings.permissions) {
+        setPermissions(settingsRes.settings.permissions)
       }
-    } else {
-      showToast(res.message || 'Failed to fetch settings.', 'error')
+    } else if (!orgProfileRes.success) {
+      showToast('Failed to fetch settings.', 'error')
     }
     setLoading(false)
   }
@@ -126,12 +142,23 @@ export default function SettingsPage({ tokens }) {
 
   const handleSaveProfile = async () => {
     setSaving(true)
-    const res = await settingsService.updateProfile(profileForm)
+    let res
+    if (profileForm.id) {
+      res = await organizersService.update(profileForm.id, {
+        name: profileForm.name,
+        email: profileForm.email,
+        phone: profileForm.phone,
+        department: profileForm.department,
+        collegeId: profileForm.employeeId
+      })
+    } else {
+      res = await settingsService.updateProfile(profileForm)
+    }
     setSaving(false)
     if (res.success) {
-      showToast(res.message, 'success')
+      showToast(res.message || 'Profile updated successfully.', 'success')
     } else {
-      showToast(res.message, 'error')
+      showToast(res.message || 'Failed to update profile.', 'error')
     }
   }
 

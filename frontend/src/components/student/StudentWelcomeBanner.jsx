@@ -16,7 +16,7 @@ export default function StudentWelcomeBanner({ user, tokens }) {
       }}
     >
       {/* 🌟 1. Animated Border Shimmer Overlay on Hover */}
-      <div className="absolute inset-0 rounded-3xl p-[1.5px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-gradient-to-r from-amber-400 via-indigo-500 to-emerald-400 [background-size:200%_auto] animate-borderGlow" />
+      <div className="absolute inset-0 rounded-3xl p-[1.5px] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-700 bg-linear-to-r from-amber-400 via-indigo-500 to-emerald-400 bg-size-[200%_auto] animate-borderGlow" />
 
       {/* 🌌 2. Ambient Radiant Background Orbs */}
       <div
@@ -51,7 +51,7 @@ export default function StudentWelcomeBanner({ user, tokens }) {
 
           <h2 className="text-3xl sm:text-4xl md:text-[44px] font-black tracking-tight m-0 my-1 leading-tight flex items-center gap-2.5">
             <span
-              className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff9800] via-[#f97316] to-[#ff5722] drop-shadow-sm group-hover:brightness-125 transition-all duration-300"
+              className="text-transparent bg-clip-text bg-linear-to-r from-[#ff9800] via-[#f97316] to-[#ff5722] drop-shadow-sm group-hover:brightness-125 transition-all duration-300"
             >
               {user?.name || 'Arjun Sharma'}
             </span>

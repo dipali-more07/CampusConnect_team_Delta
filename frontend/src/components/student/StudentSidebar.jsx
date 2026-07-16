@@ -8,7 +8,8 @@ import {
   LogOut,
   GraduationCap,
   TextAlignJustify,
-  Bell
+  Bell,
+  Trophy
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -16,6 +17,7 @@ export const STUDENT_NAV = [
   { icon: LayoutDashboard, label: 'Dashboard' },
   { icon: SquareCheckBig,  label: 'Attendance' },
   { icon: CalendarDays,    label: 'Events' },
+  { icon: Trophy,          label: 'Results' },
   { icon: Award,           label: 'Certificates' },
 ]
 
@@ -96,7 +98,7 @@ export default function StudentSidebar({
                 transition: 'color 0.25s ease',
               }}
             >
-              EventHub
+              CampusConnect
             </span>
             <span className="text-[11px] font-medium leading-none text-slate-400 dark:text-[#4a6a8a]">
               Student Portal

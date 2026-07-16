@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useCallback } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { saveTokens, clearTokens } from '../utils/apiClient'
 
 const AuthContext = createContext(null)
 
 const SESSION_KEY = 'cc_session'
+const REFRESH_KEY = 'cc_refresh_token'
 
 function loadSession() {
   try {
@@ -26,24 +28,84 @@ function loadSession() {
  * Then call useAuth() in any component.
  *
  * useAuth() returns:
- *   { user, token, isLoggedIn, login, logout }
+ *   { user, token, isLoggedIn, login, logout, updateToken }
  */
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(loadSession)
 
-  const login = useCallback((user, token) => {
+  // Fetch and sync complete user info from /auth/me on mount/token load
+  useEffect(() => {
+    const token = session?.token
+    if (token) {
+      fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/me`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'ngrok-skip-browser-warning': 'true',
+        }
+      })
+      .then(res => {
+        if (res.ok) return res.json()
+        throw new Error('Failed to fetch /auth/me')
+      })
+      .then(data => {
+        const profile = data.data || data
+        let role = (profile.role || profile.userType || profile.roleName || 'student').toString().toLowerCase()
+        if (role === 'participant') {
+          role = 'student'
+        }
+        const updatedUser = {
+          ...profile,
+          name: profile.full_name || profile.name || profile.fullName || profile.username || profile.email?.split('@')[0] || 'User',
+          role,
+        }
+        setSession(prev => {
+          if (!prev) return null
+          const s = { ...prev, user: updatedUser }
+          sessionStorage.setItem(SESSION_KEY, JSON.stringify(s))
+          return s
+        })
+      })
+      .catch(err => {
+        console.warn('[AuthContext] Failed to sync profile with /auth/me:', err)
+      })
+    }
+  }, [session?.token])
+
+  const login = useCallback((user, token, refreshToken) => {
     const s = { user, token }
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(s))
-    sessionStorage.setItem('token', token)
-    sessionStorage.setItem('cc_token', token)
+    // Save both tokens via apiClient helper
+    saveTokens(token, refreshToken)
     setSession(s)
   }, [])
 
   const logout = useCallback(() => {
+    clearTokens()
     sessionStorage.removeItem(SESSION_KEY)
-    sessionStorage.removeItem('token')
-    sessionStorage.removeItem('cc_token')
     setSession(null)
+  }, [])
+
+  // Called after silent token refresh to update stored access token
+  const updateToken = useCallback((newToken) => {
+    setSession(prev => {
+      if (!prev) return null
+      const updated = { ...prev, token: newToken }
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated))
+      sessionStorage.setItem('token', newToken)
+      sessionStorage.setItem('cc_token', newToken)
+      return updated
+    })
+  }, [])
+
+  const updateUser = useCallback((updatedUserInfo) => {
+    setSession(prev => {
+      if (!prev) return null
+      const updatedUser = { ...prev.user, ...updatedUserInfo }
+      const s = { ...prev, user: updatedUser }
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(s))
+      return s
+    })
   }, [])
 
   const value = {
@@ -52,6 +114,8 @@ export function AuthProvider({ children }) {
     isLoggedIn: !!session,
     login,
     logout,
+    updateToken,
+    updateUser,
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

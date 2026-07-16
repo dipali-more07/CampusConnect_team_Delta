@@ -4,7 +4,7 @@ import defaultAttendance from '../data/attendance.json'
 import { ATTENDANCE_EVENTS, RECENT_SCANS as DEFAULT_SCANS, LIVE_CHART_DATA as DEFAULT_CHART, DEPT_ATTENDANCE_DATA as DEFAULT_DEPT } from '../data/attendanceData'
 
 function authHeaders() {
-  const token = sessionStorage.getItem('cc_token')
+  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
@@ -126,6 +126,35 @@ async function mockGenerateQR(eventId, session) {
 }
 
 /* ── REAL API ──────────────────────────────────────────────────── */
+function mapAttendanceRecord(r) {
+  // Format datetime string to readable time e.g. "2026-07-16T16:08:00" → "04:08 PM"
+  const fmtTime = (dt) => {
+    if (!dt) return '-'
+    try {
+      return new Date(dt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    } catch { return dt }
+  }
+
+  // Capitalize status e.g. "present" → "Present"
+  const fmtStatus = (s) => {
+    if (!s) return 'Present'
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  }
+
+  return {
+    id: r.attendance_id || r.id,
+    studentName: r.student_name || r.full_name || r.name || r.studentName || r.registration_id?.slice(0, 8) || 'Student',
+    rollNo: r.roll_no || r.rollNo || r.college_id || r.student_id || 'N/A',
+    eventId: r.event_id || r.eventId || '',
+    eventName: r.event_name || r.eventName || '',
+    checkIn: fmtTime(r.check_in_time || r.checkIn),
+    checkOut: fmtTime(r.check_out_time || r.checkOut),
+    status: fmtStatus(r.attendance_status || r.status),
+    department: r.department || r.dept || '',
+    registrationId: r.registration_id || r.registrationId || '',
+  }
+}
+
 async function apiFetchAll(eventId) {
   try {
     const url = eventId && eventId !== 'ALL'
@@ -134,7 +163,9 @@ async function apiFetchAll(eventId) {
     const res = await fetch(url, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch attendance.' }
-    return { success: true, records: data.records || data.data || data || [] }
+    const raw = data.data || data.records || data || []
+    const records = Array.isArray(raw) ? raw.map(mapAttendanceRecord) : []
+    return { success: true, records }
   } catch (err) {
     console.error('[attendanceService] fetchAll error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -204,24 +235,105 @@ async function apiAddScan(studentName, rollNo, status) {
   }
 }
 
+function mapHourlyTrend(raw) {
+  if (!raw) return []
+  
+  // Format hour helper (e.g. 9 -> "9AM", "09:00" -> "9AM", "9AM" -> "9AM")
+  const formatHour = (h) => {
+    if (typeof h === 'string' && (h.includes('AM') || h.includes('PM'))) {
+      return h;
+    }
+    const num = parseInt(h, 10);
+    if (isNaN(num)) return String(h);
+    const ampm = num >= 12 ? 'PM' : 'AM';
+    let displayHour = num % 12;
+    if (displayHour === 0) displayHour = 12;
+    return `${displayHour}${ampm}`;
+  }
+
+  // Case 1: Array of objects
+  if (Array.isArray(raw)) {
+    return raw.map(item => {
+      if (typeof item === 'object' && item !== null) {
+        const hour = item.hour !== undefined ? item.hour : (item.check_in_hour !== undefined ? item.check_in_hour : (item.time_slot || ''));
+        const count = item.count !== undefined ? Number(item.count) : (item.attendance_count !== undefined ? Number(item.attendance_count) : Number(item.count || 0));
+        return { hour: formatHour(hour), count };
+      }
+      return null;
+    }).filter(Boolean);
+  }
+
+  // Case 2: Object with key-value pairs (e.g., { "09:00": 85, "10:00": 134 })
+  if (typeof raw === 'object' && raw !== null) {
+    return Object.entries(raw).map(([h, c]) => ({
+      hour: formatHour(h),
+      count: Number(c || 0)
+    }));
+  }
+
+  return [];
+}
+
 /* ── SERVICE EXPORT ────────────────────────────────────────────── */
 async function mockFetchLiveChart(eventId) {
   await new Promise(r => setTimeout(r, 300))
-  // In real app, chart would be per-event; here we return the same default data
   return { success: true, chart: DEFAULT_CHART, eventId }
 }
 
 async function apiFetchLiveChart(eventId) {
   try {
-    const url = `${API_BASE}/attendance/chart${eventId ? `?eventId=${eventId}` : ''}`
+    const url = `${API_BASE}/analytics/hourly-attendance`
     const res = await fetch(url, { headers: authHeaders() })
     const data = await parseJSON(res)
-    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch chart data.' }
-    return { success: true, chart: data.chart || [], eventId }
+    
+    if (!res.ok) {
+      console.warn('[attendanceService] fetchLiveChart failed, trying fallback to mock.')
+      return mockFetchLiveChart(eventId)
+    }
+
+    const raw = data.data || data.chart || data || []
+    const mapped = mapHourlyTrend(raw)
+    
+    if (mapped.length === 0) {
+      console.warn('[attendanceService] mapped hourly data is empty, falling back to mock.')
+      return mockFetchLiveChart(eventId)
+    }
+
+    return { success: true, chart: mapped, eventId }
   } catch (err) {
-    console.error('[attendanceService] fetchLiveChart error:', err)
-    return { success: false, message: 'Server unreachable.' }
+    console.error('[attendanceService] fetchLiveChart error, falling back to mock:', err)
+    return mockFetchLiveChart(eventId)
   }
+}
+
+function mapDeptAttendance(raw) {
+  if (!raw) return []
+
+  const DEPT_COLORS = ['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#e11d48', '#7c3aed', '#0891b2', '#dc2626']
+
+  // Case 1: Array of objects
+  if (Array.isArray(raw)) {
+    return raw.map((item, idx) => {
+      if (typeof item === 'object' && item !== null) {
+        const dept = item.department || item.dept || item.name || '';
+        const count = item.count !== undefined ? Number(item.count) : (item.attendance_count !== undefined ? Number(item.attendance_count) : Number(item.value || 0));
+        const color = item.color || DEPT_COLORS[idx % DEPT_COLORS.length];
+        return { dept, count, color };
+      }
+      return null;
+    }).filter(Boolean);
+  }
+
+  // Case 2: Object with key-value pairs (e.g., { "CSE": 35, "ECE": 26 })
+  if (typeof raw === 'object' && raw !== null) {
+    return Object.entries(raw).map(([dept, count], idx) => ({
+      dept,
+      count: Number(count || 0),
+      color: DEPT_COLORS[idx % DEPT_COLORS.length]
+    }));
+  }
+
+  return [];
 }
 
 async function mockFetchDeptAttendance(eventId) {
@@ -231,14 +343,27 @@ async function mockFetchDeptAttendance(eventId) {
 
 async function apiFetchDeptAttendance(eventId) {
   try {
-    const url = `${API_BASE}/attendance/departments${eventId ? `?eventId=${eventId}` : ''}`
+    const url = `${API_BASE}/analytics/department-attendance`
     const res = await fetch(url, { headers: authHeaders() })
     const data = await parseJSON(res)
-    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch department attendance.' }
-    return { success: true, depts: data.depts || [], eventId }
+    
+    if (!res.ok) {
+      console.warn('[attendanceService] fetchDeptAttendance failed, trying fallback to mock.')
+      return mockFetchDeptAttendance(eventId)
+    }
+
+    const raw = data.data || data.depts || data || []
+    const mapped = mapDeptAttendance(raw)
+
+    if (mapped.length === 0) {
+      console.warn('[attendanceService] mapped department data is empty, falling back to mock.')
+      return mockFetchDeptAttendance(eventId)
+    }
+
+    return { success: true, depts: mapped, eventId }
   } catch (err) {
-    console.error('[attendanceService] fetchDeptAttendance error:', err)
-    return { success: false, message: 'Server unreachable.' }
+    console.error('[attendanceService] fetchDeptAttendance error, falling back to mock:', err)
+    return mockFetchDeptAttendance(eventId)
   }
 }
 

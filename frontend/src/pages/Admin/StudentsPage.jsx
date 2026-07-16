@@ -11,6 +11,7 @@ import StudentTable from '../../components/admin/adminStudent/StudentTable'
 import StudentFormModal from '../../components/admin/adminStudent/StudentFormModal'
 import StudentViewModal from '../../components/admin/adminStudent/StudentViewModal'
 import StudentDeleteModal from '../../components/admin/adminStudent/StudentDeleteModal'
+import StudentStatusModal from '../../components/admin/adminStudent/StudentStatusModal'
 
 const DEPTS = ['All', 'CSE', 'ECE', 'ME', 'MBA', 'EEE', 'Civil']
 const YEARS = ['All', '1st', '2nd', '3rd', '4th']
@@ -31,8 +32,10 @@ export default function StudentsPage({ tokens }) {
   const [editing, setEditing] = useState(null)
   const [viewStudent, setViewStudent] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [statusTarget, setStatusTarget] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', rollNo: '', email: '', department: 'CSE', year: '1st', phone: '' })
+  const [statusSaving, setStatusSaving] = useState(false)
+  const [form, setForm] = useState({ name: '', rollNo: '', email: '', password: '', department: 'CSE', year: '1st', phone: '' })
   const [errors, setErrors] = useState({})
 
   const card = { background: tokens.card, border: `1px solid ${tokens.border}`, boxShadow: tokens.shadow }
@@ -54,14 +57,15 @@ export default function StudentsPage({ tokens }) {
     return matchQ && (dept === 'All' || s.department === dept) && (year === 'All' || s.year === year) && (status === 'All' || s.status === status)
   })
 
-  const openCreate = () => { setEditing(null); setForm({ name: '', rollNo: '', email: '', department: 'CSE', year: '1st', phone: '' }); setErrors({}); setModalOpen(true) }
-  const openEdit = (s) => { setEditing(s); setForm({ name: s.name, rollNo: s.rollNo, email: s.email, department: s.department, year: s.year, phone: s.phone || '' }); setErrors({}); setModalOpen(true) }
+  const openCreate = () => { setEditing(null); setForm({ name: '', rollNo: '', email: '', password: '', department: 'CSE', year: '1st', phone: '' }); setErrors({}); setModalOpen(true) }
+  const openEdit = (s) => { setEditing(s); setForm({ name: s.name, rollNo: s.rollNo, email: s.email, password: '', department: s.department, year: s.year, phone: s.phone || '' }); setErrors({}); setModalOpen(true) }
 
   const validate = () => {
     const e = {}
     if (!form.name.trim()) e.name = 'Required'
     if (!form.rollNo.trim()) e.rollNo = 'Required'
     if (!form.email.trim()) e.email = 'Required'
+    if (!editing && !form.password.trim()) e.password = 'Required'
     setErrors(e)
     return !Object.keys(e).length
   }
@@ -81,11 +85,34 @@ export default function StudentsPage({ tokens }) {
     else showToast(res.message, 'error')
   }
 
-  const handleToggleStatus = async (s) => {
-    const next = s.status === 'Active' ? 'Suspended' : 'Active'
-    const res = await studentsService.updateStatus(s.id, next)
-    if (res.success) { showToast(`Student ${next.toLowerCase()}.`, 'success'); load() }
-    else showToast(res.message, 'error')
+  const handleToggleStatus = (s) => {
+    setStatusTarget(s)
+  }
+
+  const handleConfirmStatus = async () => {
+    if (!statusTarget) return
+    const next = statusTarget.status === 'Active' ? 'Suspended' : 'Active'
+    setStatusSaving(true)
+    const res = await studentsService.updateStatus(statusTarget.id, next)
+    setStatusSaving(false)
+    if (res.success) {
+      showToast(`Student ${next === 'Active' ? 'activated' : 'suspended'} successfully.`, 'success')
+      setStatusTarget(null)
+
+      // ✅ Local state update — backend /users/students sirf active users return karta hai
+      // isliye load() mat karo, warna suspended student gayab ho jaata hai
+      setStudents(prev =>
+        prev.map(s => s.id === statusTarget.id ? { ...s, status: next } : s)
+      )
+      setStats(prev => ({
+        ...prev,
+        total: prev.total,
+        active: next === 'Active' ? prev.active + 1 : Math.max(0, prev.active - 1),
+        suspended: next === 'Suspended' ? prev.suspended + 1 : Math.max(0, prev.suspended - 1)
+      }))
+    } else {
+      showToast(res.message || 'Failed to update status.', 'error')
+    }
   }
 
   const handleExport = () => {
@@ -203,6 +230,16 @@ export default function StudentsPage({ tokens }) {
         deleteTarget={deleteTarget}
         setDeleteTarget={setDeleteTarget}
         handleDelete={handleDelete}
+        tokens={tokens}
+        dark={dark}
+      />
+
+      {/* Activate / Suspend Confirmation Modal */}
+      <StudentStatusModal
+        statusTarget={statusTarget}
+        setStatusTarget={setStatusTarget}
+        handleConfirmStatus={handleConfirmStatus}
+        saving={statusSaving}
         tokens={tokens}
         dark={dark}
       />

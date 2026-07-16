@@ -4,7 +4,7 @@ import defaultRegistrations from '../data/registrations.json'
 import defaultEvents from '../data/events.json'
 
 function authHeaders() {
-  const token = sessionStorage.getItem('cc_token')
+  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,

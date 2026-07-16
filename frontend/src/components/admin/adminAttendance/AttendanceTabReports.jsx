@@ -2,9 +2,8 @@ import React from 'react'
 import { Download, Loader2 } from 'lucide-react'
 
 /* ─── generate trendline SVG path ─── */
-const generateTrendPath = (data) => {
+const generateTrendPath = (data, MAX = 220) => {
   if (!data || data.length === 0) return { linePath: '', fillPath: '' }
-  const MAX = 220
   const width = 800
   const height = 240
 
@@ -74,10 +73,11 @@ export default function AttendanceTabReports({
               <Loader2 className="animate-spin text-slate-400" size={24} />
             </div>
           ) : (() => {
-            const { linePath, fillPath } = generateTrendPath(chartData)
-            const yTicks = [0, 55, 110, 165, 220]
-            const MAX = 220
+            const maxDataVal = Math.max(5, ...(chartData || []).map(d => d.count || 0))
+            const MAX = Math.max(10, Math.ceil(maxDataVal / 5) * 5)
+            const yTicks = [0, Math.round(MAX * 0.25), Math.round(MAX * 0.5), Math.round(MAX * 0.75), MAX]
             const CHART_H = 240
+            const { linePath, fillPath } = generateTrendPath(chartData, MAX)
 
             return (
               <div className="w-full pl-8 pr-2">
@@ -127,7 +127,7 @@ export default function AttendanceTabReports({
                           strokeLinecap="round"
                         />
                         {/* Dots on points */}
-                        {chartData.map((d, i) => {
+                        {(chartData || []).map((d, i) => {
                           const x = (i / (chartData.length - 1)) * 800
                           const y = 240 - (d.count / MAX) * 240
                           return (
@@ -173,8 +173,9 @@ export default function AttendanceTabReports({
               <Loader2 className="animate-spin text-slate-400" size={24} />
             </div>
           ) : (() => {
-            const xTicks = [0, 9, 18, 27, 36]
-            const MAX_DEPT = 36
+            const maxDeptVal = Math.max(5, ...(deptData || []).map(d => d.count || 0))
+            const MAX_DEPT = Math.max(10, Math.ceil(maxDeptVal / 5) * 5)
+            const xTicks = [0, Math.round(MAX_DEPT * 0.25), Math.round(MAX_DEPT * 0.5), Math.round(MAX_DEPT * 0.75), MAX_DEPT]
             const CHART_H = 240
 
             return (
@@ -196,7 +197,7 @@ export default function AttendanceTabReports({
 
                 {/* Bars list */}
                 <div className="flex-1 flex flex-col justify-between pb-[10px]">
-                  {deptData.map(({ dept, count, color }) => {
+                  {(deptData || []).map(({ dept, count, color }) => {
                     const widthPct = (count / MAX_DEPT) * 100
                     return (
                       <div key={dept} className="flex items-center h-7 relative group">

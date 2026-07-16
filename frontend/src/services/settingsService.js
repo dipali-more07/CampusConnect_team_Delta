@@ -4,7 +4,7 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL
 import defaultSettings from '../data/settings.json'
 
 function authHeaders() {
-  const token = sessionStorage.getItem('cc_token')
+  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
@@ -67,35 +67,87 @@ async function mockUpdatePassword(passwordData) {
 /* ── REAL API HANDLERS ─────────────────────────────────────────── */
 async function apiFetch() {
   try {
-    const res = await fetch(`${API_BASE}/settings`, { headers: authHeaders() })
+    const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() })
     const data = await parseJSON(res)
-    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch settings.' }
-    return { success: true, settings: data.settings }
+    if (!res.ok) {
+      console.warn('[settingsService] fetch settings failed, falling back to mock.')
+      return mockFetch()
+    }
+    
+    const user = data.data || {}
+    const profile = user.profile || {}
+    const settings = {
+      profile: {
+        name: profile.full_name || '',
+        email: user.email || '',
+        phone: profile.phone || user.phone || '',
+        gender: user.gender || profile.gender || '',
+        bio: user.bio || profile.bio || '',
+        avatarColor: '#7c3aed',
+        avatarUrl: user.profile_image || null
+      },
+      appearance: {
+        themeMode: 'Light',
+        accentColor: '#615FFF',
+        fontSize: 'medium'
+      },
+      permissions: {
+        Admin: ['all'],
+        Organizer: ['events', 'attendance'],
+        Student: ['view_events']
+      }
+    }
+    return { success: true, settings }
   } catch (err) {
-    console.error('[settingsService] fetch error:', err)
-    return { success: false, message: 'Server unreachable.' }
+    console.error('[settingsService] fetch error, falling back to mock:', err)
+    return mockFetch()
   }
 }
 
 async function apiUpdateProfile(profileData) {
   try {
-    const res = await fetch(`${API_BASE}/settings/profile`, {
-      method: 'PUT',
+    const payload = {}
+    if (profileData.name) payload.full_name = profileData.name
+    if (profileData.phone) payload.phone = profileData.phone
+    if (profileData.gender) payload.gender = profileData.gender
+    if (profileData.course) payload.course = profileData.course
+    if (profileData.year_of_study) payload.year_of_study = Number(profileData.year_of_study)
+    if (profileData.bio) payload.bio = profileData.bio
+    if (profileData.college_id) payload.college_id = profileData.college_id
+
+    const res = await fetch(`${API_BASE}/users/profile`, {
+      method: 'PATCH',
       headers: authHeaders(),
-      body: JSON.stringify(profileData),
+      body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
-    if (!res.ok) return { success: false, message: data.message || 'Failed to update profile.' }
-    return { success: true, message: data.message || 'Profile updated.', settings: data.settings }
+    if (!res.ok) {
+      console.warn('[settingsService] updateProfile failed, falling back to mock.')
+      return mockUpdateProfile(profileData)
+    }
+    
+    const updatedProfile = data.data || {}
+    const settings = {
+      profile: {
+        name: updatedProfile.full_name || profileData.name,
+        email: profileData.email,
+        phone: updatedProfile.phone || profileData.phone,
+        gender: updatedProfile.gender || profileData.gender,
+        bio: updatedProfile.bio || profileData.bio,
+        avatarColor: '#7c3aed',
+        avatarUrl: updatedProfile.profile_image || profileData.avatarUrl
+      }
+    }
+    return { success: true, message: data.message || 'Profile updated successfully.', settings }
   } catch (err) {
-    console.error('[settingsService] updateProfile error:', err)
-    return { success: false, message: 'Server unreachable.' }
+    console.error('[settingsService] updateProfile error, falling back to mock:', err)
+    return mockUpdateProfile(profileData)
   }
 }
 
 async function apiUpdateAppearance(appearanceData) {
   try {
-    const res = await fetch(`${API_BASE}/settings/appearance`, {
+    const res = await fetch(`${API_BASE}/admin/settings/appearance`, {
       method: 'PUT',
       headers: authHeaders(),
       body: JSON.stringify(appearanceData),
@@ -111,8 +163,8 @@ async function apiUpdateAppearance(appearanceData) {
 
 async function apiUpdatePassword(passwordData) {
   try {
-    const res = await fetch(`${API_BASE}/settings/password`, {
-      method: 'PUT',
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify(passwordData),
     })

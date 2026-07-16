@@ -1,8 +1,77 @@
-import React from 'react'
-import { MapPin, Clock, ExternalLink } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import {
+  MapPin, Clock, ExternalLink,
+  UserPlus, CheckSquare, Calendar, Award, Send, XCircle
+} from 'lucide-react'
 import { UPCOMING_EVENTS, RECENT_ACTIVITY, BRAND } from '../../../data/dashboardData'
+import analyticsService from '../../../services/analyticsService'
+import eventsService from '../../../services/eventsService'
+
+const resolveActivityIcon = (type, text) => {
+  const t = (type || '').toLowerCase()
+  const txt = (text || '').toLowerCase()
+  
+  if (t === 'registration' || txt.includes('register')) return { icon: UserPlus, color: '#4f46e5' }
+  if (t === 'attendance' || txt.includes('attendance')) return { icon: CheckSquare, color: '#16a34a' }
+  if (t === 'publish' || t === 'event' || txt.includes('publish') || txt.includes('event') || txt.includes('create')) return { icon: Calendar, color: '#0284c7' }
+  if (t === 'certificate' || txt.includes('certificate')) return { icon: Award, color: '#d97706' }
+  if (t === 'notification' || txt.includes('notification')) return { icon: Send, color: '#7c3aed' }
+  if (t === 'cancel' || txt.includes('cancel')) return { icon: XCircle, color: '#ef4444' }
+  
+  return { icon: Calendar, color: '#615FFF' } // Default fallback
+}
+
+const formatTime = (ts) => {
+  if (!ts) return ''
+  try {
+    const diffMs = new Date() - new Date(ts)
+    const diffMins = Math.floor(diffMs / 60000)
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} min ago`
+    const diffHrs = Math.floor(diffMins / 60)
+    if (diffHrs < 24) return `${diffHrs} hr ago`
+    const diffDays = Math.floor(diffHrs / 24)
+    if (diffDays === 1) return 'Yesterday'
+    return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ts
+  }
+}
 
 export default function BottomRow({ dark }) {
+  const [activities, setActivities] = useState([])
+  const [upcomingEvents, setUpcomingEvents] = useState(UPCOMING_EVENTS)
+
+  useEffect(() => {
+    const loadActivities = async () => {
+      const res = await analyticsService.fetchRecentActivity()
+      if (res.success && res.activities && res.activities.length > 0) {
+        const mapped = res.activities.map(act => ({
+          id: act.activity_id || act.id || Math.random(),
+          text: act.message || act.text || '',
+          time: formatTime(act.timestamp || act.time),
+          type: act.type || ''
+        }))
+        setActivities(mapped)
+      } else {
+        // Fallback to static mock list if empty/failed
+        setActivities(RECENT_ACTIVITY.map(act => ({
+          id: act.id,
+          text: act.text,
+          time: act.time,
+          type: act.type || ''
+        })))
+      }
+    }
+    const loadUpcoming = async () => {
+      const res = await eventsService.fetchUpcoming(3)
+      if (res.success && res.events && res.events.length > 0) {
+        setUpcomingEvents(res.events)
+      }
+    }
+    loadActivities()
+    loadUpcoming()
+  }, [])
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 mt-5">
 
@@ -19,8 +88,8 @@ export default function BottomRow({ dark }) {
         </div>
 
         <div className="flex flex-col gap-3">
-          {UPCOMING_EVENTS.map(ev => {
-            const pct = Math.round((ev.registered / ev.capacity) * 100)
+          {upcomingEvents.map(ev => {
+            const pct = ev.capacity > 0 ? Math.round((ev.registered / ev.capacity) * 100) : 0
             return (
               <div
                 key={ev.id}
@@ -86,20 +155,20 @@ export default function BottomRow({ dark }) {
         <h2 className="text-[15px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0 mb-4">Recent Activity</h2>
 
         <div className="flex flex-col">
-          {RECENT_ACTIVITY.map((act, idx) => {
-            const Icon = act.icon
-            const isLast = idx === RECENT_ACTIVITY.length - 1
+          {activities.map((act, idx) => {
+            const { icon: Icon, color: iconColor } = resolveActivityIcon(act.type, act.text)
+            const isLast = idx === activities.length - 1
             return (
-              <div key={act.id} className="flex gap-3">
+              <div key={act.id || idx} className="flex gap-3">
                 <div className="flex flex-col items-center shrink-0">
                   <div
                     className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0"
                     style={{
-                      background: `${act.iconColor}20`,
-                      border: `1.5px solid ${act.iconColor}50`,
+                      background: `${iconColor}20`,
+                      border: `1.5px solid ${iconColor}50`,
                     }}
                   >
-                    <Icon size={14} style={{ color: act.iconColor }} />
+                    <Icon size={14} style={{ color: iconColor }} />
                   </div>
                   {!isLast && (
                     <div className="w-0.5 flex-1 min-h-[10px] my-1 rounded-full bg-slate-200 dark:bg-[#162640]" />

@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars, no-empty */
 import users from '../data/users.json'
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
@@ -47,7 +48,7 @@ async function mockLogin(email, password) {
 async function mockRegister(payload) {
   // Simulate network delay
   await new Promise(r => setTimeout(r, 900))
-  const { name, email, mobile, college, course, password, role = 'student' } = payload
+  const { name, email, mobile, college, course, department, password, role = 'student' } = payload
 
   const userList = getMockUsers()
   
@@ -70,6 +71,7 @@ async function mockRegister(payload) {
     mobile,
     college,
     course,
+    department,
     password,
     role,
     avatar: name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2),
@@ -138,8 +140,14 @@ async function apiLogin(email, password) {
       return { success: false, message: data.message || 'Login failed.' }
     }
 
-    // Support flexible backend user & token formats
+    // Support flexible backend token formats
     const token = data.data?.access_token || data.token || data.accessToken || data.data?.token || ''
+    const refreshToken = data.data?.refresh_token || data.refresh_token || data.refreshToken || ''
+
+    // Store refresh token immediately for auto-refresh to work
+    if (refreshToken) {
+      localStorage.setItem('cc_refresh_token', refreshToken)
+    }
 
     let user = null
     if (token) {
@@ -178,7 +186,7 @@ async function apiLogin(email, password) {
       }
     }
 
-    return { success: true, user, token }
+    return { success: true, user, token, refreshToken }
   } catch (err) {
     console.error('API Login Error:', err)
     return { success: false, message: `API Login Error: ${err.message || err}` }
@@ -195,7 +203,10 @@ async function apiRegister(payload) {
       full_name: payload.name,
       phone: payload.mobile,
       course: payload.course,
-      college_id: payload.college,
+      department: payload.department,
+      college_id: payload.collegeId || payload.college,
+      gender: payload.gender || 'male',
+      year_of_study: parseInt(payload.yearOfStudy || payload.year_of_study || 1, 10),
     }
 
     const res = await fetch(`${API_BASE}/auth/register`, {

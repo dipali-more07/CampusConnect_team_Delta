@@ -180,9 +180,9 @@ export default function AttendanceTabMonitor({
           <table className="w-full text-left border-collapse min-w-[650px]">
             <thead>
               <tr style={{ background: dark ? '#060e1c' : '#f8fafc', borderBottom: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}>
-                {['Student', 'Roll No', 'Check-In', 'Check-Out', 'Status'].map(h => (
+                {['Student', 'Roll No', 'Check-In', 'Attendance ID', 'Status'].map(h => (
                   <th key={h} className="px-6 py-3.5 text-[11px] font-bold uppercase tracking-wider"
-                    style={{ color: h === 'Check-In' || h === 'Check-Out' ? BRAND : (dark ? '#4a6a8a' : '#94a3b8') }}>
+                    style={{ color: h === 'Check-In' || h === 'Attendance ID' ? BRAND : (dark ? '#4a6a8a' : '#94a3b8') }}>
                     {h}
                   </th>
                 ))}
@@ -217,7 +217,11 @@ export default function AttendanceTabMonitor({
                     <td className="px-6 py-4 text-[13.5px] font-bold">{row.studentName}</td>
                     <td className="px-6 py-4 text-[13px] font-semibold" style={label}>{row.rollNo}</td>
                     <td className="px-6 py-4 text-[13px]" style={label}>{row.checkIn}</td>
-                    <td className="px-6 py-4 text-[13px]" style={label}>{row.checkOut}</td>
+                    <td className="px-6 py-4 text-[13px]" style={label}>
+                      <span className="font-mono text-[11.5px] bg-slate-100 dark:bg-slate-800/50 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700/50" title={row.id}>
+                        {row.id ? `${row.id.slice(0, 8)}...` : '-'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4">
                       {isUpd ? (
                         <Loader2 size={14} className="animate-spin text-slate-400" />

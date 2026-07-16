@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { Download, Trophy, Users, User, Award, Plus } from 'lucide-react'
+import { Download, Trophy, Users, User, Award, Plus, CalendarDays } from 'lucide-react'
 import resultsService from '../../services/resultsService'
+import eventsService from '../../services/eventsService'
+import studentsService from '../../services/studentsService'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import { useToast } from '../../context/ToastContext'
 
@@ -15,11 +17,20 @@ export default function ResultsPage({ tokens }) {
   const BRAND = tokens?.brand || DEFAULT_BRAND
   const showToast = useToast()
 
+  // Events list for dropdown
+  const [events, setEvents] = useState([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [selectedEventId, setSelectedEventId] = useState('')  // event_id from backend
+
+  // Students list for enrichment
+  const [students, setStudents] = useState([])
+
+  // Results state
   const [results, setResults] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('All') // 'All', 'Solo', 'Team'
-  const [selectedEvent, setSelectedEvent] = useState('All')
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1)
@@ -27,159 +38,150 @@ export default function ResultsPage({ tokens }) {
   
   // Modals state
   const [formOpen, setFormOpen] = useState(false)
-  const [editingResult, setEditingResult] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // Form inputs
-  const [eventId, setEventId] = useState('EVT081')
-  const [eventName, setEventName] = useState('TechFest 2025')
-  const [type, setType] = useState('Solo')
-  const [participantName, setParticipantName] = useState('')
-  const [membersInput, setMembersInput] = useState('') // comma separated names
-  const [rollNo, setRollNo] = useState('')
-  const [department, setDepartment] = useState('CSE')
-  const [year, setYear] = useState('3rd')
-  const [rank, setRank] = useState(1)
-  const [resultTitle, setResultTitle] = useState('')
-  const [score, setScore] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  // Registrations for participant dropdown in declare modal
+  const [registrations, setRegistrations] = useState([])
+  const [regsLoading, setRegsLoading] = useState(false)
 
-  const loadResults = async () => {
-    setLoading(true)
-    const res = await resultsService.fetchAll()
-    if (res.success) {
-      setResults(res.results)
-    } else {
-      showToast(res.message || 'Failed to load results.', 'error')
-    }
-    setLoading(false)
-  }
-
+  // ── Load events and students list on mount ──────────────────────────
   useEffect(() => {
-    loadResults()
+    const loadEventsAndStudents = async () => {
+      setEventsLoading(true)
+      const [evRes, stuRes] = await Promise.all([
+        eventsService.fetchAll(),
+        studentsService.fetchAll()
+      ])
+      if (evRes.success && evRes.events.length > 0) {
+        setEvents(evRes.events)
+        // Default: first event selected
+        setSelectedEventId(evRes.events[0].id)
+      } else {
+        setEvents([])
+      }
+      if (stuRes.success) {
+        setStudents(stuRes.students || [])
+      }
+      setEventsLoading(false)
+    }
+    loadEventsAndStudents()
   }, [])
 
-  // Calculate statistics
-  const totalCount = results.length
-  const soloCount = results.filter(r => r.type === 'Solo').length
-  const teamCount = results.filter(r => r.type === 'Team').length
-  const rank1Count = results.filter(r => Number(r.rank) === 1).length
+  // ── Load results when selectedEventId changes ──────────────────
+  useEffect(() => {
+    if (!selectedEventId) return
+    const loadResults = async () => {
+      setLoading(true)
+      setResults([])
+      const res = await resultsService.fetchByEventId(selectedEventId)
+      if (res.success) {
+        setResults(res.results)
+      } else {
+        showToast(res.message || 'Failed to load results.', 'error')
+      }
+      setLoading(false)
+    }
+    loadResults()
+  }, [selectedEventId])
 
-  // Get unique events list for filter dropdown
-  const uniqueEvents = ['All', ...new Set(results.map(r => r.eventName).filter(Boolean))]
+  // Enrich results using loaded events and students
+  const enrichedResults = results.map(row => {
+    const ev = events.find(e => e.id === (row.event_id || row.eventId))
+    const eventName = ev ? ev.name : (row.eventName || 'Unknown Event')
 
-  // Filter logic
-  const filteredResults = results.filter(res => {
-    // Type tab match (All / Solo / Team)
+    const isTeam = !!(row.team_id || row.teamId)
+    const type = isTeam ? 'Team' : 'Solo'
+
+    let participantName = row.participantName || ''
+    let department = row.department || 'N/A'
+    let year = row.year || 'N/A'
+    let rollNo = row.rollNo || row.roll_no || ''
+
+    if (!isTeam) {
+      const pId = row.participant_id || row.participantId
+      const stu = students.find(s => s.id === pId)
+      if (stu) {
+        participantName = stu.name || stu.full_name || participantName
+        department = stu.department || stu.course || department
+        year = stu.year_of_study ? `${stu.year_of_study} Yr` : (stu.year || year)
+        rollNo = stu.rollNo || stu.roll_no || rollNo
+      } else {
+        participantName = participantName || pId || 'Unknown Student'
+      }
+    } else {
+      participantName = row.teamName || row.participantName || row.team_id || row.teamId || 'Team Winner'
+    }
+
+    const dateVal = row.created_at
+      ? new Date(row.created_at).toISOString().split('T')[0]
+      : (row.date || new Date().toISOString().split('T')[0])
+
+    const rankVal = row.rank || 1
+
+    return {
+      ...row,
+      id: row.id || row.result_id,
+      eventName,
+      type,
+      participantName,
+      department,
+      year,
+      rollNo,
+      rank: rankVal,
+      date: dateVal,
+    }
+  })
+
+  // Calculate statistics from enriched results
+  const totalCount = enrichedResults.length
+  const soloCount = enrichedResults.filter(r => r.type === 'Solo').length
+  const teamCount = enrichedResults.filter(r => r.type === 'Team').length
+  const rank1Count = enrichedResults.filter(r => Number(r.rank) === 1).length
+
+  // Filter logic (search + solo/team tab only — event is already filtered by API)
+  const filteredResults = enrichedResults.filter(res => {
     const typeMatch = activeTab === 'All' || res.type === activeTab
-
-    // Event match
-    const eventMatch = selectedEvent === 'All' || res.eventName === selectedEvent
-
-    // Search query match
     const searchLower = searchQuery.toLowerCase()
     const nameMatch = (res.participantName || '').toLowerCase().includes(searchLower)
     const rollMatch = (res.rollNo || '').toLowerCase().includes(searchLower)
     const deptMatch = (res.department || '').toLowerCase().includes(searchLower)
-    const evNameMatch = (res.eventName || '').toLowerCase().includes(searchLower)
     const titleMatch = (res.resultTitle || '').toLowerCase().includes(searchLower)
-    const searchMatch = searchQuery === '' || nameMatch || rollMatch || deptMatch || evNameMatch || titleMatch
-
-    return typeMatch && eventMatch && searchMatch
+    const searchMatch = searchQuery === '' || nameMatch || rollMatch || deptMatch || titleMatch
+    return typeMatch && searchMatch
   })
 
   // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1)
-  }, [searchQuery, activeTab, selectedEvent])
+  }, [searchQuery, activeTab, selectedEventId])
 
-  // Pagination Calculations
+  // Pagination
   const totalItems = filteredResults.length
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage))
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = Math.min(startIndex + itemsPerPage, totalItems)
   const paginatedResults = filteredResults.slice(startIndex, startIndex + itemsPerPage)
 
-  // Open Form for Adding New Result
+  // Selected event object
+  const selectedEventObj = events.find(e => e.id === selectedEventId)
+
+  // Open Add Modal
   const handleOpenAddModal = () => {
-    setEditingResult(null)
-    setEventId('EVT081')
-    setEventName('TechFest 2025')
-    setType('Solo')
-    setParticipantName('')
-    setMembersInput('')
-    setRollNo('')
-    setDepartment('CSE')
-    setYear('3rd')
-    setRank(1)
-    setResultTitle('')
-    setScore('')
-    setDate(new Date().toISOString().split('T')[0])
     setFormOpen(true)
   }
 
-  // Open Form for Editing Existing Result
-  const handleOpenEditModal = (resItem) => {
-    setEditingResult(resItem)
-    setEventId(resItem.eventId || 'EVT081')
-    setEventName(resItem.eventName || 'TechFest 2025')
-    setType(resItem.type || 'Solo')
-    setParticipantName(resItem.participantName || '')
-    setMembersInput(resItem.members ? resItem.members.join(', ') : '')
-    setRollNo(resItem.rollNo || '')
-    setDepartment(resItem.department || 'CSE')
-    setYear(resItem.year || '3rd')
-    setRank(resItem.rank || 1)
-    setResultTitle(resItem.resultTitle || '')
-    setScore(resItem.score || '')
-    setDate(resItem.date || new Date().toISOString().split('T')[0])
-    setFormOpen(true)
-  }
-
-  // Form submission handler
-  const handleFormSubmit = async (e) => {
-    e.preventDefault()
+  // Declare result using POST /api/v1/results/declare
+  const handleDeclare = async (payload) => {
     setSubmitting(true)
-
-    const membersArray = type === 'Team' 
-      ? membersInput.split(',').map(m => m.trim()).filter(Boolean)
-      : []
-
-    const payload = {
-      eventId,
-      eventName,
-      type,
-      participantName,
-      members: membersArray,
-      rollNo,
-      department,
-      year,
-      rank: Number(rank),
-      resultTitle: resultTitle || `${rank === 1 ? '1st' : rank === 2 ? '2nd' : rank === 3 ? '3rd' : rank + 'th'} Rank`,
-      score,
-      date
-    }
-
-    if (editingResult) {
-      // Edit mode
-      const res = await resultsService.update(editingResult.id, payload)
-      if (res.success) {
-        showToast('Result updated successfully.', 'success')
-        setResults(prev => prev.map(r => r.id === editingResult.id ? res.result : r))
-        setFormOpen(false)
-      } else {
-        showToast(res.message || 'Failed to update result.', 'error')
-      }
+    const res = await resultsService.declare(payload)
+    if (res.success) {
+      showToast('Result declared successfully! 🏆', 'success')
+      setFormOpen(false)
+      // Reload results for this event
+      const updated = await resultsService.fetchByEventId(selectedEventId)
+      if (updated.success) setResults(updated.results)
     } else {
-      // Create mode
-      const res = await resultsService.create(payload)
-      if (res.success) {
-        showToast('New result published successfully.', 'success')
-        setResults(prev => [res.result, ...prev])
-        setFormOpen(false)
-      } else {
-        showToast(res.message || 'Failed to publish result.', 'error')
-      }
+      showToast(res.message || 'Failed to declare result.', 'error')
     }
     setSubmitting(false)
   }
@@ -223,7 +225,7 @@ export default function ResultsPage({ tokens }) {
       const url = URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.setAttribute("href", url)
-      link.setAttribute("download", `event_results_export_${new Date().toISOString().split('T')[0]}.csv`)
+      link.setAttribute("download", `event_results_${selectedEventId}_${new Date().toISOString().split('T')[0]}.csv`)
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -259,13 +261,15 @@ export default function ResultsPage({ tokens }) {
       <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <div>
           <div className="flex items-center gap-1.5 text-[12px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2">
-            <span>EventHub</span>
+            <span>CampusConnect</span>
             <span>&gt;</span>
             <span style={{ color: BRAND }}>Results</span>
           </div>
           <h1 className="text-[28px] font-extrabold m-0 tracking-tight">Event Results</h1>
           <p className="text-[13px] mt-1 mb-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-            Manage and view winners across multiple solo and team events
+            {selectedEventObj
+              ? <>Results for <strong style={{ color: BRAND }}>{selectedEventObj.name}</strong></>
+              : 'Select an event to view results'}
           </p>
         </div>
 
@@ -280,12 +284,54 @@ export default function ResultsPage({ tokens }) {
 
           <button
             onClick={handleOpenAddModal}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-150 hover:-translate-y-px"
+            disabled={!selectedEventId}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-150 hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: BRAND, boxShadow: '0 4px 12px rgba(97,95,255,0.25)' }}
           >
             <Plus size={15} /> Add Result
           </button>
         </div>
+      </div>
+
+      {/* ── EVENT SELECTOR ── */}
+      <div
+        className="rounded-2xl p-4 mb-5 flex flex-wrap items-center gap-3"
+        style={cardStyle}
+      >
+        <CalendarDays size={17} style={{ color: BRAND }} className="shrink-0" />
+        <span className="text-[13px] font-bold shrink-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+          Select Event:
+        </span>
+        <select
+          value={selectedEventId}
+          onChange={e => setSelectedEventId(e.target.value)}
+          disabled={eventsLoading}
+          className="flex-1 min-w-[220px] max-w-[420px] px-3 py-2 rounded-xl text-[13px] font-semibold outline-none cursor-pointer"
+          style={inputStyle}
+        >
+          {eventsLoading ? (
+            <option>Loading events…</option>
+          ) : events.length === 0 ? (
+            <option value="">No events found</option>
+          ) : (
+            events.map(ev => (
+              <option key={ev.id} value={ev.id}>
+                {ev.name}
+              </option>
+            ))
+          )}
+        </select>
+        {selectedEventObj && (
+          <span
+            className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"
+            style={{
+              background: dark ? 'rgba(97,95,255,0.15)' : 'rgba(97,95,255,0.1)',
+              color: BRAND
+            }}
+          >
+            {selectedEventObj.status}
+          </span>
+        )}
       </div>
 
       {/* ── STATS ROW ── */}
@@ -295,9 +341,6 @@ export default function ResultsPage({ tokens }) {
       <ResultFilters
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        selectedEvent={selectedEvent}
-        setSelectedEvent={setSelectedEvent}
-        uniqueEvents={uniqueEvents}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         inputStyle={inputStyle}
@@ -321,39 +364,19 @@ export default function ResultsPage({ tokens }) {
         BRAND={BRAND}
         dark={dark}
         cardStyle={cardStyle}
-        handleOpenEditModal={handleOpenEditModal}
         handleDeleteResult={handleDeleteResult}
       />
 
-      {/* ── ADD/EDIT RESULT MODAL ── */}
+      {/* ── ADD RESULT MODAL ── */}
       <ResultFormModal
         formOpen={formOpen}
         setFormOpen={setFormOpen}
-        editingResult={editingResult}
-        eventId={eventId}
-        setEventId={setEventId}
-        setEventName={setEventName}
-        type={type}
-        setType={setType}
-        rank={rank}
-        setRank={setRank}
-        participantName={participantName}
-        setParticipantName={setParticipantName}
-        membersInput={membersInput}
-        setMembersInput={setMembersInput}
-        rollNo={rollNo}
-        setRollNo={setRollNo}
-        department={department}
-        setDepartment={setDepartment}
-        year={year}
-        setYear={setYear}
-        score={score}
-        setScore={setScore}
-        resultTitle={resultTitle}
-        setResultTitle={setResultTitle}
-        date={date}
-        setDate={setDate}
-        handleFormSubmit={handleFormSubmit}
+        selectedEventId={selectedEventId}
+        selectedEventName={selectedEventObj?.name}
+        events={events}
+        registrations={registrations}
+        regsLoading={regsLoading}
+        handleDeclare={handleDeclare}
         submitting={submitting}
         inputStyle={inputStyle}
         dark={dark}

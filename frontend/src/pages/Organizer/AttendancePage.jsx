@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import {
-  QrCode, ScanLine, Activity, BarChart2,
+  QrCode, Activity, BarChart2,
   Users, UserX, Percent, Clock
 } from 'lucide-react'
 import attendanceService from '../../services/attendanceService'
+import eventsService from '../../services/eventsService'
+import studentsService from '../../services/studentsService'
 import { ATTENDANCE_EVENTS } from '../../data/attendanceData'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import { useToast } from '../../context/ToastContext'
@@ -11,14 +13,12 @@ import { useToast } from '../../context/ToastContext'
 // Sub-components
 import AttendanceStats from '../../components/admin/adminAttendance/AttendanceStats'
 import AttendanceTabQR from '../../components/admin/adminAttendance/AttendanceTabQR'
-import AttendanceTabScan from '../../components/admin/adminAttendance/AttendanceTabScan'
 import AttendanceTabMonitor from '../../components/admin/adminAttendance/AttendanceTabMonitor'
 import AttendanceTabReports from '../../components/admin/adminAttendance/AttendanceTabReports'
 
 /* ─── Tabs config ─── */
 const TABS = [
   { id: 'qr', label: 'Generate QR', Icon: QrCode },
-  { id: 'scan', label: 'Scan QR', Icon: ScanLine },
   { id: 'monitor', label: 'Live Monitor', Icon: Activity },
   { id: 'reports', label: 'Reports', Icon: BarChart2 },
 ]
@@ -30,7 +30,8 @@ export default function AttendancePage({ tokens }) {
 
   /* shared state */
   const [activeTab, setActiveTab] = useState(() => {
-    return localStorage.getItem('cc_attendance_active_tab') || 'qr'
+    const saved = localStorage.getItem('cc_attendance_active_tab')
+    return (saved && saved !== 'scan') ? saved : 'qr'
   })
 
   useEffect(() => {
@@ -39,30 +40,61 @@ export default function AttendancePage({ tokens }) {
 
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
-  const [selectedEvent, setSelectedEvent] = useState(ATTENDANCE_EVENTS[0].id)
-  const [selectedSession, setSelectedSession] = useState('fullday')
+  const [eventsList, setEventsList] = useState([])
+  const [selectedEvent, setSelectedEvent] = useState('')
+  const [students, setStudents] = useState([])
 
   /* qr state */
   const [qrGenerated, setQrGenerated] = useState(false)
   const [qrLoading, setQrLoading] = useState(false)
+  const [qrImageUrl, setQrImageUrl] = useState(null)
   const [countdown, setCountdown] = useState(0)
   const countdownRef = useRef(null)
 
-  /* scan tab state */
-  const [scannerActive, setScannerActive] = useState(false)
-  const [recentScans, setRecentScans] = useState([])
-  const [scansLoading, setScansLoading] = useState(false)
+  // Fetch events list
+  useEffect(() => {
+    eventsService.fetchAll().then(res => {
+      if (res.success && Array.isArray(res.events)) {
+        const mapped = res.events.map(ev => ({
+          id: ev.id || ev.event_id,
+          name: ev.name || ev.event_name || ev.title || 'Untitled Event'
+        }))
+        setEventsList(mapped)
+        if (mapped.length > 0) {
+          setSelectedEvent(mapped[0].id)
+        }
+      } else {
+        setEventsList(ATTENDANCE_EVENTS)
+        if (ATTENDANCE_EVENTS.length > 0) {
+          setSelectedEvent(ATTENDANCE_EVENTS[0].id)
+        }
+      }
+    }).catch(err => {
+      console.error(err)
+      setEventsList(ATTENDANCE_EVENTS)
+      if (ATTENDANCE_EVENTS.length > 0) {
+        setSelectedEvent(ATTENDANCE_EVENTS[0].id)
+      }
+    })
+  }, [])
 
-  /* load recent scans */
-  const loadRecentScans = async () => {
-    setScansLoading(true)
-    const res = await attendanceService.fetchRecentScans()
-    if (res.success) setRecentScans(res.scans)
-    else showToast(res.message || 'Failed to load scans.', 'error')
-    setScansLoading(false)
-  }
+  // Clear QR image when event changes
+  useEffect(() => {
+    setQrGenerated(false)
+    if (qrImageUrl) {
+      URL.revokeObjectURL(qrImageUrl)
+      setQrImageUrl(null)
+    }
+  }, [selectedEvent])
 
-  useEffect(() => { loadRecentScans() }, [])
+  // Revoke URL on unmount
+  useEffect(() => {
+    return () => {
+      if (qrImageUrl) {
+        URL.revokeObjectURL(qrImageUrl)
+      }
+    }
+  }, [qrImageUrl])
 
   /* start countdown when QR is generated */
   const startCountdown = useCallback(() => {
@@ -111,8 +143,18 @@ export default function AttendancePage({ tokens }) {
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('All')
   const [updatingId, setUpdatingId] = useState(null)
+  const [registrations, setRegistrations] = useState([])
 
   /* fetch */
+  const loadRegistrations = async (evtId) => {
+    const [res, stuRes] = await Promise.all([
+      eventsService.fetchRegistrations(evtId || selectedEvent),
+      studentsService.fetchAll()
+    ])
+    if (stuRes.success) setStudents(stuRes.students || [])
+    if (res.success) setRegistrations(res.registrations || [])
+  }
+
   const loadRecords = async (evtId) => {
     setLoading(true)
     const res = await attendanceService.fetchAll(evtId || selectedEvent)
@@ -121,17 +163,40 @@ export default function AttendancePage({ tokens }) {
     setLoading(false)
   }
 
-  useEffect(() => { loadRecords(selectedEvent) }, [selectedEvent])
+  useEffect(() => {
+    if (activeTab === 'monitor' || activeTab === 'reports') {
+      loadRegistrations(selectedEvent)
+      loadRecords(selectedEvent)
+    }
+  }, [selectedEvent, activeTab])
 
-  useEffect(() => { loadChart(selectedEvent) }, [selectedEvent])
+  useEffect(() => {
+    if (activeTab === 'monitor' || activeTab === 'reports') loadChart(selectedEvent)
+  }, [selectedEvent, activeTab])
 
-  useEffect(() => { loadDeptData(selectedEvent) }, [selectedEvent])
+  useEffect(() => {
+    if (activeTab === 'reports') loadDeptData(selectedEvent)
+  }, [selectedEvent, activeTab])
 
   /* stats */
-  const totalPresent = records.filter(r => r.status === 'Present').length
-  const totalAbsent = records.filter(r => r.status === 'Absent').length
-  const totalLate = records.filter(r => r.status === 'Late').length
-  const pct = records.length ? Math.round(((totalPresent + totalLate) / records.length) * 100) : 0
+  const mappedRecords = records.map(r => {
+    const reg = registrations.find(regItem => (regItem.id === r.registrationId) || (regItem.registration_id === r.registrationId))
+    const student = reg ? students.find(s => s.id === reg.userId || s.id === reg.user_id) : null
+    return {
+      ...r,
+      studentName: r.studentName && r.studentName !== 'Student' && r.studentName.length < 20
+        ? r.studentName
+        : (student?.name || reg?.studentName || reg?.student_name || reg?.full_name || r.studentName),
+      rollNo: r.rollNo && r.rollNo !== 'N/A'
+        ? r.rollNo
+        : (student?.rollNo || reg?.rollNo || reg?.roll_no || r.rollNo)
+    }
+  })
+
+  const totalPresent = mappedRecords.filter(r => r.status === 'Present').length
+  const totalAbsent = mappedRecords.filter(r => r.status === 'Absent').length
+  const totalLate = mappedRecords.filter(r => r.status === 'Late').length
+  const pct = mappedRecords.length ? Math.round(((totalPresent + totalLate) / mappedRecords.length) * 100) : 0
 
   const statsCards = [
     { label: 'Total Present', value: totalPresent, Icon: Users, bg: '#00BC7D' },
@@ -145,7 +210,7 @@ export default function AttendancePage({ tokens }) {
   const [itemsPerPage, setItemsPerPage] = useState(5)
 
   /* filter */
-  const filtered = records.filter(r => {
+  const filtered = mappedRecords.filter(r => {
     const sm = filterStatus === 'All' || r.status === filterStatus
     const q = search.toLowerCase()
     const tm = !q || r.studentName.toLowerCase().includes(q) || r.rollNo.toLowerCase().includes(q)
@@ -205,7 +270,26 @@ export default function AttendancePage({ tokens }) {
   const getInitials = (name = '') =>
     name.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
 
-  const selectedEvtName = ATTENDANCE_EVENTS.find(e => e.id === selectedEvent)?.name || ''
+  const selectedEvtName = eventsList.find(e => String(e.id) === String(selectedEvent))?.name || ''
+
+  const handleGenerateQR = async () => {
+    if (!selectedEvent) {
+      showToast('No event selected.', 'error')
+      return
+    }
+    setQrLoading(true)
+    const res = await eventsService.getQRCodeBlob(selectedEvent)
+    setQrLoading(false)
+    if (res.success && (res.qrUrl || res.blob)) {
+      const url = res.qrUrl || URL.createObjectURL(res.blob)
+      setQrImageUrl(url)
+      setQrGenerated(true)
+      startCountdown()
+      showToast(`QR generated for ${selectedEvtName}`, 'success')
+    } else {
+      showToast(res.message || 'Failed to generate QR code.', 'error')
+    }
+  }
 
   return (
     <div className="animate-fadeIn p-6" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
@@ -214,11 +298,29 @@ export default function AttendancePage({ tokens }) {
       <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <div>
           <div className="flex items-center gap-1.5 text-[12px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-            <span>EventHub</span><span>&gt;</span>
+            <span>CampusConnect</span><span>&gt;</span>
             <span style={{ color: BRAND }}>Attendance</span>
           </div>
           <h1 className="text-[28px] font-extrabold m-0 tracking-tight">Attendance Management</h1>
           <p className="text-[13px] mt-1 mb-0" style={label}>QR-based contactless attendance system</p>
+        </div>
+
+        {/* Global Event Select Dropdown */}
+        <div className="flex items-center gap-2">
+          <span className="text-[12px] font-bold uppercase tracking-wider" style={label}>Active Event:</span>
+          <select
+            value={selectedEvent}
+            onChange={e => {
+              setSelectedEvent(e.target.value)
+              setQrGenerated(false)
+            }}
+            className="px-4 py-2.5 rounded-xl text-[13px] outline-none cursor-pointer border font-bold transition-all hover:opacity-90"
+            style={{ ...inp, minWidth: '220px' }}
+          >
+            {(eventsList || []).map(ev => (
+              <option key={ev.id} value={ev.id}>{ev.name}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -249,10 +351,11 @@ export default function AttendancePage({ tokens }) {
       {/* ── QR GENERATOR TAB ── */}
       {activeTab === 'qr' && (
         <AttendanceTabQR
+          eventsList={eventsList}
+          qrImageUrl={qrImageUrl}
+          handleGenerateQR={handleGenerateQR}
           selectedEvent={selectedEvent}
           setSelectedEvent={setSelectedEvent}
-          selectedSession={selectedSession}
-          setSelectedSession={setSelectedSession}
           qrGenerated={qrGenerated}
           setQrGenerated={setQrGenerated}
           qrLoading={qrLoading}
@@ -267,25 +370,6 @@ export default function AttendancePage({ tokens }) {
           inp={inp}
           label={label}
           fmtCountdown={fmtCountdown}
-        />
-      )}
-
-      {/* ── SCAN QR TAB ── */}
-      {activeTab === 'scan' && (
-        <AttendanceTabScan
-          scannerActive={scannerActive}
-          setScannerActive={setScannerActive}
-          recentScans={recentScans}
-          scansLoading={scansLoading}
-          loadRecentScans={loadRecentScans}
-          dark={dark}
-          BRAND={BRAND}
-          cardStyle={card}
-          inp={inp}
-          label={label}
-          showToast={showToast}
-          getInitials={getInitials}
-          badgeStyle={badgeStyle}
         />
       )}
 

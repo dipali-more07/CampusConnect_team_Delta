@@ -50,8 +50,9 @@ export default function AnalyticsTrendChart({
           <Loader2 className="animate-spin text-slate-400" size={24} />
         </div>
       ) : (() => {
-        const MAX_VAL = 12
-        const yTicks = [0, 3, 6, 9, 12]
+        const maxDataVal = Math.max(5, ...trendData.map(d => d.value || 0))
+        const MAX_VAL = Math.max(10, Math.ceil(maxDataVal / 5) * 5)
+        const yTicks = [0, Math.round(MAX_VAL * 0.25), Math.round(MAX_VAL * 0.5), Math.round(MAX_VAL * 0.75), MAX_VAL]
         const CHART_H = 240
         const { linePath, fillPath, points } = generateTrendPath(trendData, MAX_VAL)
 

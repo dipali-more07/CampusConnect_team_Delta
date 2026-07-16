@@ -1,5 +1,6 @@
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-const API_BASE = import.meta.env.VITE_API_BASE_URL 
+const API_BASE = import.meta.env.VITE_API_BASE_URL
+import { fetchWithAuth } from '../utils/apiClient'
 import defaultRegistrations from '../data/registrations.json'
 import defaultEvents from '../data/events.json'
 import defaultAttendance from '../data/attendance.json'
@@ -65,6 +66,16 @@ function saveMockEvents(events) {
 async function mockFetchEvents() {
   await new Promise(r => setTimeout(r, 450))
   return { success: true, events: getMockEvents() }
+}
+
+async function mockFetchUpcomingEvents(limit = 10) {
+  await new Promise(r => setTimeout(r, 200))
+  const mockUpcoming = [
+    { id: 1, month: 'AUG', day: '15', title: 'TechFest 2025', venue: 'Main Auditorium', time: '09:00', registered: 425, capacity: 500, color: '#615FFF' },
+    { id: 2, month: 'JUL', day: '22', title: 'Annual Cultural Fest', venue: 'Open Air Theatre', time: '18:00', registered: 876, capacity: 1000, color: '#615FFF' },
+    { id: 3, month: 'SEP', day: '5', title: 'Sports Meet 2025', venue: 'University Grounds', time: '07:00', registered: 612, capacity: 800, color: '#615FFF' }
+  ]
+  return { success: true, events: mockUpcoming.slice(0, limit) }
 }
 
 async function mockCreateEvent(payload) {
@@ -203,10 +214,14 @@ async function mockApproveEvent(eventId, approvalStatus) {
 // Helper to map backend event fields to frontend expected fields
 function mapEvent(e) {
   if (!e) return null
+
+  // 🔍 TEMP DEBUG — console mein dekho exact backend fields
+  console.log('[mapEvent] raw backend event:', JSON.stringify(e, null, 2))
+
   return {
     id: e.event_id || e.id,
     name: e.event_name || e.name || e.title || '',
-    organizer: e.organizer || '',
+    organizer: e.organizer_name || e.organized_by || (typeof e.organizer === 'object' ? e.organizer?.name || e.organizer?.full_name || '' : e.organizer) || '',
     category: e.category ? (e.category.charAt(0).toUpperCase() + e.category.slice(1)) : 'General',
     eventType: e.event_type || e.eventType || 'offline',
     participationType: e.participation_type || e.participationType || 'individual',
@@ -216,6 +231,7 @@ function mapEvent(e) {
     start_datetime: e.start_datetime,
     end_datetime: e.end_datetime,
     capacity: e.capacity || e.max_participants || 500,
+    fees: e.fees ?? e.fee ?? e.registration_fee ?? e.event_fee ?? 0,
     registrationsCount: e.registrationsCount || e.registrations_count || 0,
     status: e.status || 'Upcoming',
     approvalStatus: (() => {
@@ -228,15 +244,13 @@ function mapEvent(e) {
   }
 }
 
+
 // ─────────────────────────────────────────────────────────────────
 // REAL API FUNCTIONS
 // ─────────────────────────────────────────────────────────────────
 async function apiFetchEvents() {
   try {
-    const res = await fetch(`${API_BASE}/events`, {
-      method: 'GET',
-      headers: authHeaders(),
-    })
+    const res = await fetchWithAuth(`${API_BASE}/events`, { method: 'GET' })
     const data = await parseJSON(res)
     if (!res.ok) {
       console.error('[eventsService] fetchEvents failed:', res.status, data)
@@ -251,11 +265,50 @@ async function apiFetchEvents() {
   }
 }
 
+async function apiFetchUpcomingEvents(limit = 10) {
+  try {
+    const res = await fetchWithAuth(`${API_BASE}/events/upcoming?limit=${limit}`, { method: 'GET' })
+    const data = await parseJSON(res)
+    if (!res.ok) {
+      console.error('[eventsService] fetchUpcomingEvents failed:', res.status, data)
+      return { success: false, events: [] }
+    }
+    const eventsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])
+    const mapped = eventsArray.map(e => {
+      const mappedEv = mapEvent(e)
+      
+      let monthStr = 'AUG'
+      let dayStr = '15'
+      if (mappedEv.date) {
+        try {
+          const dObj = new Date(mappedEv.date)
+          if (!isNaN(dObj.getTime())) {
+            monthStr = dObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+            dayStr = String(dObj.getDate())
+          }
+        } catch { }
+      }
+      return {
+        ...mappedEv,
+        title: mappedEv.name || mappedEv.title || 'Event',
+        month: monthStr,
+        day: dayStr,
+        registered: Number(mappedEv.registrationsCount || 0),
+        capacity: Number(mappedEv.capacity || 500),
+        color: '#615FFF'
+      }
+    })
+    return { success: true, events: mapped }
+  } catch (err) {
+    console.error('[eventsService] fetchUpcomingEvents network error:', err)
+    return { success: false, events: [], message: 'Server unreachable.' }
+  }
+}
+
 async function apiCreateEvent(payload) {
   try {
-    const res = await fetch(`${API_BASE}/events`, {
+    const res = await fetchWithAuth(`${API_BASE}/events`, {
       method: 'POST',
-      headers: authHeaders(),
       body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
@@ -273,9 +326,8 @@ async function apiCreateEvent(payload) {
 
 async function apiUpdateEvent(id, payload) {
   try {
-    const res = await fetch(`${API_BASE}/events/${id}`, {
+    const res = await fetchWithAuth(`${API_BASE}/events/${id}`, {
       method: 'PUT',
-      headers: authHeaders(),
       body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
@@ -293,19 +345,25 @@ async function apiUpdateEvent(id, payload) {
 
 async function apiDeleteEvent(id) {
   try {
+    const token = getToken()
+    console.log('[eventsService] apiDeleteEvent token:', token)
     const res = await fetch(`${API_BASE}/events/${id}`, {
       method: 'DELETE',
-      headers: authHeaders(),
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
+      },
     })
     const data = await parseJSON(res)
     if (!res.ok) {
       console.error('[eventsService] deleteEvent failed:', res.status, data)
-      return { success: false }
+      return { success: false, message: data.message || data.detail || 'Failed to delete event.' }
     }
     return { success: true }
   } catch (err) {
     console.error('[eventsService] deleteEvent network error:', err)
-    return { success: false }
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -415,14 +473,20 @@ async function mockFetchAttendance(eventId) {
 /* ── REAL API REGISTRATIONS ──────────────────────────────────── */
 async function apiFetchRegistrations(eventId) {
   try {
-    const res = await fetch(`${API_BASE}/events/${eventId}/registrations`, {
-      headers: authHeaders(),
-    })
+    // Correct endpoint: GET /registrations/event/{event_id}
+    const res = await fetchWithAuth(
+      `${API_BASE}/registrations/event/${eventId}?page=1&size=500`,
+      { method: 'GET' }
+    )
     const data = await parseJSON(res)
+
     if (!res.ok) {
       return { success: false, message: data.message || 'Failed to fetch registrations.' }
     }
-    return { success: true, registrations: data.registrations || [] }
+
+    // Backend may return registrations in various formats
+    const regs = data.registrations || data.data || data.items || data || []
+    return { success: true, registrations: Array.isArray(regs) ? regs : [] }
   } catch (err) {
     console.error('[eventsService] fetchRegistrations error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -448,6 +512,33 @@ async function apiUpdateRegistrationStatus(id, status) {
 }
 
 /* ── REAL API ATTENDANCE ─────────────────────────────────────── */
+function mapAttendanceRecord(r) {
+  const fmtTime = (dt) => {
+    if (!dt) return '-'
+    try {
+      return new Date(dt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+    } catch { return dt }
+  }
+
+  const fmtStatus = (s) => {
+    if (!s) return 'Present'
+    return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()
+  }
+
+  return {
+    id: r.attendance_id || r.id,
+    studentName: r.student_name || r.full_name || r.name || r.studentName || r.registration_id?.slice(0, 8) || 'Student',
+    rollNo: r.roll_no || r.rollNo || r.college_id || r.student_id || 'N/A',
+    eventId: r.event_id || r.eventId || '',
+    eventName: r.event_name || r.eventName || '',
+    checkIn: fmtTime(r.check_in_time || r.checkIn),
+    checkOut: fmtTime(r.check_out_time || r.checkOut),
+    status: fmtStatus(r.attendance_status || r.status),
+    department: r.department || r.dept || '',
+    registrationId: r.registration_id || r.registrationId || '',
+  }
+}
+
 async function apiFetchAttendance(eventId) {
   try {
     const res = await fetch(`${API_BASE}/attendance/event/${eventId}`, {
@@ -457,7 +548,9 @@ async function apiFetchAttendance(eventId) {
     if (!res.ok) {
       return { success: false, message: data.message || 'Failed to fetch attendance.' }
     }
-    return { success: true, attendance: data.attendance || data.data || data || [] }
+    const raw = data.attendance || data.data || data || []
+    const attendance = Array.isArray(raw) ? raw.map(mapAttendanceRecord) : []
+    return { success: true, attendance }
   } catch (err) {
     console.error('[eventsService] fetchAttendance error:', err)
     return { success: false, message: 'Server unreachable.' }
@@ -486,6 +579,27 @@ async function apiApproveEvent(eventId, approvalStatus, rejectionReason = null) 
   }
 }
 
+async function apiPublishEvent(eventId) {
+  try {
+    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
+    const res = await fetch(`${API_BASE}/events/${eventId}/publish`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
+      },
+    })
+    const data = await parseJSON(res)
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to publish event.' }
+    }
+    return { success: true, message: data.message || 'Event published successfully!' }
+  } catch (err) {
+    console.error('[eventsService] publishEvent error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────
 // PUBLIC SERVICE
 // ─────────────────────────────────────────────────────────────────
@@ -493,9 +607,23 @@ const eventsService = {
   fetchAll: () =>
     USE_MOCK ? mockFetchEvents() : apiFetchEvents(),
 
+  fetchUpcoming: (limit) =>
+    USE_MOCK ? mockFetchUpcomingEvents(limit) : apiFetchUpcomingEvents(limit),
+
   create: (payload) =>
     USE_MOCK ? mockCreateEvent(payload) : apiCreateEvent(payload),
 
+
+
+
+
+
+
+
+
+
+
+    
   update: (id, payload) =>
     USE_MOCK ? mockUpdateEvent(id, payload) : apiUpdateEvent(id, payload),
 
@@ -516,6 +644,64 @@ const eventsService = {
 
   approve: (eventId, approvalStatus, rejectionReason) =>
     USE_MOCK ? Promise.resolve({ success: true }) : apiApproveEvent(eventId, approvalStatus, rejectionReason),
+
+  publish: (eventId) =>
+    USE_MOCK ? Promise.resolve({ success: true, message: 'Event published (mock).' }) : apiPublishEvent(eventId),
+
+  getQRCodeBlob: (eventId) =>
+    USE_MOCK ? mockGetQRCodeBlob(eventId) : apiGetQRCodeBlob(eventId),
+}
+
+/* ── MOCK GET QR CODE BLOB ── */
+async function mockGetQRCodeBlob(eventId) {
+  try {
+    const res = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=cc-event-${eventId}`)
+    const blob = await res.blob()
+    return { success: true, blob }
+  } catch {
+    return { success: false }
+  }
+}
+
+/* ── API GET QR CODE BLOB ── */
+async function apiGetQRCodeBlob(eventId) {
+  try {
+    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
+    const res = await fetch(`${API_BASE}/events/${eventId}/qrcode`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'ngrok-skip-browser-warning': 'true',
+      }
+    })
+    if (!res.ok) {
+      return { success: false, message: 'Failed to fetch QR code.' }
+    }
+    const contentType = res.headers.get('content-type') || ''
+    if (contentType.includes('application/json')) {
+      const text = await res.json()
+      let qrUrl = text
+      if (typeof text === 'string') {
+        if (!text.startsWith('data:') && (text.startsWith('iVBORw0KG') || text.length > 100)) {
+          qrUrl = `data:image/png;base64,${text}`
+        }
+      } else if (text && typeof text === 'object') {
+        const val = text.qr_code || text.qrCode || text.data || text.url
+        if (typeof val === 'string') {
+          qrUrl = val
+          if (!val.startsWith('data:') && (val.startsWith('iVBORw0KG') || val.length > 100)) {
+            qrUrl = `data:image/png;base64,${val}`
+          }
+        }
+      }
+      return { success: true, qrUrl }
+    } else {
+      const blob = await res.blob()
+      return { success: true, blob }
+    }
+  } catch (err) {
+    console.error('[eventsService] apiGetQRCodeBlob error:', err)
+    return { success: false, message: 'Server unreachable.' }
+  }
 }
 
 export default eventsService

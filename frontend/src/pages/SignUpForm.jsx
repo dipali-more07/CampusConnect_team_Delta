@@ -8,7 +8,11 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
   const [email, setEmail] = useState('')
   const [mobile, setMobile] = useState('')
   const [college, setCollege] = useState('')
+  const [collegeId, setCollegeId] = useState('')
   const [course, setCourse] = useState('')
+  const [department, setDepartment] = useState('')
+  const [gender, setGender] = useState('male')
+  const [yearOfStudy, setYearOfStudy] = useState(1)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
@@ -76,7 +80,11 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       email,
       mobile,
       college,
+      collegeId,
       course,
+      department,
+      gender,
+      yearOfStudy: parseInt(yearOfStudy, 10),
       password,
       role: 'student', // default role
     }
@@ -92,7 +100,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
           setErrors({ email: res.message })
         }
       }
-    } catch (err) {
+    } catch {
       showToast('Something went wrong during registration.', 'error')
     } finally {
       setRegisterLoading(false)
@@ -114,7 +122,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       } else {
         showToast(res.message || 'Verification failed.', 'error')
       }
-    } catch (err) {
+    } catch {
       showToast('Something went wrong during verification.', 'error')
     } finally {
       setVerifyLoading(false)
@@ -132,7 +140,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       } else {
         showToast(res.message || 'Failed to resend verification code.', 'error')
       }
-    } catch (err) {
+    } catch {
       showToast('Something went wrong. Please try again.', 'error')
     } finally {
       setResendLoading(false)
@@ -143,7 +151,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
     <>
       {/* Heading */}
       <h1 className="text-2xl font-black text-slate-900 mb-1">Create an account</h1>
-      <p className="text-sm text-slate-500 mb-6">Join EventHub to explore and manage events</p>
+      <p className="text-sm text-slate-500 mb-6">Join CampusConnect to explore and manage events</p>
 
       <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-4">
         {/* Full Name */}
@@ -201,7 +209,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
                 type="tel"
                 placeholder="9876543210"
                 value={mobile}
-                onChange={e => setMobile(e.target.value)}
+                onChange={e => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 required
                 className={`w-full pl-10 pr-4 py-2 rounded-lg border text-sm text-slate-700 placeholder-slate-400
                 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition ${errors.mobile ? 'border-red-500 bg-red-50/50' : 'border-slate-200'
@@ -233,20 +241,103 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
           </div>
         </div>
 
-        {/* Course Input */}
+        {/* Course & Department row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Course */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">
+              Course Name
+            </label>
+            <div className="relative">
+              <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="e.g. B.Tech"
+                value={course}
+                onChange={e => setCourse(e.target.value)}
+                required
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
+              />
+            </div>
+          </div>
+
+          {/* Department */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">
+              Department
+            </label>
+            <div className="relative">
+              <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="e.g. CSE"
+                value={department}
+                onChange={e => setDepartment(e.target.value)}
+                required
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* College ID */}
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1 block">
-            Course Name
+            College ID / Roll No
           </label>
           <div className="relative">
             <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="e.g. B.Tech"
-              value={course}
-              onChange={e => setCourse(e.target.value)}
+              placeholder="e.g. 21CS001"
+              value={collegeId}
+              onChange={e => setCollegeId(e.target.value)}
               required
               className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
+              focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
+            />
+          </div>
+        </div>
+
+        {/* Gender & Year of Study */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {/* Gender */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">
+              Gender
+            </label>
+            <div className="relative">
+              <select
+                value={gender}
+                onChange={e => setGender(e.target.value)}
+                required
+                className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white placeholder-slate-400
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
+              >
+                <option value="male">Male</option>
+                <option value="female">Female</option>
+                <option value="other">Other</option>
+              </select>
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
+            </div>
+          </div>
+
+          {/* Year of Study */}
+          <div>
+            <label className="text-xs font-semibold text-slate-600 mb-1 block">
+              Year of Study
+            </label>
+            <input
+              type="number"
+              placeholder="e.g. 1"
+              value={yearOfStudy}
+              onChange={e => setYearOfStudy(e.target.value)}
+              required
+              min="1"
+              max="6"
+              className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
               focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
             />
           </div>

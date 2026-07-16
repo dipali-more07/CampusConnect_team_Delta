@@ -21,7 +21,7 @@ export default function StudentFormModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-5"
+      className="fixed inset-0 z-9999 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5"
       onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
     >
       <div
@@ -53,12 +53,20 @@ export default function StudentFormModal({
             { key: 'rollNo', label: 'Roll Number', placeholder: 'e.g. 21CS001' },
             { key: 'email', label: 'Email', placeholder: 'e.g. arjun@college.edu' },
             { key: 'phone', label: 'Phone', placeholder: '+91 98765 43210' },
-          ].map(({ key, label, placeholder, col }) => (
+            ...(!editing ? [{ key: 'password', label: 'Password', placeholder: 'Enter password', type: 'password', col: 2 }] : [])
+          ].map(({ key, label, placeholder, col, type }) => (
             <div key={key} style={{ gridColumn: col === 2 ? '1 / -1' : undefined }}>
               <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>{label}</label>
               <input
+                type={type || 'text'}
                 value={form[key]}
-                onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
+                onChange={e => {
+                  let val = e.target.value
+                  if (key === 'phone') {
+                    val = val.replace(/\D/g, '').slice(0, 10)
+                  }
+                  setForm(p => ({ ...p, [key]: val }))
+                }}
                 placeholder={placeholder}
                 className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
                 style={{ ...inpStyle, borderColor: errors[key] ? '#ef4444' : tokens.border }}
