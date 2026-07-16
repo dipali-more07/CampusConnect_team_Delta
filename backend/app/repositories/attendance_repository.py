@@ -58,3 +58,14 @@ class AttendanceRepository(BaseRepository[Attendance]):
                 )
             )
         ).scalar() or 0
+
+    def count_by_event(self, event_id: str) -> int:
+        """Count all attendance records for an event."""
+        from app.models.registration import EventRegistration
+        return self.db.execute(
+            select(func.count())
+            .select_from(Attendance)
+            .join(EventRegistration, Attendance.registration_id == EventRegistration.registration_id)
+            .where(EventRegistration.event_id == event_id)
+        ).scalar() or 0
+

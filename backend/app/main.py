@@ -478,6 +478,60 @@ def reset_password_page(token: str = ""):
             font-size: 15px;
             line-height: 1.6;
         }
+
+        .password-requirements {
+            margin-top: 10px;
+            background: rgba(15, 23, 42, 0.4);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .requirement-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            transition: color 0.3s ease;
+        }
+
+        .requirement-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .requirement-item .icon {
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            border: 1.5px solid var(--text-muted);
+            transition: all 0.3s ease;
+        }
+
+        .requirement-item.valid {
+            color: var(--success);
+        }
+
+        .requirement-item.valid .icon {
+            border-color: var(--success);
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success);
+        }
+
+        .requirement-item.invalid {
+            color: var(--error);
+        }
+
+        .requirement-item.invalid .icon {
+            border-color: var(--error);
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--error);
+        }
     </style>
 </head>
 <body>
@@ -491,11 +545,28 @@ def reset_password_page(token: str = ""):
                 <div class="form-group">
                     <label for="password">New Password</label>
                     <input type="password" id="password" required minlength="8" placeholder="••••••••">
+                    <div class="password-requirements" id="passwordRequirements">
+                        <div class="requirement-item" id="reqLength">
+                            <span class="icon">○</span> At least 8 characters
+                        </div>
+                        <div class="requirement-item" id="reqUpper">
+                            <span class="icon">○</span> At least one uppercase letter (A-Z)
+                        </div>
+                        <div class="requirement-item" id="reqLower">
+                            <span class="icon">○</span> At least one lowercase letter (a-z)
+                        </div>
+                        <div class="requirement-item" id="reqNumber">
+                            <span class="icon">○</span> At least one number (0-9)
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
                     <label for="confirmPassword">Confirm Password</label>
                     <input type="password" id="confirmPassword" required minlength="8" placeholder="••••••••">
+                    <div class="requirement-item" id="reqMatch" style="margin-top: 10px; display: none;">
+                        <span class="icon">○</span> Passwords match
+                    </div>
                 </div>
 
                 <div id="errorMessage" class="feedback-message"></div>
@@ -517,9 +588,18 @@ def reset_password_page(token: str = ""):
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
 
+        const passwordInput = document.getElementById('password');
+        const confirmPasswordInput = document.getElementById('confirmPassword');
+        const reqLength = document.getElementById('reqLength');
+        const reqUpper = document.getElementById('reqUpper');
+        const reqLower = document.getElementById('reqLower');
+        const reqNumber = document.getElementById('reqNumber');
+        const reqMatch = document.getElementById('reqMatch');
+        const submitBtn = document.getElementById('submitBtn');
+
         if (!token) {
             showError("Invalid or missing password reset token. Please check the link in your email.");
-            document.getElementById('submitBtn').disabled = true;
+            submitBtn.disabled = true;
         }
 
         function showError(msg) {
@@ -528,11 +608,67 @@ def reset_password_page(token: str = ""):
             errDiv.className = "feedback-message feedback-error";
         }
 
+        function updateRequirement(element, isValid) {
+            if (isValid) {
+                element.classList.remove('invalid');
+                element.classList.add('valid');
+                element.querySelector('.icon').innerText = '✓';
+            } else {
+                element.classList.remove('valid');
+                element.classList.remove('invalid');
+                element.querySelector('.icon').innerText = '○';
+            }
+        }
+
+        function validatePassword() {
+            const val = passwordInput.value;
+            
+            const hasLength = val.length >= 8;
+            const hasUpper = /[A-Z]/.test(val);
+            const hasLower = /[a-z]/.test(val);
+            const hasNumber = /\d/.test(val);
+
+            updateRequirement(reqLength, hasLength);
+            updateRequirement(reqUpper, hasUpper);
+            updateRequirement(reqLower, hasLower);
+            updateRequirement(reqNumber, hasNumber);
+
+            const isAllValid = hasLength && hasUpper && hasLower && hasNumber;
+
+            const confirmVal = confirmPasswordInput.value;
+            if (confirmVal.length > 0) {
+                reqMatch.style.display = 'flex';
+                const isMatch = val === confirmVal;
+                if (isMatch) {
+                    reqMatch.classList.remove('invalid');
+                    reqMatch.classList.add('valid');
+                    reqMatch.querySelector('.icon').innerText = '✓';
+                } else {
+                    reqMatch.classList.remove('valid');
+                    reqMatch.classList.add('invalid');
+                    reqMatch.querySelector('.icon').innerText = '✗';
+                }
+            } else {
+                reqMatch.style.display = 'none';
+            }
+
+            // Disable submit if invalid or token is missing
+            if (token) {
+                submitBtn.disabled = !isAllValid || (confirmVal.length > 0 && val !== confirmVal);
+            }
+        }
+
+        // Initialize state
+        if (token) {
+            submitBtn.disabled = true;
+        }
+        passwordInput.addEventListener('input', validatePassword);
+        confirmPasswordInput.addEventListener('input', validatePassword);
+
         async function handleSubmit(event) {
             event.preventDefault();
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            const submitBtn = document.getElementById('submitBtn');
+            const password = passwordInput.value;
+            const confirmPassword = confirmPasswordInput.value;
             const errDiv = document.getElementById('errorMessage');
 
             // Reset UI
@@ -567,7 +703,12 @@ def reset_password_page(token: str = ""):
                     document.getElementById('formScreen').style.display = 'none';
                     document.getElementById('successScreen').style.display = 'block';
                 } else {
-                    showError(data.message || "Failed to reset password. The link may have expired.");
+                    let errMsg = data.message || "Failed to reset password. The link may have expired.";
+                    if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+                        const detailMsgs = data.data.map(err => err.message).join(". ");
+                        errMsg = `${data.message} Detail: ${detailMsgs}`;
+                    }
+                    showError(errMsg);
                     submitBtn.disabled = false;
                     submitBtn.innerText = "Reset Password";
                 }

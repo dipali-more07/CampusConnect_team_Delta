@@ -1,13 +1,28 @@
 """
 app/services/registration_service.py
+=====================================
 Event registration business logic.
 
-KEY BUSINESS RULES:
-  1. A user can only register ONCE per event (duplicate prevention)
-  2. Cannot register after the registration deadline
-  3. Cannot register if event is full (goes to waitlist)
-  4. Cannot register for a cancelled event
-  5. Only the user themselves can cancel their registration
+WHAT IS A SERVICE?
+  Services are the "brain" of the application. This file handles all the
+  rules and logic for registering students to events.
+
+  RULE: Never put business logic in routers (api/v1/*.py files).
+        Routers call services, services call repositories.
+
+KEY BUSINESS RULES (enforced in this file):
+  1. A user can only register ONCE per event (no duplicate registrations)
+  2. Cannot register after the registration deadline has passed
+  3. If the event is full → put user on WAITLIST (don't reject them)
+  4. Cannot register for a non-PUBLISHED event (must be published, not draft)
+  5. Only the user themselves can cancel their own registration (or admin)
+  6. When someone cancels → first waitlisted person is auto-promoted to CONFIRMED
+
+TEAM REGISTRATION RULES:
+  - All team members must already have accounts on CampusConnect
+  - Team leader submits a list of teammate emails
+  - Each member gets their own individual registration record (linked by team_id)
+  - If capacity is insufficient → entire team goes on WAITLIST
 """
 from app.schemas.registration import RegisterForEventRequest
 from typing import List, Optional
@@ -20,7 +35,7 @@ from app.repositories.notification_repository import NotificationRepository
 from app.core.exceptions import (
     ConflictException, BadRequestException, NotFoundException, ForbiddenException
 )
-from app.core.constants import RegistrationStatus, EventStatus, NotificationType, ParticipationType
+from app.core.constants import RegistrationStatus, EventStatus, NotificationType, ParticipationType, PaymentStatus
 from app.models.registration import EventRegistration
 from app.models.user import User
 from app.services.email_service import email_service
@@ -77,20 +92,24 @@ class RegistrationService:
                     return existing
                 raise ConflictException("You are already registered for this event")
 
-            # Rule 4: Check capacity
+            # --- CHECK CAPACITY ---
+            # max_participants = 0 or None means unlimited seats
             status = RegistrationStatus.CONFIRMED
             if event.max_participants:
                 confirmed_count = self.reg_repo.count_confirmed_registrations(data.event_id)
                 if confirmed_count >= event.max_participants:
-                    # Put on waiting list instead of rejecting
+                    # Event is full! Put user on waiting list instead of rejecting them
+                    # When someone cancels, _promote_from_waitlist() will auto-upgrade them
                     status = RegistrationStatus.WAITLISTED
 
-            # Create registration record
+            # --- CREATE REGISTRATION RECORD ---
             registration = EventRegistration(
                 event_id=data.event_id,
                 participant_id=current_user.user_id,
                 registration_status=status,
                 registration_type="individual",
+                # Payment status: FREE if event has no fees, PENDING if fees > 0
+                payment_status=PaymentStatus.PENDING if (event.fees and event.fees > 0) else PaymentStatus.FREE,
             )
             self.reg_repo.create(registration)
 
@@ -180,6 +199,7 @@ class RegistrationService:
                     registration_status=status,
                     registration_type="team",
                     team_id=team.team_id,
+                    payment_status=PaymentStatus.PENDING if (event.fees and event.fees > 0) else PaymentStatus.FREE,
                 )
                 self.reg_repo.create(reg)
                 if member.user_id == current_user.user_id:
@@ -235,9 +255,22 @@ class RegistrationService:
         return registration
 
     def _promote_from_waitlist(self, event_id: str) -> None:
-        """When someone cancels, promote the first waitlisted person to confirmed."""
+        """
+        Automatically promote the first waitlisted person to CONFIRMED
+        when a seat becomes available (i.e., someone cancelled).
+
+        HOW IT WORKS:
+          - Query for waitlisted registrations for this event
+          - Order by registered_at ASC (first come, first served = FIFO queue)
+          - Take only the first one (limit 1)
+          - Change their status to CONFIRMED
+
+        This is called automatically inside cancel_registration().
+        """
         from sqlalchemy import select, and_
         from app.models.registration import EventRegistration
+
+        # Find the earliest waitlisted registration for this event
         waitlisted = self.db.execute(
             select(EventRegistration)
             .where(
@@ -246,11 +279,12 @@ class RegistrationService:
                     EventRegistration.registration_status == RegistrationStatus.WAITLISTED,
                 )
             )
-            .order_by(EventRegistration.registered_at.asc())
+            .order_by(EventRegistration.registered_at.asc())  # First waitlisted = first promoted
             .limit(1)
         ).scalar_one_or_none()
 
         if waitlisted:
+            # Promote them! They now have a confirmed spot.
             waitlisted.registration_status = RegistrationStatus.CONFIRMED
 
     def get_user_registrations(

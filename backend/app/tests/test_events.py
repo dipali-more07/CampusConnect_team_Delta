@@ -22,6 +22,53 @@ class TestEventListing:
         response = client.get("/api/v1/events/?page=1&size=5")
         assert response.status_code == 200
 
+    def test_list_events_filters_unapproved_for_participants(self, client, db, organizer_user, participant_token):
+        from app.models.event import Event
+        from app.core.constants import ParticipationType, ApprovalStatus, EventStatus
+        
+        # 1. Create an approved event
+        approved_event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Approved Event",
+            start_datetime=datetime.utcnow() + timedelta(days=10),
+            end_datetime=datetime.utcnow() + timedelta(days=11),
+            max_participants=50,
+            status=EventStatus.PUBLISHED,
+            approval_status=ApprovalStatus.APPROVED,
+            participation_type=ParticipationType.INDIVIDUAL,
+        )
+        # 2. Create a pending event
+        pending_event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Pending Event",
+            start_datetime=datetime.utcnow() + timedelta(days=10),
+            end_datetime=datetime.utcnow() + timedelta(days=11),
+            max_participants=50,
+            status=EventStatus.DRAFT,
+            approval_status=ApprovalStatus.PENDING,
+            participation_type=ParticipationType.INDIVIDUAL,
+        )
+        
+        db.add(approved_event)
+        db.add(pending_event)
+        db.commit()
+
+        # Public list should only show approved event
+        res_public = client.get("/api/v1/events/")
+        assert res_public.status_code == 200
+        data_public = res_public.json()["data"]
+        titles_public = [e["title"] for e in data_public]
+        assert "Approved Event" in titles_public
+        assert "Pending Event" not in titles_public
+
+        # Participant list should only show approved event
+        res_part = client.get("/api/v1/events/", headers=auth_headers(participant_token))
+        assert res_part.status_code == 200
+        data_part = res_part.json()["data"]
+        titles_part = [e["title"] for e in data_part]
+        assert "Approved Event" in titles_part
+        assert "Pending Event" not in titles_part
+
 
 class TestEventCreation:
     def test_create_event_requires_auth(self, client):

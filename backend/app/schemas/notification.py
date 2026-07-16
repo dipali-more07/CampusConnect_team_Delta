@@ -7,8 +7,10 @@ from datetime import datetime
 from app.core.constants import NotificationType
 
 
+from typing import Optional
+
 class CreateNotificationRequest(BaseModel):
-    user_id: str
+    user_id: Optional[str] = None
     title: str = Field(..., max_length=255)
     message: str
     notification_type: NotificationType = NotificationType.SYSTEM

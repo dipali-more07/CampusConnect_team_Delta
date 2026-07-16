@@ -63,6 +63,9 @@ class TestEventRegistration:
         data = response.json()
         assert data["success"] is True
         assert data["data"]["registration_type"] == "individual"
+        assert data["data"]["event_name"] == test_event.title
+        assert data["data"]["title"] == test_event.title
+
 
     def test_team_registration_success(self, client, participant_user, participant_token, registered_teammate, test_event):
         response = client.post(
@@ -80,6 +83,9 @@ class TestEventRegistration:
         assert data["success"] is True
         assert data["data"]["registration_type"] == "team"
         assert data["data"]["team_id"] is not None
+        assert data["data"]["event_name"] == test_event.title
+        assert data["data"]["title"] == test_event.title
+
 
     def test_team_registration_fails_unregistered_member(self, client, participant_user, participant_token, test_event):
         response = client.post(

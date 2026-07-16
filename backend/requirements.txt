@@ -54,3 +54,5 @@ faker>=25.2.0              # Generate fake data for tests
 # --- Utilities ---
 python-slugify>=8.0.0      # Convert text to URL-friendly slugs
 pytz>=2024.1               # Timezone handling
+razorpay>=1.3.0            # Razorpay payment gateway SDK
+

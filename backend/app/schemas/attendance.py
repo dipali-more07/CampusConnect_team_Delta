@@ -8,12 +8,12 @@ from datetime import datetime
 
 
 class CheckInRequest(BaseModel):
-    registration_id: str
     event_id: str
+    registration_id: Optional[str] = None
 
 
-class CheckOutRequest(BaseModel):
-    registration_id: str
+
+
 
 
 class AttendanceResponse(BaseModel):
