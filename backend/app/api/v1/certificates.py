@@ -123,3 +123,146 @@ def download_certificate(
         media_type="application/pdf",
         filename=f"certificate_{certificate_number}.pdf",
     )
+
+
+import json
+
+def _get_templates_file_path() -> str:
+    os.makedirs("uploads", exist_ok=True)
+    return "uploads/certificate_templates.json"
+
+def _read_templates() -> list:
+    path = _get_templates_file_path()
+    if not os.path.exists(path):
+        default_templates = [
+            {
+                "template_id": "template_classic",
+                "name": "Classic Navy",
+                "background_image": "/assets/templates/classic.png",
+                "font_color": "#1a237e",
+                "title_font_size": 36,
+                "body_font_size": 14,
+                "is_active": True,
+                "organisation_name": "State University",
+                "certificate_title": "Certificate of Participation",
+                "background_gradient_from": "#0f172a",
+                "background_gradient_mid": "#1e1b4b",
+                "background_gradient_to": "#311042",
+                "accent_color": "#6366f1",
+                "border_style": "none",
+                "font_family": "Manrope",
+                "show_logo": True,
+                "show_signatures": True
+            }
+        ]
+        with open(path, "w") as f:
+            json.dump(default_templates, f, indent=4)
+        return default_templates
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
+def _write_templates(templates: list) -> None:
+    path = _get_templates_file_path()
+    with open(path, "w") as f:
+        json.dump(templates, f, indent=4)
+
+
+@router.get("/", summary="List all certificates (Admin/Organizer only)")
+def list_all_certificates(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    skip = (page - 1) * size
+    from sqlalchemy import select, func
+    from app.models.certificate import Certificate
+    certs = db.execute(select(Certificate).offset(skip).limit(size)).scalars().all()
+    total = db.execute(select(func.count()).select_from(Certificate)).scalar() or 0
+    return paginated_response(
+        message="All certificates",
+        data=[_cert_to_dict(c) for c in certs],
+        total=total, page=page, size=size
+    )
+
+
+@router.get("/templates", summary="Get certificate design templates (Admin/Organizer only)")
+def get_templates(
+    current_user: User = Depends(require_organizer),
+):
+    templates = _read_templates()
+    return success_response(message="Certificate templates fetched", data=templates)
+
+
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class DesignTemplateRequest(BaseModel):
+    template_id: Optional[str] = None
+    name: str
+    background_image: Optional[str] = None
+    font_color: Optional[str] = "#1e293b"
+    title_font_size: Optional[int] = 36
+    body_font_size: Optional[int] = 14
+    is_active: Optional[bool] = False
+    
+    # Custom design template fields from UI mockup
+    organisation_name: Optional[str] = "State University"
+    certificate_title: Optional[str] = "Certificate of Participation"
+    background_gradient_from: Optional[str] = "#0f172a"
+    background_gradient_mid: Optional[str] = "#1e1b4b"
+    background_gradient_to: Optional[str] = "#311042"
+    accent_color: Optional[str] = "#6366f1"
+    border_style: Optional[str] = "none" # none, thin, thick, double
+    font_family: Optional[str] = "Manrope"
+    show_logo: Optional[bool] = True
+    show_signatures: Optional[bool] = True
+
+
+@router.post("/templates", summary="Create or update certificate design template (Admin/Organizer only)")
+def design_template(
+    data: DesignTemplateRequest,
+    current_user: User = Depends(require_organizer),
+):
+    templates = _read_templates()
+    
+    import uuid
+    t_id = data.template_id or f"template_{uuid.uuid4().hex[:12]}"
+    
+    if data.is_active:
+        for t in templates:
+            t["is_active"] = False
+            
+    existing = next((t for t in templates if t["template_id"] == t_id), None)
+    
+    template_dict = {
+        "template_id": t_id,
+        "name": data.name,
+        "background_image": data.background_image or "",
+        "font_color": data.font_color,
+        "title_font_size": data.title_font_size,
+        "body_font_size": data.body_font_size,
+        "is_active": data.is_active or False,
+        "organisation_name": data.organisation_name,
+        "certificate_title": data.certificate_title,
+        "background_gradient_from": data.background_gradient_from,
+        "background_gradient_mid": data.background_gradient_mid,
+        "background_gradient_to": data.background_gradient_to,
+        "accent_color": data.accent_color,
+        "border_style": data.border_style,
+        "font_family": data.font_family,
+        "show_logo": data.show_logo if data.show_logo is not None else True,
+        "show_signatures": data.show_signatures if data.show_signatures is not None else True,
+    }
+
+    if existing:
+        existing.update(template_dict)
+    else:
+        templates.append(template_dict)
+        
+    _write_templates(templates)
+    return success_response(message="Template designed/saved successfully", data={"template_id": t_id})
+

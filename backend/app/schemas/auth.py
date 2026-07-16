@@ -4,8 +4,8 @@ Authentication request and response schemas.
 """
 import re
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from app.core.constants import UserRole, Gender
 from typing import Optional
-from app.core.constants import UserRole
 
 
 class RegisterRequest(BaseModel):
@@ -16,7 +16,10 @@ class RegisterRequest(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255, description="User's full name")
     phone: str = Field(..., min_length=10, max_length=20, description="Mobile / phone number")
     course: str = Field(..., min_length=1, max_length=255, description="Course / degree program")
+    department: Optional[str] = Field(None, max_length=255, description="Department (e.g. CSE, IT)")
     college_id: str = Field(..., description="College identifier UUID")
+    gender: Optional[Gender] = Field(None, description="Gender (male, female, other, prefer_not_to_say)")
+    year_of_study: Optional[int] = Field(None, ge=1, le=5, description="Year of study (1-5)")
 
     @field_validator("phone")
     @classmethod

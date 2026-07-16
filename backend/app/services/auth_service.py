@@ -125,7 +125,9 @@ class AuthService:
             full_name=data.full_name,
             mobile=data.phone,
             course=data.course,
+            department=data.department,
             college_name=college.college_name,
+            gender=data.gender,
         )
 
         # Step 4: Save User to DB (flush sends SQL but doesn't commit yet)
@@ -138,6 +140,9 @@ class AuthService:
             full_name=data.full_name,
             phone=data.phone,
             course=data.course,
+            department=data.department,
+            gender=data.gender,
+            year_of_study=data.year_of_study,
         )
         self.profile_repo.create(new_profile)
 

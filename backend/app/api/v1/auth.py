@@ -183,6 +183,7 @@ def get_me(
             "bio": current_user.profile.bio,
             "profile_picture": current_user.profile.profile_picture,
             "college_id": current_user.profile.college_id,
+            "gender": current_user.profile.gender.value if hasattr(current_user.profile.gender, "value") else current_user.profile.gender,
         }
     return success_response(
         message="User profile fetched successfully",
@@ -194,6 +195,18 @@ def get_me(
             "is_email_verified": current_user.is_email_verified,
             "created_at": current_user.created_at.isoformat(),
             "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
+            "full_name": current_user.full_name,
+            "mobile": current_user.mobile,
+            "phone": current_user.mobile,
+            "college_name": current_user.college_name,
+            "department": current_user.department,
+            "course": current_user.course,
+            "gender": current_user.gender,
+            "profile_image": current_user.profile_image,
+            "profile_picture": current_user.profile_image,
+            "year_of_study": current_user.profile.year_of_study if current_user.profile else None,
+            "bio": current_user.profile.bio if current_user.profile else None,
+            "college_id": current_user.profile.college_id if current_user.profile else None,
             "profile": profile_data,
         },
     )

@@ -134,6 +134,12 @@ class UserProfile(Base):
     year_of_study: Mapped[Optional[int]] = mapped_column(nullable=True)
     bio: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     profile_picture: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    
+    # Appearance preferences
+    theme_mode: Mapped[Optional[str]] = mapped_column(String(50), default="light", nullable=True)
+    accent_color: Mapped[Optional[str]] = mapped_column(String(50), default="#6366f1", nullable=True)
+    font_size: Mapped[Optional[str]] = mapped_column(String(50), default="medium", nullable=True)
+    
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, onupdate=datetime.utcnow

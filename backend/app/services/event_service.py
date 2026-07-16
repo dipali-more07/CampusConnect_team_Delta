@@ -39,7 +39,19 @@ class EventService:
     def create_event(
         self, data: CreateEventRequest, current_user: User
     ) -> Event:
-        """Create a new event (organizer or admin)."""
+        """
+        Create a new event.
+
+        WHO CAN CREATE:
+          - Organizers and Admins (participants cannot create events)
+
+        APPROVAL STATUS LOGIC:
+          - Organizer creates event → approval_status = PENDING (needs admin approval)
+          - Admin creates event     → approval_status = APPROVED (auto-approved)
+
+        NOTE: All events start with status = DRAFT regardless of approval status.
+        To allow students to register, the organizer must call the /publish endpoint.
+        """
         if current_user.role not in [UserRole.ORGANIZER, UserRole.ADMIN]:
             raise ForbiddenException("You must be an organizer to perform this action")
 
@@ -64,7 +76,7 @@ class EventService:
             fees=data.fees,
             event_date=data.event_date,
             status=EventStatus.DRAFT,
-            approval_status=ApprovalStatus.PENDING,
+            approval_status=ApprovalStatus.APPROVED if current_user.role == UserRole.ADMIN else ApprovalStatus.PENDING,
         )
         self.event_repo.create(event)
         self.db.commit()
@@ -85,14 +97,34 @@ class EventService:
         category: Optional[str] = None,
         status: Optional[str] = None,
         organizer_id: Optional[str] = None,
+        current_user: Optional[User] = None,
     ) -> tuple[List[Event], int]:
         skip = (page - 1) * size
+
+        # Role-based visibility filter:
+        # - Participants and guests: only see APPROVED events
+        # - Organizers: see all their own events, but only approved events from others
+        # - Admins: see ALL events (no filter)
+        approval_status = ApprovalStatus.APPROVED.value  # Default: approved only
+
+        if current_user:
+            if current_user.role == UserRole.ADMIN:
+                # Admins can see all events (no approval status restriction)
+                approval_status = None
+            elif current_user.role == UserRole.ORGANIZER:
+                # Organizers can see all of their own events, but only approved events from others
+                if organizer_id and organizer_id == current_user.user_id:
+                    approval_status = None   # Viewing their own events: show all
+                else:
+                    approval_status = ApprovalStatus.APPROVED.value  # Others' events: approved only
+
         events = self.event_repo.get_all_events(
             skip=skip, limit=size, search=search, category=category,
-            status=status, organizer_id=organizer_id,
+            status=status, organizer_id=organizer_id, approval_status=approval_status
         )
         total = self.event_repo.count_events(
-            search=search, category=category, status=status, organizer_id=organizer_id
+            search=search, category=category, status=status, organizer_id=organizer_id,
+            approval_status=approval_status
         )
         return events, total
 
@@ -116,10 +148,22 @@ class EventService:
         return event
 
     def publish_event(self, event_id: str, current_user: User) -> Event:
-        """Publish a draft event (must be admin-approved first)."""
+        """
+        Publish a draft event so students can register.
+
+        REQUIREMENTS BEFORE PUBLISHING:
+          1. Event must be admin-approved (approval_status = APPROVED)
+          2. Event must be in DRAFT status (can't re-publish a cancelled event)
+
+        WHAT HAPPENS ON PUBLISH:
+          - status changes from DRAFT to PUBLISHED
+          - A QR code is generated for event check-in
+          - Students can now register for this event
+        """
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
 
+        # Block publishing if admin hasn't approved yet
         if event.approval_status != ApprovalStatus.APPROVED:
             raise BadRequestException(
                 "Event must be approved by an admin before publishing"
@@ -128,7 +172,7 @@ class EventService:
         if event.status != EventStatus.DRAFT:
             raise BadRequestException(f"Cannot publish event with status '{event.status}'")
 
-        # Generate QR code for the event
+        # Generate a unique QR code image for this event (used for attendance check-in)
         qr_path = qr_service.generate_event_qr(event_id)
 
         event.status = EventStatus.PUBLISHED

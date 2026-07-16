@@ -79,17 +79,36 @@ def delete_notification(
     return success_response(message="Notification deleted")
 
 
-@router.post("/broadcast", status_code=201, summary="Send notification to user (Admin only)")
+@router.post("/broadcast", status_code=201, summary="Send notification to user or broadcast to everyone (Admin only)")
 def broadcast_notification(
     data: CreateNotificationRequest,
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ):
     service = NotificationService(db)
-    notification = service.create_notification(
-        user_id=data.user_id,
-        title=data.title,
-        message=data.message,
-        notification_type=data.notification_type,
-    )
-    return success_response(message="Notification sent", data=_notif_to_dict(notification), status_code=201)
+    
+    if data.user_id:
+        # Send to a specific user
+        notification = service.create_notification(
+            user_id=data.user_id,
+            title=data.title,
+            message=data.message,
+            notification_type=data.notification_type,
+        )
+        return success_response(
+            message="Notification sent to user",
+            data=_notif_to_dict(notification),
+            status_code=201
+        )
+    else:
+        # Broadcast to all active users
+        service.broadcast_notification(
+            title=data.title,
+            message=data.message,
+            notification_type=data.notification_type,
+        )
+        return success_response(
+            message="Broadcast notification sent to all active users",
+            data=None,
+            status_code=201
+        )

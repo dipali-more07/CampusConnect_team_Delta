@@ -3,7 +3,7 @@ app/repositories/event_repository.py
 Event database operations.
 """
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import select, func, or_, and_
 
@@ -30,6 +30,7 @@ class EventRepository(BaseRepository[Event]):
         status: Optional[str] = None,
         organizer_id: Optional[str] = None,
         college_id: Optional[str] = None,
+        approval_status: Optional[str] = None,
     ) -> List[Event]:
         """Get events with rich filtering. Used for event discovery."""
         query = select(Event)
@@ -48,6 +49,8 @@ class EventRepository(BaseRepository[Event]):
             query = query.where(Event.status == status)
         if organizer_id:
             query = query.where(Event.organizer_id == organizer_id)
+        if approval_status:
+            query = query.where(Event.approval_status == approval_status)
 
         query = query.order_by(Event.start_datetime.desc()).offset(skip).limit(limit)
         return list(self.db.execute(query).scalars().all())
@@ -58,6 +61,7 @@ class EventRepository(BaseRepository[Event]):
         category: Optional[str] = None,
         status: Optional[str] = None,
         organizer_id: Optional[str] = None,
+        approval_status: Optional[str] = None,
     ) -> int:
         query = select(func.count()).select_from(Event)
         if search:
@@ -70,11 +74,13 @@ class EventRepository(BaseRepository[Event]):
             query = query.where(Event.status == status)
         if organizer_id:
             query = query.where(Event.organizer_id == organizer_id)
+        if approval_status:
+            query = query.where(Event.approval_status == approval_status)
         return self.db.execute(query).scalar() or 0
 
     def get_upcoming_events(self, limit: int = 10) -> List[Event]:
         """Get published events that haven't started yet."""
-        now = datetime.utcnow()
+        now = datetime.utcnow() + timedelta(hours=5, minutes=30)
         query = (
             select(Event)
             .where(

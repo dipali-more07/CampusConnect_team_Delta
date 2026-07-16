@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     MAIL_SSL_TLS: bool = False
     MOCK_EMAIL: bool = False
 
+    # --- Razorpay ---
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+    MOCK_PAYMENT: bool = True
+
     # --- File Storage ---
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE_MB: int = 10

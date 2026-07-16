@@ -8,7 +8,7 @@ from app.tests.conftest import auth_headers
 
 
 class TestRegister:
-    def test_register_success(self, client, test_college):
+    def test_register_success(self, client, test_college, db):
         response = client.post("/api/v1/auth/register", json={
             "email": "newuser@test.com",
             "password": "NewUser@123",
@@ -17,6 +17,8 @@ class TestRegister:
             "phone": "+919876543210",
             "course": "B.Tech Computer Science",
             "college_id": test_college.college_id,
+            "gender": "male",
+            "year_of_study": 3,
         })
         assert response.status_code == 201
         data = response.json()
@@ -24,6 +26,17 @@ class TestRegister:
         assert "user_id" in data["data"]
         assert data["data"]["email"] == "newuser@test.com"
         assert data["data"]["role"] == "participant"
+
+        # Check DB values directly
+        from app.models.user import User, UserProfile
+        user = db.query(User).filter(User.email == "newuser@test.com").first()
+        assert user is not None
+        assert user.gender == "male"
+
+        profile = db.query(UserProfile).filter(UserProfile.user_id == user.user_id).first()
+        assert profile is not None
+        assert profile.gender.value == "male" if hasattr(profile.gender, "value") else profile.gender == "male"
+        assert profile.year_of_study == 3
 
     def test_register_duplicate_email_returns_409(self, client, test_college):
         payload = {
@@ -101,6 +114,11 @@ class TestProtectedRoutes:
         assert response.status_code == 200
         data = response.json()["data"]
         assert data["email"] == "student@test.com"
+        assert "full_name" in data
+        assert "mobile" in data
+        assert "gender" in data
+        assert "year_of_study" in data
+        assert "profile" in data
 
     def test_get_me_without_token_returns_401(self, client):
         response = client.get("/api/v1/auth/me")
