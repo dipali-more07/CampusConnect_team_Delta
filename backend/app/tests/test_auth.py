@@ -209,3 +209,21 @@ class TestEmailVerification:
         db.refresh(user)
         assert user.verification_code != old_code
 
+
+class TestGenderValidation:
+    def test_registration_with_gender_variations(self, client, test_college):
+        import random
+        # Test variations of gender input (capitalization, abbreviations)
+        for i, (gender_input, expected_val) in enumerate([("Male", "male"), ("FEMALE", "female"), ("m", "male"), ("f", "female"), ("Other", "other")]):
+            resp = client.post("/api/v1/auth/register", json={
+                "email": f"gender_{i}@test.com",
+                "password": "GenderUser@123",
+                "confirm_password": "GenderUser@123",
+                "full_name": f"Gender User {i}",
+                "phone": f"+9198765432{i}0",
+                "course": "B.Tech",
+                "college_id": test_college.college_id,
+                "gender": gender_input
+            })
+            assert resp.status_code == 201, f"Failed for gender {gender_input}: {resp.json()}"
+

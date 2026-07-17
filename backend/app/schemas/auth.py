@@ -21,6 +21,29 @@ class RegisterRequest(BaseModel):
     gender: Optional[Gender] = Field(None, description="Gender (male, female, other, prefer_not_to_say)")
     year_of_study: Optional[int] = Field(None, ge=1, le=5, description="Year of study (1-5)")
 
+    @field_validator("gender", mode="before")
+    @classmethod
+    def validate_gender(cls, v: any) -> Optional[Gender]:
+        if not v:
+            return None
+        if isinstance(v, Gender):
+            return v
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ["male", "m"]:
+                return Gender.MALE
+            if v_clean in ["female", "f"]:
+                return Gender.FEMALE
+            if v_clean in ["other", "o"]:
+                return Gender.OTHER
+            if v_clean in ["prefer_not_to_say", "prefer not to say", "none"]:
+                return Gender.PREFER_NOT_TO_SAY
+            try:
+                return Gender(v_clean)
+            except ValueError:
+                pass
+        raise ValueError("Invalid gender value. Must be 'male' or 'female'")
+
     @field_validator("phone")
     @classmethod
     def validate_phone_number(cls, v: str) -> str:

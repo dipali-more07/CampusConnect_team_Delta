@@ -15,7 +15,7 @@ PYDANTIC DOES AUTOMATIC VALIDATION:
 
 IMPORTANT: Do NOT change field names here — the frontend uses these exact names.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 from app.core.constants import UserRole, Gender
@@ -60,6 +60,30 @@ class UpdateProfileRequest(BaseModel):
     full_name: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=20)
     gender: Optional[Gender] = None                             # Enum from constants.py
+    
+    @field_validator("gender", mode="before")
+    @classmethod
+    def validate_gender(cls, v: any) -> Optional[Gender]:
+        if not v:
+            return None
+        if isinstance(v, Gender):
+            return v
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ["male", "m"]:
+                return Gender.MALE
+            if v_clean in ["female", "f"]:
+                return Gender.FEMALE
+            if v_clean in ["other", "o"]:
+                return Gender.OTHER
+            if v_clean in ["prefer_not_to_say", "prefer not to say", "none"]:
+                return Gender.PREFER_NOT_TO_SAY
+            try:
+                return Gender(v_clean)
+            except ValueError:
+                pass
+        raise ValueError("Invalid gender value. Must be 'male' or 'female'")
+
     department: Optional[str] = Field(None, max_length=255)
     course: Optional[str] = Field(None, max_length=255)
     year_of_study: Optional[int] = Field(None, ge=1, le=10)    # 1 to 10
@@ -128,6 +152,29 @@ class CreateOrganizerRequest(BaseModel):
     college_id: str                                             # Required
     gender: Optional[Gender] = None
 
+    @field_validator("gender", mode="before")
+    @classmethod
+    def validate_gender(cls, v: any) -> Optional[Gender]:
+        if not v:
+            return None
+        if isinstance(v, Gender):
+            return v
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ["male", "m"]:
+                return Gender.MALE
+            if v_clean in ["female", "f"]:
+                return Gender.FEMALE
+            if v_clean in ["other", "o"]:
+                return Gender.OTHER
+            if v_clean in ["prefer_not_to_say", "prefer not to say", "none"]:
+                return Gender.PREFER_NOT_TO_SAY
+            try:
+                return Gender(v_clean)
+            except ValueError:
+                pass
+        raise ValueError("Invalid gender value. Must be 'male' or 'female'")
+
 
 class CreateStudentRequest(BaseModel):
     """
@@ -157,6 +204,30 @@ class CreateStudentRequest(BaseModel):
     course: Optional[str] = Field(None, max_length=255)
     college_id: str
     gender: Optional[Gender] = None
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def validate_gender(cls, v: any) -> Optional[Gender]:
+        if not v:
+            return None
+        if isinstance(v, Gender):
+            return v
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ["male", "m"]:
+                return Gender.MALE
+            if v_clean in ["female", "f"]:
+                return Gender.FEMALE
+            if v_clean in ["other", "o"]:
+                return Gender.OTHER
+            if v_clean in ["prefer_not_to_say", "prefer not to say", "none"]:
+                return Gender.PREFER_NOT_TO_SAY
+            try:
+                return Gender(v_clean)
+            except ValueError:
+                pass
+        raise ValueError("Invalid gender value. Must be 'male' or 'female'")
+
     year_of_study: Optional[int] = Field(None, ge=1, le=10)
 
 
