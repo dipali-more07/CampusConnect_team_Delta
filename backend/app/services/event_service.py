@@ -60,6 +60,7 @@ class EventService:
             raise BadRequestException("Event start time must be in the future")
 
         event = Event(
+            organizer=current_user,
             organizer_id=current_user.user_id,
             title=data.title,
             description=data.description,

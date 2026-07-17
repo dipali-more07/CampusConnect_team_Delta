@@ -26,6 +26,10 @@ def _cert_to_dict(cert) -> dict:
         "certificate_number": cert.certificate_number,
         "pdf_path": cert.pdf_path,
         "generated_at": cert.generated_at.isoformat(),
+        "event_name": cert.event.title if cert.event else None,
+        "title": cert.event.title if cert.event else None,
+        "event_date": cert.event.event_date.isoformat() if cert.event and cert.event.event_date else (cert.event.start_datetime.date().isoformat() if cert.event else None),
+        "certificate_url": cert.certificate_url,
     }
 
 

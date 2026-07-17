@@ -49,6 +49,8 @@ def _reg_to_dict(reg) -> dict:
       - registered_at    → when they registered (ISO date string)
       - registration_type → "individual" or "team"
       - team_id          → if team registration, which team they belong to
+      - event_name       → title of the registered event
+      - title            → title of the registered event
     """
     return {
         "registration_id": reg.registration_id,
@@ -59,7 +61,10 @@ def _reg_to_dict(reg) -> dict:
         "registered_at": reg.registered_at.isoformat(),  # ISO 8601 date string
         "registration_type": reg.registration_type,      # "individual" or "team"
         "team_id": reg.team_id,                          # None for individual registrations
+        "event_name": reg.event.title if reg.event else None,
+        "title": reg.event.title if reg.event else None,
     }
+
 
 
 @router.post("/", status_code=201, summary="Register for an event")

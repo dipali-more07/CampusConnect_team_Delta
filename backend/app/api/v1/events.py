@@ -83,9 +83,17 @@ def _event_to_dict(event) -> dict:
         elif event.approval_status == ApprovalStatus.REJECTED:
             status_val = "rejected"   # Admin rejected the event
 
+    # Get organizer name from user full_name, fallback to user profile full_name
+    organizer_name = None
+    if event.organizer:
+        organizer_name = event.organizer.full_name
+        if not organizer_name and event.organizer.profile:
+            organizer_name = event.organizer.profile.full_name
+
     return {
         "event_id": event.event_id,
         "organizer_id": event.organizer_id,
+        "organizer_name": organizer_name,
         "event_name": event.title,      # Alias for title (kept for backward compatibility)
         "title": event.title,
         "description": event.description,

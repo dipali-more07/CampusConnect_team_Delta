@@ -160,6 +160,7 @@ class ApproveEventRequest(BaseModel):
 class EventResponse(BaseModel):
     event_id: str
     organizer_id: str
+    organizer_name: Optional[str] = None
     event_name: str
     title: str
     description: Optional[str] = None
@@ -187,6 +188,8 @@ class EventResponse(BaseModel):
 
 class EventListResponse(BaseModel):
     event_id: str
+    organizer_id: Optional[str] = None
+    organizer_name: Optional[str] = None
     event_name: str
     title: str
     category: str

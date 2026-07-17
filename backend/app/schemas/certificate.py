@@ -23,6 +23,10 @@ class CertificateResponse(BaseModel):
     certificate_number: str
     pdf_path: Optional[str] = None
     generated_at: datetime
+    event_name: Optional[str] = None
+    title: Optional[str] = None
+    event_date: Optional[str] = None
+    certificate_url: Optional[str] = None
     model_config = {"from_attributes": True}
 
 
