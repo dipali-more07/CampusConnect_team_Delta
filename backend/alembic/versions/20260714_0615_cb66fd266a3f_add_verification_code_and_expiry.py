@@ -24,7 +24,6 @@ def upgrade() -> None:
                existing_type=postgresql.TIMESTAMP(),
                nullable=False,
                existing_server_default=sa.text('now()'))
-    op.drop_constraint(op.f('uq_organizer_user'), 'organizers', type_='unique')
     op.create_index(op.f('ix_organizers_organizer_id'), 'organizers', ['organizer_id'], unique=False)
     op.create_index(op.f('ix_organizers_user_id'), 'organizers', ['user_id'], unique=True)
     # ### end Alembic commands ###
