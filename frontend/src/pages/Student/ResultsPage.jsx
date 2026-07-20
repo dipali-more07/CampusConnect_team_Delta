@@ -16,6 +16,7 @@ export default function ResultsPage({ tokens, user }) {
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [registrations, setRegistrations] = useState([])
   
   // Tabs: 'All' (Leaderboard), 'My' (My Placements only)
   const [viewTab, setViewTab] = useState('All') 
@@ -47,11 +48,19 @@ export default function ResultsPage({ tokens, user }) {
     if (!selectedEventId) return
     const loadResults = async () => {
       setLoading(true)
-      const res = await resultsService.fetchByEventId(selectedEventId)
+      setResults([])
+      setRegistrations([])
+      const [res, regRes] = await Promise.all([
+        resultsService.fetchByEventId(selectedEventId),
+        eventsService.fetchRegistrations(selectedEventId)
+      ])
       if (res.success) {
         setResults(res.results || [])
       } else {
         setResults([])
+      }
+      if (regRes.success) {
+        setRegistrations(regRes.registrations || [])
       }
       setLoading(false)
     }
@@ -70,11 +79,13 @@ export default function ResultsPage({ tokens, user }) {
     let department = row.department || 'N/A'
     let year = row.year || 'N/A'
     let rollNo = row.rollNo || row.roll_no || ''
+    let members = row.members || []
 
     const pId = row.participant_id || row.participantId
-    const isCurrentUser = !isTeam && pId === (user?.id || user?.userId || user?.user_id)
+    let isCurrentUser = false
 
     if (!isTeam) {
+      isCurrentUser = pId === (user?.id || user?.userId || user?.user_id)
       const stu = students.find(s => s.id === pId)
       if (stu) {
         participantName = stu.name || stu.full_name || participantName
@@ -85,7 +96,22 @@ export default function ResultsPage({ tokens, user }) {
         participantName = participantName || pId || 'Unknown Student'
       }
     } else {
-      participantName = row.teamName || row.participantName || row.team_id || row.teamId || 'Team Winner'
+      const tId = row.team_id || row.teamId
+      const teamRegs = registrations.filter(r => (r.teamId || r.team_id) === tId)
+      const reg = teamRegs[0]
+      participantName = row.team_name || row.teamName || reg?.teamName || reg?.team_name || row.participantName || tId || 'Team Winner'
+      
+      isCurrentUser = teamRegs.some(r => (r.userId || r.user_id) === (user?.id || user?.userId || user?.user_id))
+
+      if (members.length === 0) {
+        const memberNames = teamRegs
+          .map(r => {
+            const student = students.find(s => s.id === (r.userId || r.user_id))
+            return student?.name || r.studentName || r.student_name || r.full_name || ''
+          })
+          .filter(Boolean)
+        members = memberNames.length > 0 ? memberNames : members
+      }
     }
 
     const dateVal = row.created_at
@@ -101,6 +127,7 @@ export default function ResultsPage({ tokens, user }) {
       department,
       year,
       rollNo,
+      members,
       isCurrentUser,
       date: dateVal,
       rank: row.rank || 1,
@@ -315,6 +342,11 @@ export default function ResultsPage({ tokens, user }) {
                       </span>
                     )}
                   </div>
+                  {row.type === 'Team' && row.members && row.members.length > 0 && (
+                    <div className="text-[11px] text-slate-400 dark:text-[#7a98bb] font-semibold mt-0.5">
+                      Members: {row.members.join(', ')}
+                    </div>
+                  )}
                   
                   <div className="flex items-center gap-2 mt-1.5 flex-wrap text-[12.5px]" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
                     <span className="font-bold">{row.department}</span>

@@ -5,13 +5,12 @@ import authService from '../services/authService'
 
 export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
   const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(() => localStorage.getItem('pendingVerificationEmail') || '')
   const [mobile, setMobile] = useState('')
   const [college, setCollege] = useState('')
-  const [collegeId, setCollegeId] = useState('')
   const [course, setCourse] = useState('')
   const [department, setDepartment] = useState('')
-  const [gender, setGender] = useState('male')
+  const [gender, setGender] = useState('')
   const [yearOfStudy, setYearOfStudy] = useState(1)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -20,7 +19,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
   const [errors, setErrors] = useState({})
 
   // Verification popup states
-  const [showVerifyModal, setShowVerifyModal] = useState(false)
+  const [showVerifyModal, setShowVerifyModal] = useState(() => !!localStorage.getItem('pendingVerificationEmail'))
   const [verificationCode, setVerificationCode] = useState('')
   const [registerLoading, setRegisterLoading] = useState(false)
   const [verifyLoading, setVerifyLoading] = useState(false)
@@ -67,6 +66,11 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       newErrors.confirmPassword = 'Passwords do not match.'
     }
 
+    // Gender validation
+    if (!gender) {
+      newErrors.gender = 'Please select your gender.'
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
       return
@@ -80,7 +84,6 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       email,
       mobile,
       college,
-      collegeId,
       course,
       department,
       gender,
@@ -93,6 +96,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       const res = await authService.register(payload)
       if (res.success) {
         showToast(res.message || 'Verification code sent to your email!', 'success')
+        localStorage.setItem('pendingVerificationEmail', email)
         setShowVerifyModal(true)
       } else {
         showToast(res.message || 'Registration failed.', 'error')
@@ -115,6 +119,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
       const res = await authService.verifyEmail(email, verificationCode)
       if (res.success) {
         showToast(res.message || 'Email verified successfully!', 'success')
+        localStorage.removeItem('pendingVerificationEmail')
         setShowVerifyModal(false)
         if (onSignUpSuccess) {
           onSignUpSuccess(email)
@@ -151,7 +156,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
     <>
       {/* Heading */}
       <h1 className="text-2xl font-black text-slate-900 mb-1">Create an account</h1>
-      <p className="text-sm text-slate-500 mb-6">Join CampusConnect to explore and manage events</p>
+      <p className="text-sm text-slate-500 mb-6">Join CampusConnect to explore and register for events</p>
 
       <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-4">
         {/* Full Name */}
@@ -282,24 +287,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
           </div>
         </div>
 
-        {/* College ID */}
-        <div>
-          <label className="text-xs font-semibold text-slate-600 mb-1 block">
-            College ID / Roll No
-          </label>
-          <div className="relative">
-            <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="e.g. 21CS001"
-              value={collegeId}
-              onChange={e => setCollegeId(e.target.value)}
-              required
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
-              focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
-            />
-          </div>
-        </div>
+
 
         {/* Gender & Year of Study */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -313,17 +301,23 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
                 value={gender}
                 onChange={e => setGender(e.target.value)}
                 required
-                className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white placeholder-slate-400
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
+                className={`w-full px-3.5 py-2 rounded-lg border text-sm text-slate-700 bg-white placeholder-slate-400
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer ${
+                  errors.gender ? 'border-red-500 bg-red-50/50' : 'border-slate-200'
+                }`}
               >
+                <option value="" disabled>Select Gender</option>
                 <option value="male">Male</option>
                 <option value="female">Female</option>
                 <option value="other">Other</option>
               </select>
               <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
             </div>
+            {errors.gender && (
+              <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.gender}</p>
+            )}
           </div>
-
+            
           {/* Year of Study */}
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">
@@ -333,7 +327,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
               type="number"
               placeholder="e.g. 1"
               value={yearOfStudy}
-              onChange={e => setYearOfStudy(e.target.value)}
+              onChange={e => { const v = Math.max(1, Math.min(6, parseInt(e.target.value, 10) || 1)); setYearOfStudy(v) }}
               required
               min="1"
               max="6"
@@ -429,7 +423,10 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
           Already have an account?{' '}
           <button
             type="button"
-            onClick={onSwitchToSignIn}
+            onClick={() => {
+              localStorage.removeItem('pendingVerificationEmail')
+              onSwitchToSignIn()
+            }}
             className="text-indigo-600 font-semibold bg-transparent border-none hover:underline cursor-pointer p-0 align-baseline animate-fadeIn"
           >
             Sign In
@@ -443,7 +440,10 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
           {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/45 backdrop-blur-xs"
-            onClick={() => setShowVerifyModal(false)}
+            onClick={() => {
+              setShowVerifyModal(false)
+              localStorage.removeItem('pendingVerificationEmail')
+            }}
           />
 
           {/* Modal Container */}
@@ -532,7 +532,10 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
 
               <button
                 type="button"
-                onClick={() => setShowVerifyModal(false)}
+                onClick={() => {
+                  setShowVerifyModal(false)
+                  localStorage.removeItem('pendingVerificationEmail')
+                }}
                 className="text-sm text-slate-500 hover:text-slate-700 text-center transition-colors border-none bg-transparent cursor-pointer font-bold"
               >
                 Cancel

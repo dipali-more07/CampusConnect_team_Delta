@@ -7,8 +7,7 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'ngrok-skip-browser-warning': 'true'
+    'Authorization': `Bearer ${token}`
   }
 }
 
@@ -132,8 +131,7 @@ async function apiFetchAll() {
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch certificates.' }
     return { success: true, certificates: data.certificates || [], stats: data.stats || {} }
   } catch (err) {
-    console.error('[certificatesService] fetchAll error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -153,8 +151,7 @@ async function apiGenerate(eventIdOrList, userId) {
       await Promise.all(promises)
       return { success: true, message: `Batch certificates processed.` }
     } catch (err) {
-      console.error('[certificatesService] batch generate error:', err)
-      return { success: false, message: 'Server error during batch generation.' }
+            return { success: false, message: 'Server error during batch generation.' }
     }
   }
 
@@ -171,8 +168,7 @@ async function apiGenerate(eventIdOrList, userId) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to generate certificate.' }
     return { success: true, message: data.message || 'Certificate generated successfully.' }
   } catch (err) {
-    console.error('[certificatesService] generate error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -187,7 +183,6 @@ async function apiBulkGenerate(eventId) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to bulk generate.' }
     return { success: true, generated: data.generated, message: data.message }
   } catch (err) {
-    console.error('[certificatesService] bulkGenerate error:', err)
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -203,8 +198,7 @@ async function apiSend(ids) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to send certificates.' }
     return { success: true, sent: data.sent, message: data.message }
   } catch (err) {
-    console.error('[certificatesService] send error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -218,8 +212,7 @@ async function apiRevoke(id) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to revoke certificate.' }
     return { success: true, message: data.message }
   } catch (err) {
-    console.error('[certificatesService] revoke error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -234,8 +227,7 @@ async function apiVerify(verifyCode) {
     
     return { success: true, valid, certificate }
   } catch (err) {
-    console.error('[certificatesService] verify error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -247,8 +239,7 @@ async function apiDownload(certificateNumber) {
     const url = URL.createObjectURL(blob)
     return { success: true, url, blob }
   } catch (err) {
-    console.error('[certificatesService] download error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -260,8 +251,7 @@ async function apiFetchTemplates() {
     const templates = Array.isArray(data) ? data : (data.data ? (Array.isArray(data.data) ? data.data : [data.data]) : [])
     return { success: true, templates }
   } catch (err) {
-    console.error('[certificatesService] fetchTemplates error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -276,8 +266,7 @@ async function apiSaveTemplate(templateData) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to save template.' }
     return { success: true, template: data.data || data }
   } catch (err) {
-    console.error('[certificatesService] save template error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 

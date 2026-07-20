@@ -73,13 +73,22 @@ export default function ResultsPage({ tokens }) {
     const loadResults = async () => {
       setLoading(true)
       setResults([])
-      const res = await resultsService.fetchByEventId(selectedEventId)
+      setRegsLoading(true)
+      setRegistrations([])
+      const [res, regRes] = await Promise.all([
+        resultsService.fetchByEventId(selectedEventId),
+        eventsService.fetchRegistrations(selectedEventId)
+      ])
       if (res.success) {
         setResults(res.results)
       } else {
         showToast(res.message || 'Failed to load results.', 'error')
       }
+      if (regRes.success) {
+        setRegistrations(regRes.registrations || [])
+      }
       setLoading(false)
+      setRegsLoading(false)
     }
     loadResults()
   }, [selectedEventId])
@@ -96,6 +105,7 @@ export default function ResultsPage({ tokens }) {
     let department = row.department || 'N/A'
     let year = row.year || 'N/A'
     let rollNo = row.rollNo || row.roll_no || ''
+    let members = row.members || []
 
     if (!isTeam) {
       const pId = row.participant_id || row.participantId
@@ -109,7 +119,20 @@ export default function ResultsPage({ tokens }) {
         participantName = participantName || pId || 'Unknown Student'
       }
     } else {
-      participantName = row.teamName || row.participantName || row.team_id || row.teamId || 'Team Winner'
+      const tId = row.team_id || row.teamId
+      const teamRegs = registrations.filter(r => (r.teamId || r.team_id) === tId)
+      const reg = teamRegs[0]
+      participantName = row.team_name || row.teamName || reg?.teamName || reg?.team_name || row.participantName || tId || 'Team Winner'
+      
+      if (members.length === 0) {
+        const memberNames = teamRegs
+          .map(r => {
+            const student = students.find(s => s.id === (r.userId || r.user_id))
+            return student?.name || r.studentName || r.student_name || r.full_name || ''
+          })
+          .filter(Boolean)
+        members = memberNames.length > 0 ? memberNames : members
+      }
     }
 
     const dateVal = row.created_at
@@ -127,6 +150,7 @@ export default function ResultsPage({ tokens }) {
       department,
       year,
       rollNo,
+      members,
       rank: rankVal,
       date: dateVal,
     }

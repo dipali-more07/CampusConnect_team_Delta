@@ -9,7 +9,8 @@ import {
   GraduationCap,
   TextAlignJustify,
   Bell,
-  Trophy
+  Trophy,
+  CreditCard
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 
@@ -19,6 +20,7 @@ export const STUDENT_NAV = [
   { icon: CalendarDays,    label: 'Events' },
   { icon: Trophy,          label: 'Results' },
   { icon: Award,           label: 'Certificates' },
+  { icon: CreditCard,      label: 'Payments' },
 ]
 
 export default function StudentSidebar({
@@ -187,26 +189,34 @@ export default function StudentSidebar({
           <button
             onClick={onLogout}
             title="Logout"
-            className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[12px] font-bold border-none cursor-pointer hover:opacity-85 transition-opacity"
+            className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[12px] font-bold border-none cursor-pointer hover:opacity-85 transition-opacity overflow-hidden"
             style={{ background: BRAND }}
           >
-            {user?.avatar || (user?.name ? user.name.substring(0, 2).toUpperCase() : 'ST')}
+            {(user?.avatarUrl || user?.profile_image || (typeof user?.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http')))) ? (
+              <img src={user?.avatarUrl || user?.profile_image || user?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              user?.avatar || (user?.name ? user.name.substring(0, 2).toUpperCase() : 'ST')
+            )}
           </button>
         ) : (
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3 min-w-0">
               <div
-                className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[13px] font-bold shadow-xs"
+                className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[13px] font-bold shadow-xs overflow-hidden"
                 style={{ background: BRAND }}
               >
-                {user?.avatar || (user?.name ? user.name.substring(0, 2).toUpperCase() : 'ST')}
+                {(user?.avatarUrl || user?.profile_image || (typeof user?.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http')))) ? (
+                  <img src={user?.avatarUrl || user?.profile_image || user?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  user?.avatar || (user?.name ? user.name.substring(0, 2).toUpperCase() : 'ST')
+                )}
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[13.5px] font-bold text-slate-800 dark:text-[#e8f0fe] truncate">
                   {user?.name || 'Arjun Sharma'}
                 </span>
                 <span className="text-[11px] font-semibold text-slate-400 dark:text-[#4a6a8a] truncate">
-                  {user?.department || 'Student'}
+                  Student
                 </span>
               </div>
             </div>

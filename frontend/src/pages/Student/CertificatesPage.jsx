@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
-import { Award, Download, ExternalLink, ShieldCheck } from 'lucide-react'
+import { Award, Download, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import studentService from '../../services/studentService'
+import certificatesService from '../../services/certificatesService'
 
 export default function CertificatesPage({ tokens, user }) {
   const { accentColor } = useTheme()
@@ -10,10 +11,38 @@ export default function CertificatesPage({ tokens, user }) {
   const [certificatesList, setCertificatesList] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCert, setSelectedCert] = useState(null)
+  const [downloadingId, setDownloadingId] = useState(null)
+
+  const handleDownload = async (cert) => {
+    if (!cert) return
+    const certNum = cert.certificate_number || cert.verifyCode || cert.id || cert.verify_code
+    if (!certNum) {
+      alert('Certificate number not found.')
+      return
+    }
+    
+    setDownloadingId(cert.id)
+    try {
+      const res = await certificatesService.download(certNum)
+      if (res.success && res.url) {
+        const link = document.createElement('a')
+        link.href = res.url
+        link.setAttribute('download', `Certificate-${certNum}.pdf`)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+      } else {
+        alert(res.message || 'Failed to download certificate.')
+      }
+    } catch (err) {
+      alert('Error occurred during download.')
+    } finally {
+      setDownloadingId(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     studentService.fetchCertificatesData().then(res => {
       if (cancelled) return
       if (res.success) {
@@ -93,11 +122,20 @@ export default function CertificatesPage({ tokens, user }) {
             {/* Actions */}
             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-[#1a3050] flex items-center gap-3">
               <button
-                onClick={() => setSelectedCert(cert)}
-                className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90"
+                onClick={() => handleDownload(cert)}
+                disabled={downloadingId !== null}
+                className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: BRAND }}
               >
-                <Download size={14} /> Download PDF
+                {downloadingId === cert.id ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Downloading...
+                  </>
+                ) : (
+                  <>
+                    <Download size={14} /> Download PDF
+                  </>
+                )}
               </button>
               <button
                 onClick={() => setSelectedCert(cert)}
@@ -125,7 +163,7 @@ export default function CertificatesPage({ tokens, user }) {
               <p><strong className="text-slate-900 dark:text-white">Awarded to:</strong> {user?.name || 'Arjun Sharma'}</p>
               <p><strong className="text-slate-900 dark:text-white">Event:</strong> {selectedCert.event}</p>
               <p><strong className="text-slate-900 dark:text-white">Achievement:</strong> {selectedCert.position}</p>
-              <p><strong className="text-slate-900 dark:text-white">Verification Code:</strong> {selectedCert.verifyCode}</p>
+              <p><strong className="text-slate-900 dark:text-white">Verification Code:</strong> {selectedCert.verifyCode || selectedCert.id}</p>
             </div>
 
             <div className="flex gap-3">
@@ -136,11 +174,18 @@ export default function CertificatesPage({ tokens, user }) {
                 Close
               </button>
               <button
-                onClick={() => setSelectedCert(null)}
-                className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer"
+                onClick={() => handleDownload(selectedCert)}
+                disabled={downloadingId !== null}
+                className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: BRAND }}
               >
-                Download Certificate
+                {downloadingId === selectedCert.id ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Downloading...
+                  </>
+                ) : (
+                  'Download Certificate'
+                )}
               </button>
             </div>
           </div>

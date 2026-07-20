@@ -99,10 +99,17 @@ export default function SettingsPage({ tokens }) {
       }
       const fetchedApp = res.settings.appearance || {}
       setAppearanceForm({
-        themeMode: dark ? 'Dark' : 'Light',
-        accentColor: accentColor || fetchedApp.accentColor || '#615FFF',
-        fontSize: fontSize || fetchedApp.fontSize || 'medium'
+        themeMode: fetchedApp.themeMode || (dark ? 'Dark' : 'Light'),
+        accentColor: fetchedApp.accentColor || accentColor || '#615FFF',
+        fontSize: fetchedApp.fontSize || fontSize || 'medium'
       })
+      if (fetchedApp.themeMode || fetchedApp.accentColor || fetchedApp.fontSize) {
+        applyAppearance({
+          themeMode: fetchedApp.themeMode,
+          accentColor: fetchedApp.accentColor,
+          fontSize: fetchedApp.fontSize
+        })
+      }
       if (res.settings.permissions) {
         setPermissions(res.settings.permissions)
       }

@@ -7,8 +7,7 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'ngrok-skip-browser-warning': 'true'
+    'Authorization': `Bearer ${token}`
   }
 }
 
@@ -70,12 +69,34 @@ async function apiFetch() {
     const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) {
-      console.warn('[settingsService] fetch settings failed, falling back to mock.')
-      return mockFetch()
+            return { success: false, message: 'Failed to fetch settings.' }
     }
     
     const user = data.data || {}
     const profile = user.profile || {}
+
+    // Fetch user appearance preferences from backend
+    let appearance = {
+      themeMode: 'Light',
+      accentColor: '#615FFF',
+      fontSize: 'medium'
+    }
+    try {
+      const appRes = await fetch(`${API_BASE}/users/profile/appearance`, { headers: authHeaders() })
+      if (appRes.ok) {
+        const appData = await parseJSON(appRes)
+        const appObj = appData.data || appData || {}
+        if (appObj.theme_mode || appObj.accent_color || appObj.font_size) {
+          appearance = {
+            themeMode: appObj.theme_mode || 'Light',
+            accentColor: appObj.accent_color || '#615FFF',
+            fontSize: appObj.font_size || 'medium'
+          }
+        }
+      }
+    } catch (appErr) {
+          }
+
     const settings = {
       profile: {
         name: profile.full_name || '',
@@ -86,11 +107,7 @@ async function apiFetch() {
         avatarColor: '#7c3aed',
         avatarUrl: user.profile_image || null
       },
-      appearance: {
-        themeMode: 'Light',
-        accentColor: '#615FFF',
-        fontSize: 'medium'
-      },
+      appearance,
       permissions: {
         Admin: ['all'],
         Organizer: ['events', 'attendance'],
@@ -99,8 +116,7 @@ async function apiFetch() {
     }
     return { success: true, settings }
   } catch (err) {
-    console.error('[settingsService] fetch error, falling back to mock:', err)
-    return mockFetch()
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -122,8 +138,7 @@ async function apiUpdateProfile(profileData) {
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-      console.warn('[settingsService] updateProfile failed, falling back to mock.')
-      return mockUpdateProfile(profileData)
+            return { success: false, message: data.message || 'Failed to update profile.' }
     }
     
     const updatedProfile = data.data || {}
@@ -140,24 +155,36 @@ async function apiUpdateProfile(profileData) {
     }
     return { success: true, message: data.message || 'Profile updated successfully.', settings }
   } catch (err) {
-    console.error('[settingsService] updateProfile error, falling back to mock:', err)
-    return mockUpdateProfile(profileData)
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiUpdateAppearance(appearanceData) {
   try {
-    const res = await fetch(`${API_BASE}/admin/settings/appearance`, {
+    const payload = {
+      theme_mode: appearanceData.themeMode || appearanceData.theme_mode,
+      accent_color: appearanceData.accentColor || appearanceData.accent_color,
+      font_size: appearanceData.fontSize || appearanceData.font_size
+    }
+    const res = await fetch(`${API_BASE}/users/profile/appearance`, {
       method: 'PUT',
       headers: authHeaders(),
-      body: JSON.stringify(appearanceData),
+      body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update appearance.' }
-    return { success: true, message: data.message || 'Appearance updated.', settings: data.settings }
+    
+    const returnedApp = data.data || data.settings || data || {}
+    const settings = {
+      appearance: {
+        themeMode: returnedApp.theme_mode || returnedApp.themeMode || appearanceData.themeMode,
+        accentColor: returnedApp.accent_color || returnedApp.accentColor || appearanceData.accentColor,
+        fontSize: returnedApp.font_size || returnedApp.fontSize || appearanceData.fontSize
+      }
+    }
+    return { success: true, message: data.message || 'Appearance updated successfully.', settings }
   } catch (err) {
-    console.error('[settingsService] updateAppearance error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -172,8 +199,7 @@ async function apiUpdatePassword(passwordData) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to update password.' }
     return { success: true, message: data.message || 'Password updated.' }
   } catch (err) {
-    console.error('[settingsService] updatePassword error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 

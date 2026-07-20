@@ -8,8 +8,7 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'ngrok-skip-browser-warning': 'true'
+    'Authorization': `Bearer ${token}`
   }
 }
 
@@ -139,8 +138,7 @@ async function apiFetchAll() {
     
     return { success: true, students: mapped, stats }
   } catch (err) {
-    console.error('[studentsService] fetchAll error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -164,8 +162,7 @@ async function apiCreate(payload) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to create student.' }
     return { success: true, student: mapStudent(data.data || data.student || data) }
   } catch (err) {
-    console.error('[studentsService] create error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -188,8 +185,7 @@ async function apiUpdate(id, payload) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to update student.' }
     return { success: true, student: mapStudent(data.data || data.student || data) }
   } catch (err) {
-    console.error('[studentsService] update error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -207,8 +203,7 @@ async function apiUpdateStatus(id, status) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to update status.' }
     return { success: true, student: mapStudent(data.data || data.student || data) }
   } catch (err) {
-    console.error('[studentsService] updateStatus error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -222,8 +217,7 @@ async function apiDelete(id) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to delete student.' }
     return { success: true }
   } catch (err) {
-    console.error('[studentsService] delete error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 

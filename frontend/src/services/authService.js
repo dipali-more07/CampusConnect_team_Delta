@@ -61,8 +61,7 @@ async function mockRegister(payload) {
   // Generate a mock code and save it in sessionStorage for verification
   const mockCode = String(Math.floor(100000 + Math.random() * 900000))
   sessionStorage.setItem(`mock_otp_${email.toLowerCase()}`, mockCode)
-  console.log(`Mock OTP for ${email}: ${mockCode}`)
-
+  
   // Add user
   const newUser = {
     id: userList.length + 1,
@@ -129,7 +128,6 @@ async function apiLogin(email, password) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ email, password }),
     })
@@ -156,7 +154,6 @@ async function apiLogin(email, password) {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
-            'ngrok-skip-browser-warning': 'true',
           }
         })
         if (meRes.ok) {
@@ -173,8 +170,7 @@ async function apiLogin(email, password) {
           }
         }
       } catch (meErr) {
-        console.error('Error fetching user profile:', meErr)
-      }
+              }
     }
 
     // Fallback user object if /me failed or returned nothing
@@ -188,8 +184,7 @@ async function apiLogin(email, password) {
 
     return { success: true, user, token, refreshToken }
   } catch (err) {
-    console.error('API Login Error:', err)
-    return { success: false, message: `API Login Error: ${err.message || err}` }
+        return { success: false, message: `API Login Error: ${err.message || err}` }
   }
 }
 
@@ -213,7 +208,6 @@ async function apiRegister(payload) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify(apiPayload),
     })
@@ -233,8 +227,7 @@ async function apiRegister(payload) {
     const rawUser = data.user || data.data?.user || (data.data && typeof data.data === 'object' ? data.data : data)
     return { success: true, user: rawUser, message: data.message || 'Registration successful!' }
   } catch (err) {
-    console.error('API Register Error:', err)
-    return { success: false, message: 'Unable to reach server. Check your connection.' }
+        return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
 
@@ -245,7 +238,6 @@ async function apiForgotPassword(email) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ email }),
     })
@@ -269,7 +261,6 @@ async function apiVerifyEmail(email, code) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ email, code }),
     })
@@ -282,8 +273,7 @@ async function apiVerifyEmail(email, code) {
 
     return { success: true, message: data.message || 'Email verified successfully!' }
   } catch (err) {
-    console.error('API Verify Email Error:', err)
-    return { success: false, message: 'Unable to reach server. Check your connection.' }
+        return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
 
@@ -294,7 +284,6 @@ async function apiResendCode(email) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({ email }),
     })
@@ -307,9 +296,37 @@ async function apiResendCode(email) {
 
     return { success: true, message: data.message || 'Verification code resent successfully!' }
   } catch (err) {
-    console.error('API Resend Code Error:', err)
-    return { success: false, message: 'Unable to reach server. Check your connection.' }
+        return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
+}
+
+/* ── REAL API LOGOUT ────────────────────────────────────── */
+async function apiLogout(refreshToken) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    })
+
+    const data = await res.json().catch(() => ({}))
+
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Logout failed.' }
+    }
+
+    return { success: true, message: data.message || 'Logged out successfully.' }
+  } catch (err) {
+    return { success: false, message: `API Logout Error: ${err.message || err}` }
+  }
+}
+
+/* ── MOCK LOGOUT ────────────────────────────────────────── */
+async function mockLogout(refreshToken) {
+  await new Promise(r => setTimeout(r, 300))
+  return { success: true, message: 'Mock logout successful.' }
 }
 
 /* ── PUBLIC API ─────────────────────────────────────────── */
@@ -330,6 +347,9 @@ const authService = {
   verifyEmail: (email, code) => apiVerifyEmail(email, code),
 
   resendCode: (email) => apiResendCode(email),
+
+  logout: (refreshToken) =>
+    USE_MOCK ? mockLogout(refreshToken) : apiLogout(refreshToken),
 }
 
 export default authService

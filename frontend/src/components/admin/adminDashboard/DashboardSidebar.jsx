@@ -48,6 +48,7 @@ export default function DashboardSidebar({
           className="flex items-center gap-2.5 min-w-0 cursor-pointer"
           onMouseEnter={() => setLogoHover(true)}
           onMouseLeave={() => setLogoHover(false)}
+          onClick={() => setActiveNav('Dashboard')}
         >
           <div
             className="w-[38px] h-[38px] rounded-[10px] shrink-0 flex items-center justify-center shadow-md"
@@ -181,16 +182,24 @@ export default function DashboardSidebar({
           <button
             onClick={onLogout}
             title="Logout"
-            className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[12px] font-bold border-none cursor-pointer hover:opacity-85 transition-opacity"
+            className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[12px] font-bold border-none cursor-pointer hover:opacity-85 transition-opacity overflow-hidden"
             style={{ background: BRAND }}
           >
-            {user?.avatar || 'DP'}
+            {(user?.avatarUrl || user?.profile_image || (typeof user?.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http')))) ? (
+              <img src={user?.avatarUrl || user?.profile_image || user?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              user?.avatar || (user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'DP')
+            )}
           </button>
         ) : (
           <div className="flex items-center justify-between w-full">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[12px] font-bold" style={{ background: BRAND }}>
-                {user?.avatar || 'DP'}
+              <div className="w-[38px] h-[38px] rounded-full shrink-0 flex items-center justify-center text-white text-[12px] font-bold overflow-hidden" style={{ background: BRAND }}>
+                {(user?.avatarUrl || user?.profile_image || (typeof user?.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http')))) ? (
+                  <img src={user?.avatarUrl || user?.profile_image || user?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  user?.avatar || (user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'DP')
+                )}
               </div>
               <div className="flex flex-col min-w-0">
                 <span className="text-[13.5px] font-bold text-slate-800 dark:text-[#e8f0fe] truncate">

@@ -15,7 +15,6 @@ function authHeaders(extra = {}) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${getToken()}`,
-    'ngrok-skip-browser-warning': 'true',
     ...extra,
   }
 }
@@ -216,8 +215,7 @@ function mapEvent(e) {
   if (!e) return null
 
   // 🔍 TEMP DEBUG — console mein dekho exact backend fields
-  console.log('[mapEvent] raw backend event:', JSON.stringify(e, null, 2))
-
+  
   return {
     id: e.event_id || e.id,
     name: e.event_name || e.name || e.title || '',
@@ -253,15 +251,13 @@ async function apiFetchEvents() {
     const res = await fetchWithAuth(`${API_BASE}/events`, { method: 'GET' })
     const data = await parseJSON(res)
     if (!res.ok) {
-      console.error('[eventsService] fetchEvents failed:', res.status, data)
-      return { success: false, events: [] }
+            return { success: false, events: [] }
     }
     const eventsArray = Array.isArray(data.data) ? data.data : Array.isArray(data.events) ? data.events : []
     const mapped = eventsArray.map(e => mapEvent(e))
     return { success: true, events: mapped }
   } catch (err) {
-    console.error('[eventsService] fetchEvents network error:', err)
-    return { success: false, events: [], message: 'Server unreachable.' }
+        return { success: false, events: [], message: 'Server unreachable.' }
   }
 }
 
@@ -270,8 +266,7 @@ async function apiFetchUpcomingEvents(limit = 10) {
     const res = await fetchWithAuth(`${API_BASE}/events/upcoming?limit=${limit}`, { method: 'GET' })
     const data = await parseJSON(res)
     if (!res.ok) {
-      console.error('[eventsService] fetchUpcomingEvents failed:', res.status, data)
-      return { success: false, events: [] }
+            return { success: false, events: [] }
     }
     const eventsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])
     const mapped = eventsArray.map(e => {
@@ -300,8 +295,7 @@ async function apiFetchUpcomingEvents(limit = 10) {
     })
     return { success: true, events: mapped }
   } catch (err) {
-    console.error('[eventsService] fetchUpcomingEvents network error:', err)
-    return { success: false, events: [], message: 'Server unreachable.' }
+        return { success: false, events: [], message: 'Server unreachable.' }
   }
 }
 
@@ -313,14 +307,12 @@ async function apiCreateEvent(payload) {
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-      console.error('[eventsService] createEvent failed:', res.status, data)
-      return { success: false, message: data.message || 'Failed to create event.' }
+            return { success: false, message: data.message || 'Failed to create event.' }
     }
     const rawEvent = data.data || data.event || data
     return { success: true, event: mapEvent(rawEvent) }
   } catch (err) {
-    console.error('[eventsService] createEvent network error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -332,38 +324,32 @@ async function apiUpdateEvent(id, payload) {
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-      console.error('[eventsService] updateEvent failed:', res.status, data)
-      return { success: false, message: data.message || 'Failed to update event.' }
+            return { success: false, message: data.message || 'Failed to update event.' }
     }
     const rawEvent = data.data || data.event || data
     return { success: true, event: mapEvent(rawEvent) }
   } catch (err) {
-    console.error('[eventsService] updateEvent network error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiDeleteEvent(id) {
   try {
     const token = getToken()
-    console.log('[eventsService] apiDeleteEvent token:', token)
-    const res = await fetch(`${API_BASE}/events/${id}`, {
+        const res = await fetch(`${API_BASE}/events/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
         'authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       },
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-      console.error('[eventsService] deleteEvent failed:', res.status, data)
-      return { success: false, message: data.message || data.detail || 'Failed to delete event.' }
+            return { success: false, message: data.message || data.detail || 'Failed to delete event.' }
     }
     return { success: true }
   } catch (err) {
-    console.error('[eventsService] deleteEvent network error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -488,8 +474,7 @@ async function apiFetchRegistrations(eventId) {
     const regs = data.registrations || data.data || data.items || data || []
     return { success: true, registrations: Array.isArray(regs) ? regs : [] }
   } catch (err) {
-    console.error('[eventsService] fetchRegistrations error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -506,8 +491,7 @@ async function apiUpdateRegistrationStatus(id, status) {
     }
     return { success: true, registration: data.registration }
   } catch (err) {
-    console.error('[eventsService] updateRegistrationStatus error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -536,6 +520,7 @@ function mapAttendanceRecord(r) {
     status: fmtStatus(r.attendance_status || r.status),
     department: r.department || r.dept || '',
     registrationId: r.registration_id || r.registrationId || '',
+    scannedBy: r.scanned_by || r.scannedBy || r.student_id || r.studentId || '',
   }
 }
 
@@ -552,8 +537,7 @@ async function apiFetchAttendance(eventId) {
     const attendance = Array.isArray(raw) ? raw.map(mapAttendanceRecord) : []
     return { success: true, attendance }
   } catch (err) {
-    console.error('[eventsService] fetchAttendance error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -574,8 +558,7 @@ async function apiApproveEvent(eventId, approvalStatus, rejectionReason = null) 
     }
     return { success: true, message: data.message }
   } catch (err) {
-    console.error('[eventsService] approveEvent error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -586,7 +569,6 @@ async function apiPublishEvent(eventId) {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       },
     })
     const data = await parseJSON(res)
@@ -595,8 +577,7 @@ async function apiPublishEvent(eventId) {
     }
     return { success: true, message: data.message || 'Event published successfully!' }
   } catch (err) {
-    console.error('[eventsService] publishEvent error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -670,7 +651,6 @@ async function apiGetQRCodeBlob(eventId) {
     const res = await fetch(`${API_BASE}/events/${eventId}/qrcode`, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       }
     })
     if (!res.ok) {
@@ -699,8 +679,7 @@ async function apiGetQRCodeBlob(eventId) {
       return { success: true, blob }
     }
   } catch (err) {
-    console.error('[eventsService] apiGetQRCodeBlob error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
