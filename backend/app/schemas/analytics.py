@@ -1,7 +1,4 @@
-"""
-app/schemas/analytics.py
-Analytics response schemas.
-"""
+ 
 from pydantic import BaseModel
 from typing import List, Optional
 

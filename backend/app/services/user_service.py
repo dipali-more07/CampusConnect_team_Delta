@@ -305,7 +305,7 @@ class UserService:
             mobile=data.phone,
             college_name=college.college_name,
             department=data.department,
-            gender=data.gender,
+            gender=data.gender.value if data.gender else None,
         )
         self.user_repo.create(user)
         self.db.flush()                 # Generate user_id before creating profile
@@ -391,7 +391,7 @@ class UserService:
             college_name=college.college_name,
             department=data.department,
             course=data.course,
-            gender=data.gender,
+            gender=data.gender.value if data.gender else None,
         )
         self.user_repo.create(user)
         self.db.flush()

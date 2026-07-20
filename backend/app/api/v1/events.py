@@ -1,40 +1,4 @@
-"""
-app/api/v1/events.py
-=====================
-Event management API endpoints.
-
-WHAT THIS FILE DOES:
-  Handles everything about events — creating, listing, approving, publishing,
-  cancelling, and managing event posters and QR codes.
-
-EVENT LIFECYCLE (how an event goes from creation to completion):
-  1. Organizer creates event  → status: DRAFT, approval_status: PENDING
-  2. Admin approves it        → approval_status: APPROVED  (or REJECTED)
-  3. Organizer publishes it   → status: PUBLISHED  (students can now register!)
-  4. Event happens            → Admin marks as COMPLETED
-  5. Certificates generated   → Attendees get PDF certificates
-
-  SPECIAL CASE (Admin creates event):
-    → approval_status is AUTO set to APPROVED (admin doesn't need to approve their own events)
-    → Admin just needs to publish it directly
-
-ENDPOINTS IN THIS FILE:
-  POST   /events/                      → Create event (Organizer/Admin)
-  GET    /events/                      → List events (with filters, pagination)
-  GET    /events/upcoming              → Get upcoming events (public)
-  GET    /events/trending              → Get trending events (public)
-  GET    /events/pending-approval      → Events waiting for admin approval (Admin only)
-  GET    /events/{id}                  → Get a single event by ID (public)
-  PATCH  /events/{id}                  → Update event details (Organizer/Admin)
-  PUT    /events/{id}                  → Same as PATCH (for compatibility)
-  DELETE /events/{id}                  → Delete event (Draft only, Organizer/Admin)
-  POST   /events/{id}/publish          → Publish event (must be approved first)
-  POST   /events/{id}/cancel           → Cancel event
-  POST   /events/{id}/complete         → Mark event as completed (Admin only)
-  POST   /events/{id}/approve          → Approve or reject event (Admin only)
-  POST   /events/{id}/poster           → Upload event poster image
-  GET    /events/{id}/qrcode           → Get check-in QR code (Organizer only)
-"""
+ 
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
@@ -52,29 +16,7 @@ router = APIRouter()
 
 
 def _event_to_dict(event) -> dict:
-    """
-    Convert an Event database model object to a plain dictionary for API responses.
-
-    WHY WE NEED THIS:
-      FastAPI cannot directly serialize SQLAlchemy model objects to JSON.
-      We pick exactly which fields to expose and convert them here.
-
-    STATUS DISPLAY LOGIC:
-      The 'status' field shown to the frontend combines EventStatus and ApprovalStatus:
-        - Draft + Approved  → shows "approved"  (admin approved, waiting for organizer to publish)
-        - Draft + Rejected  → shows "rejected"  (admin rejected it)
-        - Otherwise         → shows the actual event status (draft/published/completed/cancelled)
-
-    IMPORTANT: Do NOT rename these fields — the frontend uses them!
-      event_id, organizer_id, event_name, title, description, category,
-      event_type, venue, start_datetime, end_datetime, max_participants,
-      capacity, participation_type, reg_date_time, fees, reg_deadline,
-      registration_deadline, event_date, poster, status, approval_status,
-      qr_code, created_at
-
-    NOTE: Both 'event_name' and 'title' return the same value (backward compat).
-    NOTE: Both 'reg_deadline' and 'registration_deadline' return the same value.
-    """
+   
     # Combine status + approval_status into a single human-readable status string
     status_val = event.status.value if hasattr(event.status, "value") else event.status
     if event.status == EventStatus.DRAFT:

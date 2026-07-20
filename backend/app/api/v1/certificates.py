@@ -1,7 +1,4 @@
-"""
-app/api/v1/certificates.py
-Certificate endpoints.
-"""
+ 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session

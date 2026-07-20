@@ -1,7 +1,4 @@
-"""
-app/api/v1/organizers.py
-Organizer management endpoints.
-"""
+ 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 

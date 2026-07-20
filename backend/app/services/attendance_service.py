@@ -155,3 +155,147 @@ class AttendanceService:
             self.db.commit()
             self.db.refresh(attendance)
             return attendance
+
+    def get_user_attendance(
+        self, user_id: str, page: int = 1, size: int = 100
+    ) -> tuple[List[Attendance], int]:
+        """Get paginated list of attendance records for a student."""
+        skip = (page - 1) * size
+        records = self.attendance_repo.get_by_user(user_id, skip=skip, limit=size)
+        total = self.attendance_repo.count_by_user(user_id)
+        return records, total
+
+    def get_user_attendance_analytics(self, user_id: str) -> dict:
+        """
+        Generate attendance stats, category distribution, and monthly breakdown
+        for a student's dashboard charts.
+        """
+        from sqlalchemy import select, func, and_, extract
+        from app.models.registration import EventRegistration
+        from app.models.event import Event
+        from app.core.constants import RegistrationStatus, AttendanceStatus
+
+        # 1. Total registrations (excluding cancelled)
+        total_registered = self.db.execute(
+            select(func.count())
+            .select_from(EventRegistration)
+            .where(
+                and_(
+                    EventRegistration.participant_id == user_id,
+                    EventRegistration.registration_status != RegistrationStatus.CANCELLED
+                )
+            )
+        ).scalar() or 0
+
+        # 2. Total attended (status present)
+        total_present = self.db.execute(
+            select(func.count())
+            .select_from(Attendance)
+            .where(
+                and_(
+                    Attendance.user_id == user_id,
+                    Attendance.attendance_status == AttendanceStatus.PRESENT
+                )
+            )
+        ).scalar() or 0
+
+        # 3. Total absent (status absent)
+        total_absent = self.db.execute(
+            select(func.count())
+            .select_from(Attendance)
+            .where(
+                and_(
+                    Attendance.user_id == user_id,
+                    Attendance.attendance_status == AttendanceStatus.ABSENT
+                )
+            )
+        ).scalar() or 0
+
+        # Calculated rates
+        attendance_percentage = (total_present / total_registered * 100) if total_registered > 0 else 0.0
+
+        # 4. Category distribution (Registered vs Attended by category)
+        # 4.1 Count registrations per category
+        reg_by_cat_res = self.db.execute(
+            select(Event.category, func.count(EventRegistration.registration_id))
+            .join(EventRegistration, Event.event_id == EventRegistration.event_id)
+            .where(
+                and_(
+                    EventRegistration.participant_id == user_id,
+                    EventRegistration.registration_status != RegistrationStatus.CANCELLED
+                )
+            )
+            .group_by(Event.category)
+        ).all()
+
+        reg_by_cat = {row[0]: row[1] for row in reg_by_cat_res if row[0]}
+
+        # 4.2 Count attended per category
+        att_by_cat_res = self.db.execute(
+            select(Event.category, func.count(Attendance.attendance_id))
+            .join(Attendance, Event.event_id == Attendance.event_id)
+            .where(
+                and_(
+                    Attendance.user_id == user_id,
+                    Attendance.attendance_status == AttendanceStatus.PRESENT
+                )
+            )
+            .group_by(Event.category)
+        ).all()
+
+        att_by_cat = {row[0]: row[1] for row in att_by_cat_res if row[0]}
+
+        # Build list of unique categories
+        categories = list(set(list(reg_by_cat.keys()) + list(att_by_cat.keys())))
+        category_breakdown = [
+            {
+                "category": cat.value if hasattr(cat, "value") else str(cat),
+                "registered": reg_by_cat.get(cat, 0),
+                "attended": att_by_cat.get(cat, 0)
+            }
+            for cat in categories
+        ]
+
+        # 5. Monthly breakdown for current year
+        current_year = datetime.utcnow().year
+        monthly_att_res = self.db.execute(
+            select(
+                extract("month", Attendance.check_in_time).label("month"),
+                func.count(Attendance.attendance_id).label("count")
+            )
+            .where(
+                and_(
+                    Attendance.user_id == user_id,
+                    Attendance.attendance_status == AttendanceStatus.PRESENT,
+                    extract("year", Attendance.check_in_time) == current_year
+                )
+            )
+            .group_by(extract("month", Attendance.check_in_time))
+        ).all()
+
+        monthly_counts = {int(row[0]): row[1] for row in monthly_att_res if row[0]}
+
+        # Generate all 12 months with names
+        month_names = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+        ]
+        monthly_breakdown = [
+            {
+                "month": month_names[m - 1],
+                "attended": monthly_counts.get(m, 0)
+            }
+            for m in range(1, 13)
+        ]
+
+        return {
+            "total_registered": total_registered,
+            "total_present": total_present,
+            "total_absent": total_absent,
+            "attendance_percentage": round(attendance_percentage, 2),
+            "category_breakdown": category_breakdown,
+            "monthly_breakdown": monthly_breakdown
+        }
+
+
+
