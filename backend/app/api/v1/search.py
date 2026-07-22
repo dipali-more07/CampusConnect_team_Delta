@@ -1,7 +1,4 @@
-"""
-app/api/v1/search.py
-Global search endpoints.
-"""
+ 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import select, or_

@@ -60,6 +60,7 @@ class EventService:
             raise BadRequestException("Event start time must be in the future")
 
         event = Event(
+            organizer=current_user,
             organizer_id=current_user.user_id,
             title=data.title,
             description=data.description,
@@ -207,12 +208,16 @@ class EventService:
         return event
 
     def delete_event(self, event_id: str, current_user: User) -> None:
-        """Delete a draft event."""
+        """Delete an event (only if it is not ongoing or completed)."""
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
 
-        if event.status != EventStatus.DRAFT:
-            raise BadRequestException("Only draft events can be deleted")
+        now = datetime.utcnow()
+        is_completed = (event.status == EventStatus.COMPLETED) or (now > event.end_datetime)
+        is_ongoing = (event.start_datetime <= now <= event.end_datetime)
+
+        if is_ongoing or is_completed:
+            raise BadRequestException("Cannot delete ongoing or completed events")
 
         self.event_repo.delete(event)
         self.db.commit()

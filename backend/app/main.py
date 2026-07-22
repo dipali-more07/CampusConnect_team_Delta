@@ -189,10 +189,12 @@ cors_args = {
     "allow_headers": ["*"],           # Allow all headers
 }
 
-if settings.DEBUG:
+allowed_origins = settings.get_allowed_origins_list()
+
+if settings.DEBUG or "*" in allowed_origins:
     cors_args["allow_origin_regex"] = r"https?://.*"
 else:
-    cors_args["allow_origins"] = settings.get_allowed_origins_list()
+    cors_args["allow_origins"] = allowed_origins
 
 app.add_middleware(CORSMiddleware, **cors_args)
 
@@ -760,3 +762,10 @@ def health_check():
         "message": "Service is healthy",
         "data": {"status": "ok"},
     }
+
+
+"""if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+""" 
+ 

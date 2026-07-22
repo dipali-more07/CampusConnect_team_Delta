@@ -23,4 +23,6 @@ class RegistrationResponse(BaseModel):
     registered_at: datetime
     registration_type: Optional[str] = None
     team_id: Optional[str] = None
+    event_name: Optional[str] = None
+    title: Optional[str] = None
     model_config = {"from_attributes": True}

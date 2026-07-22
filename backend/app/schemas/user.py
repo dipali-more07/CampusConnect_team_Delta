@@ -1,65 +1,53 @@
-"""
-app/schemas/user.py
-====================
-Pydantic schemas (data models) for user-related API requests and responses.
-
-WHAT ARE SCHEMAS?
-  Schemas define the SHAPE of data going in and out of the API.
-  - Request schemas: validate data SENT BY the client (frontend)
-  - Response schemas: define data SENT BACK to the client
-
-PYDANTIC DOES AUTOMATIC VALIDATION:
-  If a required field is missing, or a value is the wrong type,
-  FastAPI will automatically return a 422 Unprocessable Entity error
-  with a clear message — no manual validation code needed!
-
-IMPORTANT: Do NOT change field names here — the frontend uses these exact names.
-"""
-from pydantic import BaseModel, Field
+ 
+from pydantic import BaseModel, Field, field_validator
 from typing import Optional
 from datetime import datetime
 from app.core.constants import UserRole, Gender
 
 
 class UserResponse(BaseModel):
-    """
-    Basic user info returned in API responses.
 
-    SECURITY NOTE: This NEVER includes password_hash.
-    We only expose safe, public-facing fields.
-    """
     user_id: str
     email: str
-    role: UserRole                      # "admin", "organizer", or "participant"
-    is_active: bool                     # False if the user is deactivated
-    is_email_verified: bool             # False until they verify via OTP
+    role: UserRole                      
+    is_active: bool                    
+    is_email_verified: bool             
     created_at: datetime
-    last_login: Optional[datetime] = None  # None if they've never logged in
+    last_login: Optional[datetime] = None   
 
-    # This tells Pydantic to read data from SQLAlchemy model attributes (ORM mode)
+ 
     model_config = {"from_attributes": True}
 
 
 class UpdateProfileRequest(BaseModel):
-    """
-    Data the frontend sends when a user wants to update their profile.
-
-    ALL FIELDS ARE OPTIONAL — this is a partial update (PATCH).
-    Only fields that are provided will be updated; others stay unchanged.
-
-    FIELD GUIDE:
-      full_name    → User's display name
-      phone        → Contact phone number
-      gender       → Enum: "male", "female", "other", "prefer_not_to_say"
-      department   → Academic department (e.g., "CSE", "Mechanical")
-      course       → Degree program (e.g., "B.Tech", "MBA")
-      year_of_study → Current academic year (1 to 10)
-      bio          → Short user bio / about text (max 1000 chars)
-      college_id   → Can be a UUID or a college name string
-    """
+  
     full_name: Optional[str] = Field(None, max_length=255)
     phone: Optional[str] = Field(None, max_length=20)
     gender: Optional[Gender] = None                             # Enum from constants.py
+    
+    @field_validator("gender", mode="before")
+    @classmethod
+    def validate_gender(cls, v: any) -> Optional[Gender]:
+        if not v:
+            return None
+        if isinstance(v, Gender):
+            return v
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ["male", "m"]:
+                return Gender.MALE
+            if v_clean in ["female", "f"]:
+                return Gender.FEMALE
+            if v_clean in ["other", "o"]:
+                return Gender.OTHER
+            if v_clean in ["prefer_not_to_say", "prefer not to say", "none"]:
+                return Gender.PREFER_NOT_TO_SAY
+            try:
+                return Gender(v_clean)
+            except ValueError:
+                pass
+        raise ValueError("Invalid gender value. Must be 'male' or 'female'")
+
     department: Optional[str] = Field(None, max_length=255)
     course: Optional[str] = Field(None, max_length=255)
     year_of_study: Optional[int] = Field(None, ge=1, le=10)    # 1 to 10
@@ -128,6 +116,29 @@ class CreateOrganizerRequest(BaseModel):
     college_id: str                                             # Required
     gender: Optional[Gender] = None
 
+    @field_validator("gender", mode="before")
+    @classmethod
+    def validate_gender(cls, v: any) -> Optional[Gender]:
+        if not v:
+            return None
+        if isinstance(v, Gender):
+            return v
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ["male", "m"]:
+                return Gender.MALE
+            if v_clean in ["female", "f"]:
+                return Gender.FEMALE
+            if v_clean in ["other", "o"]:
+                return Gender.OTHER
+            if v_clean in ["prefer_not_to_say", "prefer not to say", "none"]:
+                return Gender.PREFER_NOT_TO_SAY
+            try:
+                return Gender(v_clean)
+            except ValueError:
+                pass
+        raise ValueError("Invalid gender value. Must be 'male' or 'female'")
+
 
 class CreateStudentRequest(BaseModel):
     """
@@ -157,6 +168,30 @@ class CreateStudentRequest(BaseModel):
     course: Optional[str] = Field(None, max_length=255)
     college_id: str
     gender: Optional[Gender] = None
+
+    @field_validator("gender", mode="before")
+    @classmethod
+    def validate_gender(cls, v: any) -> Optional[Gender]:
+        if not v:
+            return None
+        if isinstance(v, Gender):
+            return v
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            if v_clean in ["male", "m"]:
+                return Gender.MALE
+            if v_clean in ["female", "f"]:
+                return Gender.FEMALE
+            if v_clean in ["other", "o"]:
+                return Gender.OTHER
+            if v_clean in ["prefer_not_to_say", "prefer not to say", "none"]:
+                return Gender.PREFER_NOT_TO_SAY
+            try:
+                return Gender(v_clean)
+            except ValueError:
+                pass
+        raise ValueError("Invalid gender value. Must be 'male' or 'female'")
+
     year_of_study: Optional[int] = Field(None, ge=1, le=10)
 
 

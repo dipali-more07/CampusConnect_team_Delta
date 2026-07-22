@@ -1,7 +1,4 @@
-"""
-app/api/v1/notifications.py
-Notification endpoints.
-"""
+ 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -16,12 +13,18 @@ router = APIRouter()
 
 
 def _notif_to_dict(n) -> dict:
+    notif_type = n.notification_type
+    if hasattr(notif_type, "value"):
+        notif_type = notif_type.value
+    if isinstance(notif_type, str):
+        notif_type = notif_type.lower()
+
     return {
         "notification_id": n.notification_id,
         "user_id": n.user_id,
         "title": n.title,
         "message": n.message,
-        "notification_type": n.notification_type,
+        "notification_type": notif_type,
         "is_read": n.is_read,
         "created_at": n.created_at.isoformat(),
     }

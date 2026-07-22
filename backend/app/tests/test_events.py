@@ -198,3 +198,91 @@ class TestEventCreation:
         assert response.status_code == 200
         data = response.json()["data"]
         assert data["event_name"] == "Updated Title via PATCH"
+
+class TestEventDeletion:
+    def test_delete_draft_event_success(self, client, db, organizer_user, organizer_token):
+        from app.models.event import Event
+        event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Draft Event",
+            start_datetime=datetime.utcnow() + timedelta(days=2),
+            end_datetime=datetime.utcnow() + timedelta(days=3),
+            status="draft",
+            approval_status="pending",
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        response = client.delete(
+            f"/api/v1/events/{event.event_id}",
+            headers=auth_headers(organizer_token)
+        )
+        assert response.status_code == 200
+        assert response.json()["message"] == "Event deleted"
+
+    def test_delete_published_future_event_success(self, client, db, organizer_user, organizer_token):
+        from app.models.event import Event
+        event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Future Published Event",
+            start_datetime=datetime.utcnow() + timedelta(days=2),
+            end_datetime=datetime.utcnow() + timedelta(days=3),
+            status="published",
+            approval_status="approved",
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        response = client.delete(
+            f"/api/v1/events/{event.event_id}",
+            headers=auth_headers(organizer_token)
+        )
+        assert response.status_code == 200
+        assert response.json()["message"] == "Event deleted"
+
+    def test_delete_ongoing_event_fails(self, client, db, organizer_user, organizer_token):
+        from app.models.event import Event
+        # Ongoing event (starts 1 hour ago, ends in 1 hour)
+        event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Ongoing Event",
+            start_datetime=datetime.utcnow() - timedelta(hours=1),
+            end_datetime=datetime.utcnow() + timedelta(hours=1),
+            status="published",
+            approval_status="approved",
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        response = client.delete(
+            f"/api/v1/events/{event.event_id}",
+            headers=auth_headers(organizer_token)
+        )
+        assert response.status_code == 400
+        assert "Cannot delete ongoing or completed events" in response.json()["message"]
+
+    def test_delete_completed_event_fails(self, client, db, organizer_user, organizer_token):
+        from app.models.event import Event
+        # Completed event (past dates)
+        event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Past Completed Event",
+            start_datetime=datetime.utcnow() - timedelta(days=2),
+            end_datetime=datetime.utcnow() - timedelta(days=1),
+            status="published",
+            approval_status="approved",
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+
+        response = client.delete(
+            f"/api/v1/events/{event.event_id}",
+            headers=auth_headers(organizer_token)
+        )
+        assert response.status_code == 400
+        assert "Cannot delete ongoing or completed events" in response.json()["message"]
+

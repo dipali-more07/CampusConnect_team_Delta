@@ -1,16 +1,5 @@
 """
-app/api/v1/users.py
-====================
-User and profile management endpoints.
-
-WHAT THIS FILE DOES:
-  Handles everything about user profiles and user management:
-  - Users updating their own profile (name, phone, bio, gender, etc.)
-  - Admins listing/managing all users
-  - Admins creating new organizer accounts
-  - Admins/Organizers creating new student accounts
-
-ENDPOINTS IN THIS FILE:
+ ENDPOINTS IN THIS FILE:
   PATCH  /users/profile               → Update my profile (any logged-in user)
   POST   /users/profile/picture       → Upload my profile picture
   GET    /users/organizers            → List all organizers

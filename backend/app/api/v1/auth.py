@@ -1,23 +1,4 @@
-"""
-app/api/v1/auth.py
-===================
-Authentication endpoints (router).
-
-ROUTER RULES:
-  - Routers are THIN. They only: 
-    1. Validate input (Pydantic does this automatically)
-    2. Call a service method
-    3. Return a response
-  - NO business logic here (that's in services)
-  - NO database queries here (that's in repositories)
-
-SWAGGER DOCUMENTATION:
-  Every endpoint has:
-  - summary: Short title shown in Swagger
-  - description: Detailed explanation
-  - response_model: What the response looks like
-  - status_code: HTTP status code for success
-"""
+ 
 from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 
@@ -47,13 +28,7 @@ async def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Register a new user.
-    - Validates email uniqueness
-    - Hashes password with bcrypt
-    - Creates user and profile
-    - Sends verification email
-    """
+    
     service = AuthService(db)
     user = await service.register(data)
     return success_response(

@@ -127,7 +127,7 @@ class AuthService:
             course=data.course,
             department=data.department,
             college_name=college.college_name,
-            gender=data.gender,
+            gender=data.gender.value if data.gender else None,
         )
 
         # Step 4: Save User to DB (flush sends SQL but doesn't commit yet)

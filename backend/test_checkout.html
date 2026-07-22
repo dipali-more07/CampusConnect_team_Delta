@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Razorpay Test Integration</title>
+    <!-- Outfit Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --accent-color: #3b82f6;
+            --accent-hover: #2563eb;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --success: #10b981;
+            --error: #ef4444;
+            --border-color: #334155;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: var(--card-bg);
+            border-radius: 16px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-color);
+            padding: 40px;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 800;
+            margin-top: 0;
+            margin-bottom: 8px;
+            background: linear-gradient(to right, #3b82f6, #60a5fa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            background-color: var(--border-color);
+            color: var(--text-secondary);
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .log-box {
+            margin-top: 30px;
+            background-color: #020617;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 16px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            max-height: 250px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+
+        .info { color: #38bdf8; }
+        .success { color: var(--success); }
+        .error { color: var(--error); }
+        .warning { color: #f59e0b; }
+    </style>
+    <!-- Load Razorpay Checkout SDK -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>Razorpay Test Flow</h1>
+    <p class="subtitle">Complete end-to-end integration debugger for CampusConnect payments.</p>
+
+    <div class="form-group">
+        <label for="backendUrl">Backend API URL</label>
+        <input type="text" id="backendUrl" value="http://localhost:8000" placeholder="e.g. http://localhost:8000">
+    </div>
+
+    <div class="form-group">
+        <label for="jwtToken">JWT Authorization Token (excluding 'Bearer ')</label>
+        <input type="text" id="jwtToken" placeholder="Paste your authentication token here">
+    </div>
+
+    <div class="form-group">
+        <label for="regId">Registration ID</label>
+        <input type="text" id="regId" placeholder="e.g. reg_12345">
+    </div>
+
+    <div class="form-group">
+        <label for="rzpKey">Razorpay Test Key ID</label>
+        <input type="text" id="rzpKey" placeholder="rzp_test_...">
+    </div>
+
+    <button id="payBtn" onclick="startPaymentFlow()">Initiate and Pay</button>
+
+    <div class="log-box" id="logBox">
+        <div class="log-entry info">System ready. Fill fields and click "Initiate and Pay".</div>
+    </div>
+</div>
+
+<script>
+    const logBox = document.getElementById('logBox');
+
+    function log(message, type = 'info') {
+        const entry = document.createElement('div');
+        entry.className = `log-entry ${type}`;
+        entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+        logBox.appendChild(entry);
+        logBox.scrollTop = logBox.scrollHeight;
+    }
+
+    async function startPaymentFlow() {
+        const backendUrl = document.getElementById('backendUrl').value.trim();
+        const token = document.getElementById('jwtToken').value.trim();
+        const regId = document.getElementById('regId').value.trim();
+        const rzpKey = document.getElementById('rzpKey').value.trim();
+        const payBtn = document.getElementById('payBtn');
+
+        if (!backendUrl || !token || !regId || !rzpKey) {
+            log('Please fill in all fields (Backend URL, Token, Registration ID, and Razorpay Key).', 'error');
+            return;
+        }
+
+        payBtn.disabled = true;
+        log('Initiating payment request on backend...', 'info');
+
+        try {
+            // 1. Initiate payment in backend
+            const initiateRes = await fetch(`${backendUrl}/api/v1/payments/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    registration_id: regId,
+                    payment_gateway: 'razorpay',
+                    payment_method: 'upi'
+                })
+            });
+
+            const initData = await initiateRes.json();
+            
+            if (!initiateRes.ok) {
+                throw new Error(initData.detail || initData.message || 'Failed to initiate payment');
+            }
+
+            log('Payment initiated successfully in backend.', 'success');
+            log(`Order/Transaction ID (from Razorpay): ${initData.data.transaction_id}`, 'info');
+            log(`Backend Payment ID: ${initData.data.payment_id}`, 'info');
+
+            const orderId = initData.data.transaction_id;
+            const paymentId = initData.data.payment_id;
+            const amountInPaise = Math.round(initData.data.amount * 100);
+
+            // 2. Open Razorpay Checkout Modal
+            log('Opening Razorpay checkout form...', 'info');
+
+            const options = {
+                key: rzpKey,
+                amount: amountInPaise,
+                currency: 'INR',
+                name: 'CampusConnect',
+                description: 'Event Fee Payment',
+                order_id: orderId,
+                handler: async function (response) {
+                    log('Razorpay payment successful. Response received:', 'success');
+                    log(`Razorpay Payment ID: ${response.razorpay_payment_id}`, 'info');
+                    log(`Razorpay Signature: ${response.razorpay_signature}`, 'info');
+                    
+                    log('Sending confirmation verification to backend...', 'info');
+
+                    // 3. Send payment signature confirmation to backend
+                    try {
+                        const confirmRes = await fetch(`${backendUrl}/api/v1/payments/${paymentId}/confirm`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                razorpay_payment_id: response.razorpay_payment_id,
+                                razorpay_order_id: response.razorpay_order_id,
+                                razorpay_signature: response.razorpay_signature
+                            })
+                        });
+
+                        const confirmData = await confirmRes.json();
+
+                        if (!confirmRes.ok) {
+                            throw new Error(confirmData.detail || confirmData.message || 'Signature verification failed');
+                        }
+
+                        log('Payment successfully confirmed on backend! Order is fully paid.', 'success');
+                    } catch (err) {
+                        log(`Confirmation Error: ${err.message}`, 'error');
+                    } finally {
+                        payBtn.disabled = false;
+                    }
+                },
+                modal: {
+                    ondismiss: function() {
+                        log('Checkout modal closed by user.', 'warning');
+                        payBtn.disabled = false;
+                    }
+                },
+                prefill: {
+                    name: 'Test Student',
+                    email: 'student@example.com',
+                    contact: '9999999999'
+                },
+                theme: {
+                    color: '#3b82f6'
+                }
+            };
+
+            const rzp = new Razorpay(options);
+            rzp.open();
+
+        } catch (error) {
+            log(`Error: ${error.message}`, 'error');
+            payBtn.disabled = false;
+        }
+    }
+</script>
+</body>
+</html>

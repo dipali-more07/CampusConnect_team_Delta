@@ -69,3 +69,24 @@ class AttendanceRepository(BaseRepository[Attendance]):
             .where(EventRegistration.event_id == event_id)
         ).scalar() or 0
 
+    def get_by_user(
+        self, user_id: str, skip: int = 0, limit: int = 100
+    ) -> List[Attendance]:
+        """Get all attendance records for a specific user."""
+        query = (
+            select(Attendance)
+            .where(Attendance.user_id == user_id)
+            .order_by(Attendance.check_in_time.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(self.db.execute(query).scalars().all())
+
+    def count_by_user(self, user_id: str) -> int:
+        """Count all attendance records for a specific user."""
+        return self.db.execute(
+            select(func.count())
+            .select_from(Attendance)
+            .where(Attendance.user_id == user_id)
+        ).scalar() or 0
+

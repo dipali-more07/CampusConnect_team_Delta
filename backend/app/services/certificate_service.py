@@ -335,6 +335,10 @@ class CertificateService:
         if not event:
             raise NotFoundException(f"Event {event_id} not found")
 
+        # Check if certificates have already been generated for this event to prevent multiple runs
+        if self.cert_repo.count_by_event(event_id) > 0:
+            raise ConflictException("Certificates have already been generated for this event")
+
         # Get all attendees
         attendances = self.attendance_repo.get_by_event(event_id, skip=0, limit=10000)
 

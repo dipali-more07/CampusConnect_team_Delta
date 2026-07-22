@@ -1,9 +1,4 @@
-"""
-app/api/v1/router.py
-=====================
-Aggregates all routers into one APIRouter.
-This is imported in main.py and mounted at /api/v1/
-"""
+ 
 from fastapi import APIRouter
 
 from app.api.v1 import auth, users, colleges, organizers, events, registrations, attendance, certificates, notifications, analytics, search, results, payments

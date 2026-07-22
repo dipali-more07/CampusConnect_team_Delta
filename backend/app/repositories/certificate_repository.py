@@ -37,7 +37,7 @@ class CertificateRepository(BaseRepository[Certificate]):
             select(Certificate).where(
                 and_(
                     Certificate.event_id == event_id,
-                    Certificate.user_id == user_id,
+                    Certificate.participant_id == user_id,
                 )
             )
         ).scalar_one_or_none()
@@ -58,7 +58,7 @@ class CertificateRepository(BaseRepository[Certificate]):
     ) -> List[Certificate]:
         query = (
             select(Certificate)
-            .where(Certificate.user_id == user_id)
+            .where(Certificate.participant_id == user_id)
             .order_by(Certificate.generated_at.desc())
             .offset(skip)
             .limit(limit)
@@ -68,7 +68,7 @@ class CertificateRepository(BaseRepository[Certificate]):
     def count_by_user(self, user_id: str) -> int:
         return self.db.execute(
             select(func.count()).select_from(Certificate)
-            .where(Certificate.user_id == user_id)
+            .where(Certificate.participant_id == user_id)
         ).scalar() or 0
 
     def count_by_event(self, event_id: str) -> int:
