@@ -138,8 +138,7 @@ async function apiFetchStats() {
 
     return { success: true, stats }
   } catch (err) {
-    console.error('[dashboardService] apiFetchStats calculation error:', err)
-    return { success: true, stats: MOCK_STATS }
+        return { success: true, stats: MOCK_STATS }
   }
 }
 

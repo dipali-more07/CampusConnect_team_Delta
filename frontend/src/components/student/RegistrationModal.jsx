@@ -2,12 +2,13 @@ import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   X, Users, User, CheckCircle2, Loader2,
-  Plus, Trash2, IndianRupee, Ticket, AlertCircle, Mail
+  Plus, Trash2, IndianRupee, Ticket, AlertCircle, Mail,
+  Clock, CreditCard
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import studentService from '../../services/studentService'
 
-const STEPS = { FORM: 'form', SUCCESS: 'success' }
+const STEPS = { FORM: 'form', PAYMENT_PROMPT: 'payment_prompt', SUCCESS: 'success' }
 
 export default function RegistrationModal({ event, onClose, onSuccess }) {
   const { dark, accentColor } = useTheme()
@@ -20,6 +21,8 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
 
   const [step, setStep] = useState(STEPS.FORM)
   const [loading, setLoading] = useState(false)
+  const [paymentLoading, setPaymentLoading] = useState(false)
+  const [createdRegId, setCreatedRegId] = useState(null)
   const [error, setError] = useState('')
 
   // Team fields
@@ -71,7 +74,7 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
     })
   }
 
-  /* ── Submit ── */
+  /* ── Submit Registration ── */
   async function submitRegistration() {
     setError('')
     if (regType === 'team') {
@@ -90,129 +93,146 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
 
     const res = await studentService.registerEvent(event.id, payload)
 
+    setLoading(false)
     if (!res.success) {
-      setLoading(false)
       setError(res.message || 'Registration failed. Please try again.')
       return
     }
 
-    // If event has registration fees, initiate payment flow
+    const regId = res.data?.id || res.data?.registration_id || `REG_${Date.now()}`
+    setCreatedRegId(regId)
+
+    // If event has fees > 0, store pending payment and open Payment Window
     if (event.fees > 0) {
-      const registrationId = res.data?.id || res.data?.registration_id
-      if (!registrationId) {
-        setLoading(false)
-        setError('Failed to retrieve registration ID for payment.')
-        return
-      }
-
-      // Step 1: Initiate Payment
-      const paymentRes = await studentService.initiatePayment(registrationId)
-      if (!paymentRes.success) {
-        setLoading(false)
-        setError(paymentRes.message || 'Failed to initiate payment.')
-        return
-      }
-
-      const { payment_id, transaction_id, amount } = paymentRes.data || {}
-      if (!payment_id) {
-        setLoading(false)
-        setError('Invalid payment details returned from server.')
-        return
-      }
-
-      // Step 2: Determine if Mock or Live Payment
-      const isMockPayment = !transaction_id || transaction_id.startsWith('order_mock')
-
-      if (isMockPayment) {
-        // Step 3 (Mock): Confirm Payment directly
-        const confirmRes = await studentService.confirmPayment(payment_id, {
-          razorpay_payment_id: `pay_mock_${Math.random().toString(36).substr(2, 9)}`,
-          razorpay_order_id: transaction_id || `order_mock_${Math.random().toString(36).substr(2, 9)}`,
-          razorpay_signature: `sig_mock_${Math.random().toString(36).substr(2, 9)}`
-        })
-        setLoading(false)
-        if (confirmRes.success) {
-          setStep(STEPS.SUCCESS)
-          setTimeout(() => { onSuccess(event.id) }, 2000)
-        } else {
-          setError(confirmRes.message || 'Mock payment verification failed.')
+      try {
+        const storedPending = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
+        const newPayment = {
+          id: regId,
+          transaction_id: `TXN_${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+          event_id: event.id,
+          event_name: event.title,
+          amount: event.fees,
+          payment_method: 'Pending',
+          payment_status: 'Pending',
+          created_at: new Date().toISOString()
         }
-      } else {
-        // Step 2 & 3 (Live): Load Razorpay SDK and open Checkout Modal
-        const scriptLoaded = await loadRazorpayScript()
-        if (!scriptLoaded) {
-          setLoading(false)
-          setError('Razorpay SDK failed to load. Please check your internet connection.')
-          return
-        }
+        const updatedPending = [newPayment, ...storedPending.filter(p => p.event_id !== event.id)]
+        sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updatedPending))
+      } catch (err) {}
 
-        let userEmail = ''
-        let userPhone = ''
-        let userName = ''
-        try {
-          const profileRes = await studentService.fetchProfile()
-          if (profileRes.success) {
-            userEmail = profileRes.data?.email || ''
-            userPhone = profileRes.data?.phone || ''
-            userName = profileRes.data?.full_name || ''
-          }
-        } catch (e) {
-          console.warn('Could not fetch student profile for prefill', e)
-        }
-
-        try {
-          const options = {
-            key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
-            amount: Math.round(amount * 100),
-            currency: 'INR',
-            name: 'CampusConnect',
-            description: `Payment for ${event.title}`,
-            order_id: transaction_id,
-            handler: async function (response) {
-              setLoading(true)
-              const confirmRes = await studentService.confirmPayment(payment_id, {
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature
-              })
-              setLoading(false)
-              if (confirmRes.success) {
-                setStep(STEPS.SUCCESS)
-                setTimeout(() => { onSuccess(event.id) }, 2000)
-              } else {
-                setError(confirmRes.message || 'Payment verification failed.')
-              }
-            },
-            modal: {
-              ondismiss: async function () {
-                setLoading(true)
-                await studentService.failPayment(payment_id)
-                setLoading(false)
-                setError('Payment cancelled by user.')
-              }
-            },
-            prefill: {
-              name: userName,
-              email: userEmail,
-              contact: userPhone
-            },
-            theme: {
-              color: BRAND
-            }
-          }
-          const rzp = new window.Razorpay(options)
-          rzp.open()
-          setLoading(false)
-        } catch (err) {
-          setLoading(false)
-          setError('Failed to open Razorpay Checkout: ' + err.message)
-        }
-      }
+      // Transition to Payment Prompt Window
+      setStep(STEPS.PAYMENT_PROMPT)
     } else {
-      // Free Event: Direct registration
-      setLoading(false)
       setStep(STEPS.SUCCESS)
       setTimeout(() => { onSuccess(event.id) }, 2000)
+    }
+  }
+
+  /* ── Handle Pay Later ── */
+  function handlePayLater() {
+    setStep(STEPS.SUCCESS)
+    setTimeout(() => { onSuccess(event.id) }, 1500)
+  }
+
+  /* ── Handle Pay Now ── */
+  async function handlePayNow() {
+    setError('')
+    setPaymentLoading(true)
+
+    const regId = createdRegId || event.id
+
+    const paymentRes = await studentService.initiatePayment(regId)
+    if (!paymentRes.success) {
+      setPaymentLoading(false)
+      setError(paymentRes.message || 'Failed to initiate payment.')
+      return
+    }
+
+    const { payment_id, transaction_id, amount } = paymentRes.data || {}
+    const isMockPayment = !transaction_id || transaction_id.startsWith('order_mock')
+
+    if (isMockPayment) {
+      const confirmRes = await studentService.confirmPayment(payment_id || regId, {
+        razorpay_payment_id: `pay_mock_${Math.random().toString(36).substr(2, 9)}`,
+        razorpay_order_id: transaction_id || `order_mock_${Math.random().toString(36).substr(2, 9)}`,
+        razorpay_signature: `sig_mock_${Math.random().toString(36).substr(2, 9)}`
+      })
+      setPaymentLoading(false)
+      if (confirmRes.success) {
+        try {
+          const stored = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
+          const updated = stored.map(item => (item.id === regId || item.event_id === event.id) ? { ...item, payment_status: 'Success', status: 'Success', payment_method: 'UPI' } : item)
+          sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
+        } catch (e) {}
+
+        setStep(STEPS.SUCCESS)
+        setTimeout(() => { onSuccess(event.id) }, 1500)
+      } else {
+        setError(confirmRes.message || 'Payment verification failed.')
+      }
+    } else {
+      const scriptLoaded = await loadRazorpayScript()
+      if (!scriptLoaded) {
+        setPaymentLoading(false)
+        setError('Razorpay SDK failed to load.')
+        return
+      }
+
+      let userEmail = '', userPhone = '', userName = ''
+      try {
+        const profileRes = await studentService.fetchProfile()
+        if (profileRes.success) {
+          userEmail = profileRes.data?.email || ''
+          userPhone = profileRes.data?.phone || ''
+          userName = profileRes.data?.full_name || ''
+        }
+      } catch (e) {}
+
+      try {
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+          amount: Math.round((amount || event.fees) * 100),
+          currency: 'INR',
+          name: 'CampusConnect',
+          description: `Payment for ${event.title}`,
+          order_id: transaction_id,
+          handler: async function (response) {
+            setPaymentLoading(true)
+            const confirmRes = await studentService.confirmPayment(payment_id, {
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature
+            })
+            setPaymentLoading(false)
+            if (confirmRes.success) {
+              try {
+                const stored = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
+                const updated = stored.map(item => (item.id === regId || item.event_id === event.id) ? { ...item, payment_status: 'Success', status: 'Success', payment_method: 'UPI' } : item)
+                sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
+              } catch (e) {}
+
+              setStep(STEPS.SUCCESS)
+              setTimeout(() => { onSuccess(event.id) }, 1500)
+            } else {
+              setError(confirmRes.message || 'Payment verification failed.')
+            }
+          },
+          modal: {
+            ondismiss: async function () {
+              setPaymentLoading(false)
+              setError('Payment cancelled by user. Payment status remains Pending.')
+            }
+          },
+          prefill: { name: userName, email: userEmail, contact: userPhone },
+          theme: { color: BRAND }
+        }
+        const rzp = new window.Razorpay(options)
+        rzp.open()
+        setPaymentLoading(false)
+      } catch (err) {
+        setPaymentLoading(false)
+        setError('Failed to open Razorpay Checkout: ' + err.message)
+      }
     }
   }
 
@@ -220,7 +240,7 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
   const maxMembers = (event.maxTeamSize || 5) - 1
 
   const modal = (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center px-4" style={{ fontFamily: 'Manrope, sans-serif' }}>
+    <div className="fixed inset-0 z-999 flex items-center justify-center px-4" style={{ fontFamily: 'Manrope, sans-serif' }}>
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
@@ -254,6 +274,70 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
           </button>
         </div>
 
+        {/* ── STEP: PAYMENT PROMPT (Window after registration) ── */}
+        {step === STEPS.PAYMENT_PROMPT && (
+          <div className="px-6 py-6 flex flex-col items-center text-center gap-4">
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 shadow-xs">
+              <CheckCircle2 size={30} />
+            </div>
+
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-2">
+                <Clock size={12} /> Payment Status: Pending
+              </span>
+              <h3 className="text-lg font-black m-0" style={{ color: txt }}>
+                Registered Successfully!
+              </h3>
+              <p className="text-xs mt-1.5 m-0" style={{ color: txtSec }}>
+                You are registered for <strong>{event.title}</strong>. Fee for this event is <strong>₹{event.fees}</strong>.
+              </p>
+            </div>
+
+            <div className="w-full p-4 rounded-2xl border flex items-center justify-between"
+              style={{ background: inputBg, borderColor: border }}>
+              <div className="text-left">
+                <span className="text-[11px] font-bold uppercase tracking-wider block" style={{ color: txtSec }}>Total Registration Fee</span>
+                <span className="text-xl font-black" style={{ color: txt }}>₹{event.fees}</span>
+              </div>
+              <span className="text-[11px] font-semibold text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-lg">
+                Pending Payment
+              </span>
+            </div>
+
+            {error && (
+              <div className="w-full flex items-start gap-2 text-[12px] font-semibold text-red-400 px-3 py-2.5 rounded-xl text-left"
+                style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                <AlertCircle size={14} className="shrink-0 mt-0.5" /> <span>{error}</span>
+              </div>
+            )}
+
+            <div className="w-full flex gap-3 pt-2">
+              <button
+                onClick={handlePayLater}
+                disabled={paymentLoading}
+                className="flex-1 py-3 rounded-xl text-xs font-bold border cursor-pointer transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
+                style={{ background: 'transparent', color: txtSec, borderColor: border }}
+              >
+                Pay Later
+              </button>
+              <button
+                onClick={handlePayNow}
+                disabled={paymentLoading}
+                className="flex-1 py-3 rounded-xl text-xs font-bold text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 shadow-md"
+                style={{ background: BRAND, opacity: paymentLoading ? 0.7 : 1 }}
+              >
+                {paymentLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <>
+                    <CreditCard size={14} /> Pay Now (₹{event.fees})
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* ── STEP: SUCCESS ── */}
         {step === STEPS.SUCCESS && (
           <div className="flex flex-col items-center justify-center py-12 px-6 gap-3">
@@ -266,6 +350,11 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
               You are now registered for <strong>{event.title}</strong>.
               {regType === 'team' && <><br />Team <strong>{teamName}</strong> has been enrolled.</>}
             </p>
+            {event.fees > 0 && (
+              <div className="text-[12px] font-bold text-amber-500 bg-amber-500/10 px-3.5 py-1.5 rounded-xl text-center border border-amber-500/20">
+                Payment of ₹{event.fees} can be completed later from your Payments page.
+              </div>
+            )}
             <div className="text-[11px] mt-2 font-semibold" style={{ color: txtSec }}>Closing automatically…</div>
           </div>
         )}

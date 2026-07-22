@@ -66,8 +66,7 @@ export default function ResultFormModal({
           setRegistrations(enriched)
         }
       } catch (err) {
-        console.error('[ResultFormModal] Load registrations error:', err)
-      }
+              }
       setRegsLoading(false)
     }
 

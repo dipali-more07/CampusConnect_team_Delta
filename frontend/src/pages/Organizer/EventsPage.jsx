@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import eventsService from '../../services/eventsService'
 import { useToast } from '../../context/ToastContext'
+import { useAuth } from '../../context/AuthContext'
 
 // Import Admin Event sub-components
 import EventsHeader from '../../components/admin/adminEvent/EventsHeader'
@@ -47,6 +48,7 @@ export default function EventsPage({ tokens }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
   const showToast = useToast()
+  const { user } = useAuth()
 
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -177,7 +179,7 @@ export default function EventsPage({ tokens }) {
 
     setFormState({
       name: '',
-      organizer: '',
+      organizer: user?.name || '',
       category: 'Technical',
       participationType: 'individual',
       eventType: 'offline',

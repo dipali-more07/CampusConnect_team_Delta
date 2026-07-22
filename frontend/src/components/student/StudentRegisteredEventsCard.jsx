@@ -6,53 +6,7 @@ export default function StudentRegisteredEventsCard({ tokens, onNavigate, events
   const { accentColor } = useTheme()
   const BRAND = accentColor || '#615FFF'
 
-  const events = eventsList ? eventsList.slice(0, 5) : [
-    {
-      id: 1,
-      code: 'TF',
-      title: 'TechFest 2K25',
-      date: '7 February 2025',
-      location: 'Main Auditorium',
-      status: 'Registered',
-      avatarBg: BRAND,
-    },
-    {
-      id: 2,
-      code: 'SM',
-      title: 'Sports Meet 2K25',
-      date: '22 May 2025',
-      location: 'University Grounds',
-      status: 'Registered',
-      avatarBg: '#0284c7',
-    },
-    {
-      id: 3,
-      code: 'SEM',
-      title: 'AI & Robotics Seminar',
-      date: '22 May 2025',
-      location: 'CS Hall 1',
-      status: 'Registered',
-      avatarBg: '#7c3aed',
-    },
-    {
-      id: 4,
-      code: 'CH',
-      title: 'Code Hunt 2025',
-      date: '20 October 2025',
-      location: 'Computer Lab 3',
-      status: 'Registered',
-      avatarBg: '#d97706',
-    },
-    {
-      id: 5,
-      code: 'AI',
-      title: 'AI & Data Workshop',
-      date: '15 November 2025',
-      location: 'Online Webinar',
-      status: 'Workshop',
-      avatarBg: '#16a34a',
-    },
-  ]
+  const events = eventsList ? eventsList.slice(0, 5) : []
 
   return (
     <div

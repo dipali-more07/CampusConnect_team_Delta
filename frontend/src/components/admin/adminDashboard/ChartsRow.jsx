@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { LineDotRightHorizontal } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, PieChart, Pie, Cell,
 } from 'recharts'
-import { CHART_DATA, DEPT_DATA } from '../../../data/dashboardData'
 import analyticsService from '../../../services/analyticsService'
 
 function CustomTooltip({ active, payload, label, dark }) {
@@ -30,8 +29,8 @@ function CustomTooltip({ active, payload, label, dark }) {
 
 export default function ChartsRow({ dark, tokens }) {
   const { card, border, shadow, txtPri, inputBg } = tokens
-  const [deptData, setDeptData] = useState(DEPT_DATA)
-  const [chartData, setChartData] = useState(CHART_DATA)
+  const [deptData, setDeptData] = useState([])
+  const [chartData, setChartData] = useState([])
 
   useEffect(() => {
     const loadDeptParticipation = async () => {

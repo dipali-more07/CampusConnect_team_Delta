@@ -25,14 +25,6 @@ export default function CertificateTable({
         <table className="w-full text-left border-collapse">
           <thead>
             <tr style={{ borderBottom: `1px solid ${tokens.border}` }}>
-              <th className="px-5 py-4">
-                <input
-                  type="checkbox"
-                  checked={allSelected}
-                  onChange={toggleAll}
-                  className="w-4 h-4 cursor-pointer accent-brand"
-                />
-              </th>
               {['STUDENT', 'EVENT', 'ISSUED DATE', 'VERIFY CODE', 'STATUS', 'ACTIONS'].map(h => (
                 <th key={h} className="px-5 py-4 text-[11px] font-bold tracking-wider" style={{ color: tokens.txtSec }}>{h}</th>
               ))}
@@ -42,7 +34,6 @@ export default function CertificateTable({
             {loading ? (
               [1, 2, 3, 4, 5].map(i => (
                 <tr key={i} style={{ borderBottom: `1px solid ${tokens.border}` }}>
-                  <td className="px-5 py-4"><div className="w-4 h-4 rounded" style={{ background: skBg }} /></td>
                   <td className="px-5 py-4"><div className="w-28 h-3.5 rounded" style={{ background: skBg }} /></td>
                   <td className="px-5 py-4"><div className="w-32 h-3.5 rounded" style={{ background: skBg }} /></td>
                   <td className="px-5 py-4"><div className="w-20 h-3.5 rounded" style={{ background: skBg }} /></td>
@@ -53,7 +44,7 @@ export default function CertificateTable({
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan="7" className="p-12 text-center">
+                <td colSpan="6" className="p-12 text-center">
                   <Award size={40} className="block mx-auto mb-3" style={{ color: tokens.txtMuted }} />
                   <p className="text-[14px] font-medium" style={{ color: tokens.txtSec }}>No certificates found</p>
                 </td>
@@ -61,7 +52,7 @@ export default function CertificateTable({
             ) : (
               filtered.map((cert, i) => {
                 const badge = badgeStyle(cert.status)
-                const isSelected = selected.includes(cert.id)
+                const isSelected = selected?.includes(cert.id)
                 return (
                   <tr
                     key={cert.id}
@@ -73,14 +64,6 @@ export default function CertificateTable({
                     onMouseEnter={e => { if (!isSelected) e.currentTarget.style.background = tokens.hoverBg }}
                     onMouseLeave={e => { if (!isSelected) e.currentTarget.style.background = 'transparent' }}
                   >
-                    <td className="px-5 py-4">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(cert.id)}
-                        className="w-4 h-4 cursor-pointer accent-brand"
-                      />
-                    </td>
                     <td className="px-5 py-4">
                       <div className="text-[13.5px] font-bold" style={{ color: tokens.txtPri }}>{cert.studentName}</div>
                       <div className="text-[11px] mt-0.5 font-medium" style={{ color: tokens.txtSec }}>{cert.rollNo} · {cert.department}</div>

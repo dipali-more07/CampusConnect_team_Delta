@@ -88,19 +88,17 @@ export default function StudentTopBar({
 
   const handleMarkAsRead = (id, e) => {
     e.stopPropagation()
-    studentService.markNotificationAsRead(id).then(res => {
-      if (res.success) {
-        setNotifications(res.data)
-      }
-    })
+    setNotifications(prev =>
+      prev.map(n => n.id === id ? { ...n, unread: false } : n)
+    )
+    studentService.markNotificationAsRead(id)
   }
 
   const handleMarkAllAsRead = () => {
-    studentService.markAllNotificationsAsRead().then(res => {
-      if (res.success) {
-        setNotifications(res.data)
-      }
-    })
+    setNotifications(prev =>
+      prev.map(n => ({ ...n, unread: false }))
+    )
+    studentService.markAllNotificationsAsRead()
   }
 
   const handleProfileUpdated = (updatedUser) => {
@@ -269,10 +267,14 @@ export default function StudentTopBar({
             className="flex items-center gap-2.5 p-1 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-[#1e2d45] bg-slate-50 dark:bg-[#162640] hover:bg-slate-100 dark:hover:bg-[#1e2d45] cursor-pointer transition-all duration-150"
           >
             <div
-              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-white text-[12px] font-bold"
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center text-white text-[12px] font-bold overflow-hidden"
               style={{ background: BRAND }}
             >
-              {profileData.avatar || profileData.name.substring(0, 2).toUpperCase()}
+              {(profileData.avatarUrl || profileData.profile_image || (typeof profileData.avatar === 'string' && (profileData.avatar.startsWith('data:') || profileData.avatar.startsWith('http')))) ? (
+                <img src={profileData.avatarUrl || profileData.profile_image || profileData.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                profileData.avatar || profileData.name.substring(0, 2).toUpperCase()
+              )}
             </div>
             <span className="hidden sm:inline-block text-[13px] font-bold text-slate-800 dark:text-[#e8f0fe]">
               {profileData.name}
@@ -295,17 +297,21 @@ export default function StudentTopBar({
                 {/* User Profile Header Card */}
                 <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-[#121f36] mb-2">
                   <div
-                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-base font-black shrink-0 shadow-md"
+                    className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-base font-black shrink-0 shadow-md overflow-hidden"
                     style={{ background: BRAND }}
                   >
-                    {profileData.avatar || profileData.name.substring(0, 2).toUpperCase()}
+                    {(profileData.avatarUrl || profileData.profile_image || (typeof profileData.avatar === 'string' && (profileData.avatar.startsWith('data:') || profileData.avatar.startsWith('http')))) ? (
+                      <img src={profileData.avatarUrl || profileData.profile_image || profileData.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      profileData.avatar || profileData.name.substring(0, 2).toUpperCase()
+                    )}
                   </div>
                   <div className="min-w-0">
                     <h4 className="text-sm font-extrabold text-slate-900 dark:text-white m-0 truncate">
                       {profileData.name}
                     </h4>
                     <p className="text-xs font-semibold text-slate-500 dark:text-[#6c85a8] m-0 truncate">
-                      {profileData.college}
+                      {profileData.email}
                     </p>
                   </div>
                 </div>

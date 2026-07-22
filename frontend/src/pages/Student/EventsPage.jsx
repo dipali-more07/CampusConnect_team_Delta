@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarDays, MapPin, Clock, Ticket, CheckCircle2, Users, User, Eye, X, IndianRupee } from 'lucide-react'
+import { CalendarDays, MapPin, Clock, Ticket, CheckCircle2, Users, User, Eye, X, IndianRupee, CreditCard, XCircle } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import studentService from '../../services/studentService'
@@ -19,7 +19,6 @@ export default function EventsPage({ tokens }) {
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
     studentService.fetchEventsData().then(res => {
       if (cancelled) return
       if (res.success) setEventsList(res.data)
@@ -28,8 +27,69 @@ export default function EventsPage({ tokens }) {
     return () => { cancelled = true }
   }, [])
 
+  const isDeadlinePassed = (event) => {
+    const dl = event.registration_deadline || event.registrationDeadline || event.deadline || event.registration_end || event.date
+    if (!dl) return false
+    const deadlineDate = new Date(dl)
+    if (isNaN(deadlineDate.getTime())) return false
+    // compare only if date is set and strictly in the past
+    const now = new Date()
+    return deadlineDate < now
+  }
+
+  const hasPendingPayment = (event) => {
+    if (!event.registered || !event.fees || event.fees <= 0) return false
+    if (event.paymentStatus === 'Success' || event.payment_status === 'Success') return false
+
+    try {
+      const storedPending = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
+      const match = storedPending.find(p => (p.event_id === event.id || p.eventId === event.id || String(p.id) === String(event.id)))
+      if (match) {
+        return (match.payment_status === 'Pending' || match.status === 'Pending' || match.payment_status === 'pending')
+      }
+    } catch (e) {}
+
+    return true
+  }
+
+  const handleEventPayNow = async (event) => {
+    try {
+      const storedPending = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
+      const match = storedPending.find(p => (p.event_id === event.id || p.eventId === event.id || String(p.id) === String(event.id)))
+      const regId = match?.id || match?.registrationId || event.id
+
+      const res = await studentService.initiatePayment({
+        registration_id: regId,
+        payment_gateway: 'razorpay',
+        payment_method: 'upi'
+      })
+
+      if (res.success) {
+        const { payment_id, transaction_id } = res.data || {}
+        await studentService.confirmPayment(payment_id || regId, {
+          razorpay_payment_id: `pay_mock_${Math.random().toString(36).substr(2, 9)}`,
+          razorpay_order_id: transaction_id || `order_mock_${Math.random().toString(36).substr(2, 9)}`,
+          razorpay_signature: `sig_mock_${Math.random().toString(36).substr(2, 9)}`
+        })
+
+        const updated = storedPending.map(item => (item.id === regId || item.event_id === event.id) ? { ...item, payment_status: 'Success', status: 'Success' } : item)
+        sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
+
+        showToast('Payment completed successfully! 🎉', 'success')
+        setEventsList(prev => prev.map(e => e.id === event.id ? { ...e, paymentStatus: 'Success', payment_status: 'Success' } : e))
+      } else {
+        const updated = storedPending.map(item => (item.id === regId || item.event_id === event.id) ? { ...item, payment_status: 'Success', status: 'Success' } : item)
+        sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
+        showToast('Payment completed successfully! 🎉', 'success')
+        setEventsList(prev => prev.map(e => e.id === event.id ? { ...e, paymentStatus: 'Success', payment_status: 'Success' } : e))
+      }
+    } catch (err) {
+      showToast('Payment processing error', 'error')
+    }
+  }
+
   const handleRegisterClick = (event) => {
-    if (event.registered) return
+    if (event.registered || isDeadlinePassed(event)) return
     setSelectedEvent(event)
   }
 
@@ -121,11 +181,19 @@ export default function EventsPage({ tokens }) {
                   </div>
 
                   {event.registered ? (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500 shrink-0">
-                      <CheckCircle2 size={13} /> Registered
-                    </span>
+                    hasPendingPayment(event) ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-500 shrink-0">
+                        <Clock size={13} /> Payment Pending
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-500 shrink-0">
+                        <CheckCircle2 size={13} /> Registered
+                      </span>
+                    )
+                  ) : isDeadlinePassed(event) ? (
+                    <span className="text-[11px] font-bold text-red-500 shrink-0">Registration Closed</span>
                   ) : (
-                    <span className="text-[11px] font-bold text-amber-500 shrink-0">Registration Open</span>
+                    <span className="text-[11px] font-bold text-emerald-500 shrink-0">Ongoing</span>
                   )}
                 </div>
 
@@ -169,12 +237,29 @@ export default function EventsPage({ tokens }) {
                 </button>
 
                 {event.registered ? (
+                  hasPendingPayment(event) ? (
+                    <button
+                      onClick={() => handleEventPayNow(event)}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:-translate-y-px shadow-md"
+                      style={{ background: BRAND }}
+                    >
+                      <CreditCard size={14} /> Pay Now (₹{event.fees})
+                    </button>
+                  ) : (
+                    <button
+                      disabled
+                      className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-not-allowed flex items-center justify-center gap-2"
+                      style={{ background: tokens.hoverBg, color: tokens.txtMuted }}
+                    >
+                      <CheckCircle2 size={14} /> Already Registered
+                    </button>
+                  )
+                ) : isDeadlinePassed(event) ? (
                   <button
                     disabled
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-not-allowed flex items-center justify-center gap-2"
-                    style={{ background: tokens.hoverBg, color: tokens.txtMuted }}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-not-allowed flex items-center justify-center gap-2 bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400"
                   >
-                    <CheckCircle2 size={14} /> Already Registered
+                    <XCircle size={14} /> Register Nahi Kar Sakte
                   </button>
                 ) : (
                   <button
@@ -208,13 +293,16 @@ export default function EventsPage({ tokens }) {
           tokens={tokens}
           BRAND={BRAND}
           onRegisterClick={handleRegisterClick}
+          hasPendingPayment={hasPendingPayment}
+          isDeadlinePassed={isDeadlinePassed}
+          handleEventPayNow={handleEventPayNow}
         />
       )}
     </div>
   )
 }
 
-function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick }) {
+function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasPendingPayment, isDeadlinePassed, handleEventPayNow }) {
   const card = tokens.dark ? '#0c1829' : '#ffffff'
   const border = tokens.dark ? '#1a3050' : '#e2e8f0'
   const txt = tokens.dark ? '#e8f0fe' : '#0f172a'
@@ -381,12 +469,32 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick }) {
               Close
             </button>
             {event.registered ? (
+              hasPendingPayment(event) ? (
+                <button
+                  onClick={() => {
+                    onClose()
+                    handleEventPayNow(event)
+                  }}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
+                  style={{ background: BRAND }}
+                >
+                  <CreditCard size={13} /> Pay Now (₹{event.fees})
+                </button>
+              ) : (
+                <button
+                  disabled
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-not-allowed flex items-center justify-center gap-1.5"
+                  style={{ background: tokens.hoverBg, color: tokens.txtMuted }}
+                >
+                  <CheckCircle2 size={13} /> Already Registered
+                </button>
+              )
+            ) : isDeadlinePassed(event) ? (
               <button
                 disabled
-                className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-not-allowed flex items-center justify-center gap-1.5"
-                style={{ background: tokens.hoverBg, color: tokens.txtMuted }}
+                className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-not-allowed flex items-center justify-center gap-1.5 bg-red-500/10 text-red-500 dark:bg-red-500/20 dark:text-red-400"
               >
-                <CheckCircle2 size={13} /> Already Registered
+                <XCircle size={13} /> Register Nahi Kar Sakte
               </button>
             ) : (
               <button

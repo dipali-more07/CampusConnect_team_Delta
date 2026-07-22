@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Camera, Loader2 } from 'lucide-react'
+import ImageCropperModal from '../../common/ImageCropperModal'
 
 export default function SettingsProfileTab({
   profileForm,
@@ -12,8 +13,37 @@ export default function SettingsProfileTab({
   BRAND,
   inputStyle
 }) {
+  const [rawImageSrc, setRawImageSrc] = useState(null)
+  const [cropperOpen, setCropperOpen] = useState(false)
+
+  const onFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        setRawImageSrc(reader.result)
+        setCropperOpen(true)
+      }
+      reader.readAsDataURL(file)
+      e.target.value = ''
+    }
+  }
+
+  const handleCropComplete = (croppedUrl) => {
+    setProfileForm(p => ({ ...p, avatarUrl: croppedUrl, profile_image: croppedUrl }))
+  }
+
   return (
     <div className="space-y-6">
+      {/* Image Cropper Modal */}
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        onClose={() => setCropperOpen(false)}
+        imageSrc={rawImageSrc}
+        onCropComplete={handleCropComplete}
+        BRAND={BRAND}
+      />
+
       <div>
         <h3 className="text-[17px] font-extrabold m-0" style={{ color: tokens.txtPri }}>Profile Settings</h3>
       </div>
@@ -24,11 +54,11 @@ export default function SettingsProfileTab({
         ref={fileInputRef}
         accept="image/*"
         className="hidden"
-        onChange={handlePhotoUpload}
+        onChange={onFileSelect}
       />
       <div className="flex items-center gap-4">
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center font-extrabold text-white text-[18px] relative group overflow-hidden"
+          className="w-14 h-14 rounded-full flex items-center justify-center font-extrabold text-white text-[18px] relative group overflow-hidden shrink-0"
           style={{ background: profileForm.avatarColor || BRAND }}
         >
           {profileForm.avatarUrl ? (

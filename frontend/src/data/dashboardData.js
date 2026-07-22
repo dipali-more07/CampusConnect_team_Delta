@@ -3,7 +3,7 @@ import {
   ChartColumn, Bell, Settings,
   GraduationCap, Building2, CalendarDays, SquareCheckBig,
   UserPlus, CheckSquare, Calendar,
-  SendHorizonal, XCircle, Trophy,
+  SendHorizonal, XCircle, Trophy, CreditCard,
 } from 'lucide-react'
 
 export const BRAND = '#615FFF'
@@ -13,6 +13,7 @@ export const NAV = [
   { icon: CalendarDays,    label: 'Events' },
   { icon: Trophy,          label: 'Results' },
   { icon: SquareCheckBig,  label: 'Attendance' },
+  { icon: CreditCard,      label: 'Payments' },
   { icon: ChartColumn,     label: 'Analytics' },
   { icon: Award,           label: 'Certificates' },
   { icon: GraduationCap,   label: 'Students' },

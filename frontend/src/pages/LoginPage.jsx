@@ -182,7 +182,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   // Sign Up state
-  const [isSignUp, setIsSignUp] = useState(false)
+  const [isSignUp, setIsSignUp] = useState(() => !!localStorage.getItem('pendingVerificationEmail'))
   const [logoHover, setLogoHover] = useState(false)
 
   // Forgot password modal
@@ -218,18 +218,15 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const result = await authService.login(email, password)
-      console.log('Login Response Result:', result)
-      if (result.success && result.user) {
+            if (result.success && result.user) {
         login(result.user, result.token, result.refreshToken)
         const userName = result.user?.name || result.user?.fullName || result.user?.email || 'User'
         showToast(`Logged in successfully! User: ${userName}, Role: ${result.user.role}`, 'success')
       } else {
-        console.error('Login failed result:', result)
-        showToast(result.message || 'Login failed. Please try again.', 'error')
+                showToast(result.message || 'Login failed. Please try again.', 'error')
       }
     } catch (err) {
-      console.error('Login submit exception:', err)
-      showToast('Something went wrong. Please try again.', 'error')
+            showToast('Something went wrong. Please try again.', 'error')
     } finally {
       setLoading(false)
     }

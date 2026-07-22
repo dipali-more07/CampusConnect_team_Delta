@@ -9,8 +9,7 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'ngrok-skip-browser-warning': 'true'
+    'Authorization': `Bearer ${token}`
   }
 }
 
@@ -121,8 +120,7 @@ async function apiFetchResults() {
     }
     return { success: true, results: data.results || [] }
   } catch (err) {
-    console.error('[resultsService] fetchResults error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -139,8 +137,7 @@ async function apiCreateResult(payload) {
     }
     return { success: true, result: data.result }
   } catch (err) {
-    console.error('[resultsService] createResult error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -157,8 +154,7 @@ async function apiUpdateResult(id, payload) {
     }
     return { success: true, result: data.result }
   } catch (err) {
-    console.error('[resultsService] updateResult error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -174,8 +170,7 @@ async function apiDeleteResult(id) {
     }
     return { success: true }
   } catch (err) {
-    console.error('[resultsService] deleteResult error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -188,8 +183,7 @@ async function apiFetchResultsByEvent(eventId) {
     }
     return { success: true, results: data.results || data.data || data || [] }
   } catch (err) {
-    console.error('[resultsService] fetchResultsByEvent error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -206,8 +200,7 @@ async function apiDeclareResult(payload) {
     }
     return { success: true, result: data.data || data.result || data }
   } catch (err) {
-    console.error('[resultsService] declareResult error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 

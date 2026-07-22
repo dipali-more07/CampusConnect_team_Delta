@@ -180,14 +180,13 @@ async function apiFetchAttendanceData() {
     const res = await fetch(`${API_BASE}/student/attendance`, {
       headers: {
         'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        'ngrok-skip-browser-warning': 'true'
       }
     })
     const data = await res.json()
-    if (!res.ok) return mockFetchAttendanceData()
+    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch attendance data.' }
     return { success: true, data }
   } catch {
-    return mockFetchAttendanceData()
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -198,15 +197,14 @@ async function apiScanAttendanceQR(qrCodeContent) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        'ngrok-skip-browser-warning': 'true'
       },
       body: JSON.stringify({ qrCode: qrCodeContent, qrCodeContent })
     })
     const data = await res.json()
-    if (!res.ok) return mockScanAttendanceQR(qrCodeContent)
+    if (!res.ok) return { success: false, message: data.message || 'QR scan failed.' }
     return { success: true, data }
   } catch {
-    return mockScanAttendanceQR(qrCodeContent)
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -316,13 +314,11 @@ async function apiFetchDashboardOverview() {
     let certificatesCount = 0
     try {
       const certRes = await apiFetchCertificatesData()
-      console.log('[studentService] certificates response:', certRes)
-      if (certRes.success && Array.isArray(certRes.data)) {
+            if (certRes.success && Array.isArray(certRes.data)) {
         certificatesCount = certRes.data.length
       }
     } catch (e) {
-      console.error('[studentService] Dashboard overview failed to fetch certificates:', e)
-    }
+          }
 
     // Fetch all events to map registrations to their details
     let eventsList = []
@@ -332,15 +328,13 @@ async function apiFetchDashboardOverview() {
         eventsList = evRes.data
       }
     } catch (e) {
-      console.error('[studentService] Dashboard overview failed to fetch events:', e)
-    }
+          }
 
     let registeredEventsList = []
     let rawRegs = []
     try {
       const regRes = await apiFetchMyRegistrations()
-      console.log('[studentService] registrations response:', regRes)
-      if (regRes.success && Array.isArray(regRes.data)) {
+            if (regRes.success && Array.isArray(regRes.data)) {
         rawRegs = regRes.data
         registeredEventsList = regRes.data.map(r => {
           const matchedEvent = eventsList.find(ev => String(ev.id) === String(r.event_id))
@@ -348,8 +342,7 @@ async function apiFetchDashboardOverview() {
         }).filter(Boolean)
       }
     } catch (e) {
-      console.error('[studentService] Dashboard overview failed to fetch registrations:', e)
-    }
+          }
 
     const data = {
       stats: {
@@ -376,11 +369,9 @@ async function apiFetchDashboardOverview() {
       rawRegistrations: rawRegs
     }
 
-    console.log('[studentService] apiFetchDashboardOverview final data:', data)
-    return { success: true, data }
+        return { success: true, data }
   } catch (err) {
-    console.error('[studentService] apiFetchDashboardOverview error:', err)
-    return { success: false, message: err.message || 'Error fetching dashboard data' }
+        return { success: false, message: err.message || 'Error fetching dashboard data' }
   }
 }
 
@@ -390,11 +381,10 @@ async function apiFetchEventsData() {
     const res = await fetch(`${API_BASE}/events/`, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true'
       }
     })
     const data = await res.json()
-    if (!res.ok) return mockFetchEventsData()
+    if (!res.ok) return { success: false, data: [], message: 'Failed to fetch events.' }
 
     const rawEvents = data.data || data
     const eventsArray = Array.isArray(rawEvents) ? rawEvents : []
@@ -405,7 +395,6 @@ async function apiFetchEventsData() {
       const regRes = await fetch(`${API_BASE}/registrations/my`, {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'ngrok-skip-browser-warning': 'true',
         },
       })
       if (regRes.ok) {
@@ -421,8 +410,7 @@ async function apiFetchEventsData() {
         }
       }
     } catch (e) {
-      console.error('[studentService] failed to fetch student registrations:', e)
-    }
+          }
 
     const mapped = eventsArray.map(e => {
       const mappedEvent = mapStudentEvent(e)
@@ -435,8 +423,7 @@ async function apiFetchEventsData() {
 
     return { success: true, data: mapped }
   } catch (err) {
-    console.error('[studentService] apiFetchEventsData error:', err)
-    return mockFetchEventsData()
+        return { success: false, data: [], message: 'Server unreachable.' }
   }
 }
 
@@ -445,14 +432,62 @@ async function apiFetchCertificatesData() {
     const res = await fetch(`${API_BASE}/certificates/my`, {
       headers: {
         'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        'ngrok-skip-browser-warning': 'true'
       }
     })
     const data = await res.json()
-    if (!res.ok) return mockFetchCertificatesData()
+    if (!res.ok) return { success: false, data: [], message: 'Failed to fetch certificates.' }
     return { success: true, data: data.data || data }
   } catch {
-    return mockFetchCertificatesData()
+    return { success: false, data: [], message: 'Server unreachable.' }
+  }
+}
+
+function formatStudentLocalTime(dateStr) {
+  if (!dateStr) return ''
+  try {
+    let cleanStr = dateStr
+    if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.includes('-')) {
+      cleanStr += 'Z'
+    }
+    const date = new Date(cleanStr)
+    if (isNaN(date.getTime())) return dateStr
+    
+    return date.toLocaleString('en-IN', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    })
+  } catch (err) {
+    return dateStr
+  }
+}
+
+function getStudentCategoryFromType(type) {
+  if (!type) return 'System'
+  const t = type.toLowerCase()
+  if (t.includes('registration')) return 'Registrations'
+  if (t.includes('attendance')) return 'Attendance'
+  if (t.includes('event') || t.includes('cancelled') || t.includes('warning') || t.includes('trending')) return 'Events'
+  if (t.includes('certificate')) return 'Certificates'
+  return 'System'
+}
+
+function mapStudentNotification(n) {
+  const type = n.notification_type || n.type || 'system'
+  const category = n.category || getStudentCategoryFromType(type)
+  return {
+    ...n,
+    id: n.notification_id || n.id,
+    type,
+    category,
+    title: n.title,
+    message: n.message,
+    unread: n.is_read !== undefined ? !n.is_read : (n.unread !== undefined ? n.unread : true),
+    time: n.created_at ? formatStudentLocalTime(n.created_at) : (n.time || ''),
+    priority: n.priority || 'normal',
   }
 }
 
@@ -461,54 +496,54 @@ async function apiFetchNotifications() {
     const res = await fetch(`${API_BASE}/notifications/`, {
       headers: {
         'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        'ngrok-skip-browser-warning': 'true'
       }
     })
     const data = await res.json()
-    if (!res.ok) return mockFetchNotifications()
+    if (!res.ok) return { success: false, data: [], message: 'Failed to fetch notifications.' }
     const rawData = data.data || data
-    const list = Array.isArray(rawData) ? rawData : (rawData?.notifications || [])
+    const rawList = rawData?.stats?.notifications ?? rawData?.notifications ?? (Array.isArray(rawData) ? rawData : [])
+    const list = rawList.map(mapStudentNotification)
     return { success: true, data: list }
-  } catch {
-    return mockFetchNotifications()
+  } catch (err) {
+    return { success: false, data: [], message: 'Server unreachable.' }
   }
 }
 
 async function apiMarkNotificationAsRead(id) {
   try {
     const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        'ngrok-skip-browser-warning': 'true'
       }
     })
     const data = await res.json()
-    if (!res.ok) return mockMarkNotificationAsRead(id)
+    if (!res.ok) return { success: false, message: 'Failed to mark notification as read.' }
     const rawData = data.data || data
-    const list = Array.isArray(rawData) ? rawData : (rawData?.notifications || [])
+    const rawList = rawData?.stats?.notifications ?? rawData?.notifications ?? (Array.isArray(rawData) ? rawData : [])
+    const list = rawList.map(mapStudentNotification)
     return { success: true, data: list }
-  } catch {
-    return mockMarkNotificationAsRead(id)
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiMarkAllNotificationsAsRead() {
   try {
     const res = await fetch(`${API_BASE}/notifications/read-all`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: {
         'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        'ngrok-skip-browser-warning': 'true'
       }
     })
     const data = await res.json()
-    if (!res.ok) return mockMarkAllNotificationsAsRead()
+    if (!res.ok) return { success: false, message: 'Failed to mark all notifications as read.' }
     const rawData = data.data || data
-    const list = Array.isArray(rawData) ? rawData : (rawData?.notifications || [])
+    const rawList = rawData?.stats?.notifications ?? rawData?.notifications ?? (Array.isArray(rawData) ? rawData : [])
+    const list = rawList.map(mapStudentNotification)
     return { success: true, data: list }
-  } catch {
-    return mockMarkAllNotificationsAsRead()
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -525,35 +560,40 @@ async function apiUpdateStudentProfile(updatedData) {
       college_id: updatedData.college || updatedData.college_id || updatedData.collegeId || ''
     }
 
+    if (updatedData.avatarUrl || updatedData.avatar || updatedData.profile_image) {
+      backendPayload.profile_image = updatedData.avatarUrl || updatedData.avatar || updatedData.profile_image
+    }
+
     const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
     const res = await fetch(`${API_BASE}/users/profile`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true'
       },
       body: JSON.stringify(backendPayload)
     })
     const data = await res.json()
     if (!res.ok) {
-      console.error('[studentService] apiUpdateStudentProfile failed status:', res.status, data)
-      return { success: false, message: data.message || 'Failed to update profile.' }
+            return { success: false, message: data.message || 'Failed to update profile.' }
     }
     
     // Map backend user object back to frontend naming convention
     const rawUser = data.data || data.user || data
+    const avatarImg = rawUser.profile_image || rawUser.avatar_url || rawUser.avatarUrl || backendPayload.profile_image || updatedData.avatarUrl || updatedData.avatar
     const mappedUser = {
       ...rawUser,
       name: rawUser.full_name || rawUser.name || '',
       mobile: rawUser.phone || rawUser.mobile || '',
       college: rawUser.college_id || rawUser.college || '',
       course: rawUser.course || '',
+      avatarUrl: avatarImg,
+      profile_image: avatarImg,
+      avatar: avatarImg || (rawUser.full_name ? rawUser.full_name.substring(0, 2).toUpperCase() : 'AS')
     }
     return { success: true, message: data.message || 'Profile updated successfully!', data: mappedUser }
   } catch (err) {
-    console.error('[studentService] apiUpdateStudentProfile error:', err)
-    return mockUpdateStudentProfile(updatedData)
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -569,7 +609,6 @@ async function apiFetchProfile() {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       }
     })
     const data = await res.json()
@@ -581,6 +620,7 @@ async function apiFetchProfile() {
     if (role === 'participant') {
       role = 'student'
     }
+    const avatarImg = profile.profile_image || profile.avatar_url || profile.avatarUrl || null
     const mappedUser = {
       ...profile,
       name: profile.full_name || profile.name || profile.fullName || profile.username || profile.email?.split('@')[0] || 'User',
@@ -588,11 +628,13 @@ async function apiFetchProfile() {
       college: profile.college_id || profile.college || '',
       course: profile.course || '',
       role,
+      avatarUrl: avatarImg,
+      profile_image: avatarImg,
+      avatar: avatarImg || (profile.full_name ? profile.full_name.substring(0, 2).toUpperCase() : 'AS')
     }
     return { success: true, data: mappedUser }
   } catch (err) {
-    console.error('[studentService] apiFetchProfile error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -603,7 +645,6 @@ async function apiChangeStudentPassword(payload) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-        'ngrok-skip-browser-warning': 'true'
       },
       body: JSON.stringify({
         current_password: payload.currentPassword || payload.oldPassword,
@@ -612,10 +653,10 @@ async function apiChangeStudentPassword(payload) {
       })
     })
     const data = await res.json()
-    if (!res.ok) return mockChangeStudentPassword(payload)
+    if (!res.ok) return { success: false, message: data.message || 'Failed to change password.' }
     return { success: true, message: data.message || 'Password changed successfully!' }
   } catch {
-    return mockChangeStudentPassword(payload)
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -639,7 +680,6 @@ async function apiRegisterEvent(eventId, payload) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify(apiPayload),
     })
@@ -663,21 +703,16 @@ async function apiRegisterEvent(eventId, payload) {
 async function apiFetchMyRegistrations() {
   try {
     const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-    console.log('[studentService] apiFetchMyRegistrations token:', token)
-    const res = await fetch(`${API_BASE}/registrations/my`, {
+        const res = await fetch(`${API_BASE}/registrations/my`, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       },
     })
-    console.log('[studentService] apiFetchMyRegistrations response status:', res.status)
-    const data = await res.json()
-    console.log('[studentService] apiFetchMyRegistrations response body:', data)
-    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch registrations.' }
+        const data = await res.json()
+        if (!res.ok) return { success: false, message: data.message || 'Failed to fetch registrations.' }
     return { success: true, data: data.data || data }
   } catch (err) {
-    console.error('[studentService] apiFetchMyRegistrations network error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -705,30 +740,35 @@ async function mockFailPayment(paymentId) {
   return { success: true, message: 'Payment marked as failed.' }
 }
 
-/* ── API PAYMENT IMPLEMENTATIONS ── */
-async function apiInitiatePayment(registrationId) {
+async function apiInitiatePayment(registrationId, gateway = 'razorpay', method = 'upi') {
   try {
     const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
+    const regId = typeof registrationId === 'object' ? (registrationId.registration_id || registrationId.id) : registrationId
+    const gWay = typeof registrationId === 'object' && registrationId.payment_gateway ? registrationId.payment_gateway : gateway
+    const pMethod = typeof registrationId === 'object' && registrationId.payment_method ? registrationId.payment_method : method
+
     const res = await fetch(`${API_BASE}/payments/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify({
-        registration_id: registrationId,
-        payment_gateway: 'razorpay',
-        payment_method: 'upi'
+        registration_id: String(regId),
+        payment_gateway: gWay,
+        payment_method: pMethod
       }),
     })
     const data = await res.json()
     if (!res.ok) {
-      return { success: false, message: data.message || 'Payment initiation failed.' }
+      let errMsg = data.message || data.detail || 'Payment initiation failed.'
+      if (Array.isArray(data.detail)) {
+        errMsg = data.detail.map(d => d.msg || d.message || d).join(', ')
+      }
+      return { success: false, message: errMsg }
     }
     return { success: true, data: data.data || data }
   } catch (err) {
-    console.error('[studentService] apiInitiatePayment error:', err)
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -741,7 +781,6 @@ async function apiConfirmPayment(paymentId, payload) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       },
       body: JSON.stringify(payload),
     })
@@ -751,8 +790,7 @@ async function apiConfirmPayment(paymentId, payload) {
     }
     return { success: true, data: data.data || data }
   } catch (err) {
-    console.error('[studentService] apiConfirmPayment error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -763,7 +801,6 @@ async function apiFailPayment(paymentId) {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true',
       },
     })
     const data = await res.json()
@@ -772,8 +809,7 @@ async function apiFailPayment(paymentId) {
     }
     return { success: true, data: data.data || data }
   } catch (err) {
-    console.error('[studentService] apiFailPayment error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -798,27 +834,23 @@ async function apiSelfCheckIn(registrationId, eventId) {
       payload.registration_id = registrationId
     }
 
-    console.log('[studentService] selfCheckIn payload:', payload)
-
+    
     const res = await fetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'ngrok-skip-browser-warning': 'true'
       },
       body: JSON.stringify(payload)
     })
     const data = await res.json()
-    console.log('[studentService] selfCheckIn response:', res.status, data)
-    if (!res.ok) {
+        if (!res.ok) {
       const errMsg = data.message || data.detail || 'Check-in failed.'
       return { success: false, message: errMsg }
     }
     return { success: true, data: data.data || data }
   } catch (err) {
-    console.error('[studentService] apiSelfCheckIn error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 

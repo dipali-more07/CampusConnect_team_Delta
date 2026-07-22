@@ -16,9 +16,20 @@ import AttendanceTabQR from '../../components/admin/adminAttendance/AttendanceTa
 import AttendanceTabMonitor from '../../components/admin/adminAttendance/AttendanceTabMonitor'
 import AttendanceTabReports from '../../components/admin/adminAttendance/AttendanceTabReports'
 
+// Helper to convert blob to base64 for localstorage storage
+const blobToBase64 = (blob) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
 /* ─── Tabs config ─── */
 const TABS = [
   { id: 'qr', label: 'Generate QR', Icon: QrCode },
+  
   { id: 'monitor', label: 'Live Monitor', Icon: Activity },
   { id: 'reports', label: 'Reports', Icon: BarChart2 },
 ]
@@ -64,51 +75,70 @@ export default function AttendancePage({ tokens }) {
           setSelectedEvent(mapped[0].id)
         }
       } else {
-        setEventsList(ATTENDANCE_EVENTS)
-        if (ATTENDANCE_EVENTS.length > 0) {
-          setSelectedEvent(ATTENDANCE_EVENTS[0].id)
-        }
+        setEventsList([])
       }
     }).catch(err => {
-      console.error(err)
-      setEventsList(ATTENDANCE_EVENTS)
-      if (ATTENDANCE_EVENTS.length > 0) {
-        setSelectedEvent(ATTENDANCE_EVENTS[0].id)
-      }
+            setEventsList([])
     })
   }, [])
 
-  // Clear QR image when event changes
-  useEffect(() => {
-    setQrGenerated(false)
-    if (qrImageUrl) {
-      URL.revokeObjectURL(qrImageUrl)
-      setQrImageUrl(null)
-    }
-  }, [selectedEvent])
+  /* start countdown when QR is generated */
+  const startCountdown = useCallback((targetExpiresAt) => {
+    if (countdownRef.current) clearInterval(countdownRef.current)
+    const expiresAt = targetExpiresAt || (Date.now() + (8 * 3600 + 32 * 60 + 14) * 1000)
+    setCountdown(Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)))
+    countdownRef.current = setInterval(() => {
+      const secs = Math.floor((expiresAt - Date.now()) / 1000)
+      if (secs <= 0) {
+        clearInterval(countdownRef.current)
+        setCountdown(0)
+        setQrGenerated(false)
+        setQrImageUrl(null)
+      } else {
+        setCountdown(secs)
+      }
+    }, 1000)
+  }, [])
 
-  // Revoke URL on unmount
+  // Load saved QR for selected event if not expired
+  useEffect(() => {
+    if (!selectedEvent) return
+    const saved = localStorage.getItem(`cc_qr_${selectedEvent}`)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed.expiresAt > Date.now()) {
+          setQrImageUrl(parsed.qrUrl)
+          setQrGenerated(true)
+          startCountdown(parsed.expiresAt)
+          return
+        }
+      } catch (e) {}
+    }
+    setQrGenerated(false)
+    setQrImageUrl(null)
+    setCountdown(0)
+    if (countdownRef.current) {
+      clearInterval(countdownRef.current)
+      countdownRef.current = null
+    }
+  }, [selectedEvent, startCountdown])
+
+  // Clean interval on unmount
   useEffect(() => {
     return () => {
-      if (qrImageUrl) {
+      if (countdownRef.current) clearInterval(countdownRef.current)
+    }
+  }, [])
+
+  // Revoke URL on change/unmount
+  useEffect(() => {
+    return () => {
+      if (qrImageUrl && qrImageUrl.startsWith('blob:')) {
         URL.revokeObjectURL(qrImageUrl)
       }
     }
   }, [qrImageUrl])
-
-  /* start countdown when QR is generated */
-  const startCountdown = useCallback(() => {
-    if (countdownRef.current) clearInterval(countdownRef.current)
-    const expiresAt = Date.now() + (8 * 3600 + 32 * 60 + 14) * 1000
-    setCountdown(Math.floor((expiresAt - Date.now()) / 1000))
-    countdownRef.current = setInterval(() => {
-      const secs = Math.floor((expiresAt - Date.now()) / 1000)
-      if (secs <= 0) { clearInterval(countdownRef.current); setCountdown(0) }
-      else setCountdown(secs)
-    }, 1000)
-  }, [])
-
-  useEffect(() => () => { if (countdownRef.current) clearInterval(countdownRef.current) }, [])
 
   const fmtCountdown = (s) => {
     const h = Math.floor(s / 3600).toString().padStart(2, '0')
@@ -181,15 +211,18 @@ export default function AttendancePage({ tokens }) {
   /* stats */
   const mappedRecords = records.map(r => {
     const reg = registrations.find(regItem => (regItem.id === r.registrationId) || (regItem.registration_id === r.registrationId))
-    const student = reg ? students.find(s => s.id === reg.userId || s.id === reg.user_id) : null
+    const studentUserId = reg?.userId || reg?.user_id || r.scannedBy || r.rollNo
+    const student = studentUserId 
+      ? students.find(s => 
+          s.id === studentUserId || 
+          (s.id && studentUserId && s.id.startsWith(studentUserId)) || 
+          (s.id && studentUserId && studentUserId.startsWith(s.id))
+        )
+      : null
     return {
       ...r,
-      studentName: r.studentName && r.studentName !== 'Student' && r.studentName.length < 20
-        ? r.studentName
-        : (student?.name || reg?.studentName || reg?.student_name || reg?.full_name || r.studentName),
-      rollNo: r.rollNo && r.rollNo !== 'N/A'
-        ? r.rollNo
-        : (student?.rollNo || reg?.rollNo || reg?.roll_no || r.rollNo)
+      studentName: student?.name || reg?.studentName || reg?.student_name || reg?.full_name || r.studentName,
+      rollNo: student?.rollNo || reg?.rollNo || reg?.roll_no || r.rollNo
     }
   })
 
@@ -277,15 +310,46 @@ export default function AttendancePage({ tokens }) {
       showToast('No event selected.', 'error')
       return
     }
+
+    // Check if valid QR already exists to prevent repeated generation
+    const saved = localStorage.getItem(`cc_qr_${selectedEvent}`)
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved)
+        if (parsed.expiresAt > Date.now()) {
+          showToast('QR code is already active for this event.', 'warning')
+          return
+        }
+      } catch (e) {}
+    }
+
     setQrLoading(true)
     const res = await eventsService.getQRCodeBlob(selectedEvent)
     setQrLoading(false)
-    if (res.success && (res.qrUrl || res.blob)) {
-      const url = res.qrUrl || URL.createObjectURL(res.blob)
-      setQrImageUrl(url)
-      setQrGenerated(true)
-      startCountdown()
-      showToast(`QR generated for ${selectedEvtName}`, 'success')
+    if (res.success) {
+      let finalUrl = ''
+      if (res.qrUrl) {
+        finalUrl = res.qrUrl
+      } else if (res.blob) {
+        try {
+          finalUrl = await blobToBase64(res.blob)
+        } catch (err) {
+          finalUrl = URL.createObjectURL(res.blob)
+        }
+      }
+
+      if (finalUrl) {
+        const expiresAt = Date.now() + (8 * 3600 + 32 * 60 + 14) * 1000
+        const dataToSave = { qrUrl: finalUrl, expiresAt }
+        localStorage.setItem(`cc_qr_${selectedEvent}`, JSON.stringify(dataToSave))
+
+        setQrImageUrl(finalUrl)
+        setQrGenerated(true)
+        startCountdown(expiresAt)
+        showToast(`QR generated for ${selectedEvtName}`, 'success')
+      } else {
+        showToast('Failed to generate QR code.', 'error')
+      }
     } else {
       showToast(res.message || 'Failed to generate QR code.', 'error')
     }

@@ -7,8 +7,7 @@ function authHeaders() {
   const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`,
-    'ngrok-skip-browser-warning': 'true'
+    'Authorization': `Bearer ${token}`
   }
 }
 
@@ -103,8 +102,7 @@ async function apiFetchAll() {
     const mapped = orgsArray.map(o => mapOrganizer(o))
     return { success: true, organizers: mapped }
   } catch (err) {
-    console.error('[organizersService] fetchAll error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -128,8 +126,7 @@ async function apiCreate(payload) {
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer) }
   } catch (err) {
-    console.error('[organizersService] create error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -152,8 +149,7 @@ async function apiUpdate(id, payload) {
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer) }
   } catch (err) {
-    console.error('[organizersService] update error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -167,8 +163,7 @@ async function apiDelete(id) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to delete organizer.' }
     return { success: true }
   } catch (err) {
-    console.error('[organizersService] delete error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -195,8 +190,7 @@ async function apiGetProfile() {
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer) }
   } catch (err) {
-    console.error('[organizersService] getProfile error:', err)
-    return { success: false, message: 'Server unreachable.' }
+        return { success: false, message: 'Server unreachable.' }
   }
 }
 

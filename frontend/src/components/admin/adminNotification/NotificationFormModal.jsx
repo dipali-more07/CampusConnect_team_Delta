@@ -55,13 +55,10 @@ export default function NotificationFormModal({
         })))
       }
       setUsersList(list)
-      // Default to the first user ID if there is one
-      if (list.length > 0) {
-        setSendForm(p => ({ ...p, user_id: list[0].id }))
-      }
+      // Default to broadcasting to everyone
+      setSendForm(p => ({ ...p, user_id: 'all' }))
     }).catch(err => {
-      console.error('[NotificationFormModal] Error loading users:', err)
-    }).finally(() => {
+          }).finally(() => {
       setLoadingUsers(false)
     })
   }, [sendOpen])
@@ -158,6 +155,7 @@ export default function NotificationFormModal({
                   className="w-full px-3.5 py-2.5 rounded-[10px] text-[13px] outline-none cursor-pointer transition-all duration-200"
                   style={inputStyle}
                 >
+                  <option value="all">📢 Broadcast to Everyone (All Users)</option>
                   <optgroup label="Students">
                     {usersList.filter(u => u.role === 'Student').map(u => (
                       <option key={u.id} value={u.id}>

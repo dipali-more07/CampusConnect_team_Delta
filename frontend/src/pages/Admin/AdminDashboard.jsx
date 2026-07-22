@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
@@ -19,6 +19,7 @@ import AttendancePage from '../Admin/AttendancePage'
 import ResultsPage from '../Admin/ResultsPage'
 import AnalyticsPage from '../Admin/AnalyticsPage'
 import CertificatesPage from '../Admin/CertificatesPage'
+import PaymentsPage from '../Admin/PaymentsPage'
 import StudentsPage from '../Admin/StudentsPage'
 import OrganizersPage from '../Admin/OrganizersPage'
 import SettingsPage from '../Admin/SettingsPage'
@@ -42,6 +43,8 @@ export default function AdminDashboard() {
         return 'Results'
       case 'attendance':
         return 'Attendance'
+      case 'payments':
+        return 'Payments'
       case 'analytics':
         return 'Analytics'
       case 'certificates':
@@ -90,6 +93,9 @@ export default function AdminDashboard() {
   const [notifLoading, setNotifLoading] = useState(true)
   const [panelOpen, setPanelOpen] = useState(false)
 
+  // Keep a ref to previous snapshot to avoid unnecessary re-renders
+  const prevNotifsRef = useRef(null)
+
   // ── Dashboard stats state
   const [dashboardStats, setDashboardStats] = useState([])
   const [statsLoading, setStatsLoading] = useState(true)
@@ -98,20 +104,38 @@ export default function AdminDashboard() {
   const notifications = rawNotifications.map(enrichNotification)
   const unreadCount = notifications.filter(n => n.unread).length
 
-  // ── Load notifications from service (mock or real API)
-  useEffect(() => {
-    let cancelled = false
-    setNotifLoading(true)
+  const fetchNotifs = useCallback((isInitial = false) => {
     notificationsService.fetchAll().then(res => {
-      if (cancelled) return
-      if (res.success) {
-        setRawNotifications(res.notifications)
+      if (!res.success) {
+        if (isInitial) setNotifLoading(false)
+        return
+      }
+
+      const incoming = res.notifications
+      const prev = prevNotifsRef.current
+
+      // Build a quick fingerprint: sorted IDs joined + unread count
+      const fingerprint = (list) =>
+        list.map(n => `${n.id}:${n.unread ? 1 : 0}`).sort().join(',')
+
+      const hasChanged =
+        prev === null ||
+        prev.length !== incoming.length ||
+        fingerprint(prev) !== fingerprint(incoming)
+
+      if (hasChanged) {
+        prevNotifsRef.current = incoming
+        setRawNotifications(incoming)
         setNotifStats(res.stats)
       }
-      setNotifLoading(false)
+
+      if (isInitial) setNotifLoading(false)
     })
-    return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    fetchNotifs(true)
+  }, [fetchNotifs])
 
   // ── Load dashboard stats from service
   useEffect(() => {
@@ -261,6 +285,9 @@ export default function AdminDashboard() {
             ) : activeNav === 'Certificates' ? (
               /* ─── Certificates Page ─── */
               <CertificatesPage tokens={tokens} />
+            ) : activeNav === 'Payments' ? (
+              /* ─── Payments Page ─── */
+              <PaymentsPage tokens={tokens} />
             ) : activeNav === 'Students' ? (
               /* ─── Students Page ─── */
               <StudentsPage tokens={tokens} />

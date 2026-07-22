@@ -29,8 +29,7 @@ export default function CertBulkGenerateModal({
         }
       })
       .catch(err => {
-        console.error('[CertBulkGenerateModal] Error fetching events:', err)
-      })
+              })
       .finally(() => {
         setLoadingEvents(false)
       })

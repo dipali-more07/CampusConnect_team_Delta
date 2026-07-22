@@ -40,7 +40,7 @@ const formatTime = (ts) => {
 
 export default function BottomRow({ dark }) {
   const [activities, setActivities] = useState([])
-  const [upcomingEvents, setUpcomingEvents] = useState(UPCOMING_EVENTS)
+  const [upcomingEvents, setUpcomingEvents] = useState([])
 
   useEffect(() => {
     const loadActivities = async () => {
@@ -54,19 +54,15 @@ export default function BottomRow({ dark }) {
         }))
         setActivities(mapped)
       } else {
-        // Fallback to static mock list if empty/failed
-        setActivities(RECENT_ACTIVITY.map(act => ({
-          id: act.id,
-          text: act.text,
-          time: act.time,
-          type: act.type || ''
-        })))
+        setActivities([])
       }
     }
     const loadUpcoming = async () => {
       const res = await eventsService.fetchUpcoming(3)
       if (res.success && res.events && res.events.length > 0) {
         setUpcomingEvents(res.events)
+      } else {
+        setUpcomingEvents([])
       }
     }
     loadActivities()
@@ -88,62 +84,68 @@ export default function BottomRow({ dark }) {
         </div>
 
         <div className="flex flex-col gap-3">
-          {upcomingEvents.map(ev => {
-            const pct = ev.capacity > 0 ? Math.round((ev.registered / ev.capacity) * 100) : 0
-            return (
-              <div
-                key={ev.id}
-                className="flex flex-wrap sm:flex-nowrap items-center gap-3.5 px-4 py-3.5 rounded-2xl border cursor-pointer transition-all duration-200"
-                style={{
-                  borderColor: dark ? '#1a3050' : '#e2e8f0',
-                  background: dark ? '#060e1c' : '#f8fafc',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = ev.color; e.currentTarget.style.boxShadow = `0 0 0 3px ${ev.color}25` }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
-              >
-                {/* Date badge */}
+          {upcomingEvents.length > 0 ? (
+            upcomingEvents.map(ev => {
+              const pct = ev.capacity > 0 ? Math.round((ev.registered / ev.capacity) * 100) : 0
+              return (
                 <div
-                  className="min-w-[48px] h-[54px] rounded-xl flex flex-col items-center justify-center text-white shrink-0"
-                  style={{ background: ev.color }}
+                  key={ev.id}
+                  className="flex flex-wrap sm:flex-nowrap items-center gap-3.5 px-4 py-3.5 rounded-2xl border cursor-pointer transition-all duration-200"
+                  style={{
+                    borderColor: dark ? '#1a3050' : '#e2e8f0',
+                    background: dark ? '#060e1c' : '#f8fafc',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = ev.color; e.currentTarget.style.boxShadow = `0 0 0 3px ${ev.color}25` }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
                 >
-                  <span className="text-[9px] font-bold tracking-widest opacity-90 uppercase">{ev.month}</span>
-                  <span className="text-[20px] font-black leading-[1.1]">{ev.day}</span>
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-bold text-slate-900 dark:text-[#e8f0fe] m-0 whitespace-nowrap overflow-hidden text-ellipsis">{ev.title}</p>
-                  <div className="flex gap-3 mt-1">
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
-                      <MapPin size={10} /> {ev.venue}
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
-                      <Clock size={10} /> {ev.time}
-                    </span>
+                  {/* Date badge */}
+                  <div
+                    className="min-w-[48px] h-[54px] rounded-xl flex flex-col items-center justify-center text-white shrink-0"
+                    style={{ background: ev.color }}
+                  >
+                    <span className="text-[9px] font-bold tracking-widest opacity-90 uppercase">{ev.month}</span>
+                    <span className="text-[20px] font-black leading-[1.1]">{ev.day}</span>
                   </div>
-                </div>
 
-                {/* Count + progress */}
-                <div className="w-full sm:w-auto shrink-0 sm:min-w-[160px] flex items-center gap-3 mt-2 sm:mt-0 justify-between sm:justify-start pl-16 sm:pl-0">
-                  <div className="text-right min-w-[70px]">
-                    <p className="text-[13px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0">
-                      {ev.registered.toLocaleString()}
-                      <span className="text-[11px] font-medium text-slate-400 dark:text-[#3d5470]">/{ev.capacity.toLocaleString()}</span>
-                    </p>
-                    <p className="text-[10px] text-slate-400 dark:text-[#3d5470] mt-0.5 font-medium">registered</p>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-bold text-slate-900 dark:text-[#e8f0fe] m-0 whitespace-nowrap overflow-hidden text-ellipsis">{ev.title}</p>
+                    <div className="flex gap-3 mt-1">
+                      <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
+                        <MapPin size={10} /> {ev.venue}
+                      </span>
+                      <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
+                        <Clock size={10} /> {ev.time}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-[70px]">
-                    <div className="h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-[#162640]">
-                      <div
-                        className="h-full rounded-full transition-[width] duration-500 ease-in-out"
-                        style={{ width: `${pct}%`, background: ev.color }}
-                      />
+
+                  {/* Count + progress */}
+                  <div className="w-full sm:w-auto shrink-0 sm:min-w-[160px] flex items-center gap-3 mt-2 sm:mt-0 justify-between sm:justify-start pl-16 sm:pl-0">
+                    <div className="text-right min-w-[70px]">
+                      <p className="text-[13px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0">
+                        {ev.registered.toLocaleString()}
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-[#3d5470]">/{ev.capacity.toLocaleString()}</span>
+                      </p>
+                      <p className="text-[10px] text-slate-400 dark:text-[#3d5470] mt-0.5 font-medium">registered</p>
+                    </div>
+                    <div className="flex-1 min-w-[70px]">
+                      <div className="h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-[#162640]">
+                        <div
+                          className="h-full rounded-full transition-[width] duration-500 ease-in-out"
+                          style={{ width: `${pct}%`, background: ev.color }}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })
+          ) : (
+            <div className="text-center py-10 text-[13px] font-medium text-slate-400 dark:text-[#7a98bb]">
+              No upcoming events found
+            </div>
+          )}
         </div>
       </div>
 
@@ -155,33 +157,39 @@ export default function BottomRow({ dark }) {
         <h2 className="text-[15px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0 mb-4">Recent Activity</h2>
 
         <div className="flex flex-col">
-          {activities.map((act, idx) => {
-            const { icon: Icon, color: iconColor } = resolveActivityIcon(act.type, act.text)
-            const isLast = idx === activities.length - 1
-            return (
-              <div key={act.id || idx} className="flex gap-3">
-                <div className="flex flex-col items-center shrink-0">
-                  <div
-                    className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0"
-                    style={{
-                      background: `${iconColor}20`,
-                      border: `1.5px solid ${iconColor}50`,
-                    }}
-                  >
-                    <Icon size={14} style={{ color: iconColor }} />
+          {activities.length > 0 ? (
+            activities.map((act, idx) => {
+              const { icon: Icon, color: iconColor } = resolveActivityIcon(act.type, act.text)
+              const isLast = idx === activities.length - 1
+              return (
+                <div key={act.id || idx} className="flex gap-3">
+                  <div className="flex flex-col items-center shrink-0">
+                    <div
+                      className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0"
+                      style={{
+                        background: `${iconColor}20`,
+                        border: `1.5px solid ${iconColor}50`,
+                      }}
+                    >
+                      <Icon size={14} style={{ color: iconColor }} />
+                    </div>
+                    {!isLast && (
+                      <div className="w-0.5 flex-1 min-h-[10px] my-1 rounded-full bg-slate-200 dark:bg-[#162640]" />
+                    )}
                   </div>
-                  {!isLast && (
-                    <div className="w-0.5 flex-1 min-h-[10px] my-1 rounded-full bg-slate-200 dark:bg-[#162640]" />
-                  )}
-                </div>
 
-                <div className={`flex-1 min-w-0 pt-1 ${isLast ? '' : 'pb-4'}`}>
-                  <p className="text-[12px] text-slate-800 dark:text-[#c8daf0] font-medium m-0 leading-relaxed">{act.text}</p>
-                  <p className="text-[10.5px] text-slate-400 dark:text-[#3d5470] mt-1 font-medium">{act.time}</p>
+                  <div className={`flex-1 min-w-0 pt-1 ${isLast ? '' : 'pb-4'}`}>
+                    <p className="text-[12px] text-slate-800 dark:text-[#c8daf0] font-medium m-0 leading-relaxed">{act.text}</p>
+                    <p className="text-[10.5px] text-slate-400 dark:text-[#3d5470] mt-1 font-medium">{act.time}</p>
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })
+          ) : (
+            <div className="text-center py-10 text-[13px] font-medium text-slate-400 dark:text-[#7a98bb]">
+              No recent activities found
+            </div>
+          )}
         </div>
       </div>
 

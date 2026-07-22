@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
@@ -19,6 +19,7 @@ import AttendancePage from './AttendancePage'
 import ResultsPage from './ResultsPage'
 import AnalyticsPage from './AnalyticsPage'
 import CertificatesPage from './CertificatesPage'
+import PaymentsPage from '../Admin/PaymentsPage'
 import StudentsPage from './StudentsPage'
 import SettingsPage from './SettingsPage'
 import NotificationPanel from '../../components/admin/adminDashboard/NotificationPanel'
@@ -41,6 +42,8 @@ export default function OrganizerDashboard() {
         return 'Results'
       case 'attendance':
         return 'Attendance'
+      case 'payments':
+        return 'Payments'
       case 'analytics':
         return 'Analytics'
       case 'certificates':
@@ -87,6 +90,9 @@ export default function OrganizerDashboard() {
   const [notifLoading, setNotifLoading] = useState(true)
   const [panelOpen, setPanelOpen] = useState(false)
 
+  // Keep a ref to previous snapshot to avoid unnecessary re-renders
+  const prevNotifsRef = useRef(null)
+
   // ── Dashboard stats state
   const [dashboardStats, setDashboardStats] = useState([])
   const [statsLoading, setStatsLoading] = useState(true)
@@ -95,20 +101,38 @@ export default function OrganizerDashboard() {
   const notifications = rawNotifications.map(enrichNotification)
   const unreadCount = notifications.filter(n => n.unread).length
 
-  // ── Load notifications from service (mock or real API)
-  useEffect(() => {
-    let cancelled = false
-    setNotifLoading(true)
+  const fetchNotifs = useCallback((isInitial = false) => {
     notificationsService.fetchAll().then(res => {
-      if (cancelled) return
-      if (res.success) {
-        setRawNotifications(res.notifications)
+      if (!res.success) {
+        if (isInitial) setNotifLoading(false)
+        return
+      }
+
+      const incoming = res.notifications
+      const prev = prevNotifsRef.current
+
+      // Build a quick fingerprint: sorted IDs joined + unread count
+      const fingerprint = (list) =>
+        list.map(n => `${n.id}:${n.unread ? 1 : 0}`).sort().join(',')
+
+      const hasChanged =
+        prev === null ||
+        prev.length !== incoming.length ||
+        fingerprint(prev) !== fingerprint(incoming)
+
+      if (hasChanged) {
+        prevNotifsRef.current = incoming
+        setRawNotifications(incoming)
         setNotifStats(res.stats)
       }
-      setNotifLoading(false)
+
+      if (isInitial) setNotifLoading(false)
     })
-    return () => { cancelled = true }
   }, [])
+
+  useEffect(() => {
+    fetchNotifs(true)
+  }, [fetchNotifs])
 
   // ── Load dashboard stats from service
   useEffect(() => {
@@ -258,6 +282,9 @@ export default function OrganizerDashboard() {
             ) : activeNav === 'Certificates' ? (
               /* ─── Certificates Page ─── */
               <CertificatesPage tokens={tokens} />
+            ) : activeNav === 'Payments' ? (
+              /* ─── Payments Page ─── */
+              <PaymentsPage tokens={tokens} />
             ) : activeNav === 'Students' ? (
               /* ─── Students Page ─── */
               <StudentsPage tokens={tokens} />

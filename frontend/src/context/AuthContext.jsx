@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { saveTokens, clearTokens } from '../utils/apiClient'
+import { saveTokens, clearTokens, getRefreshToken } from '../utils/apiClient'
+import authService from '../services/authService'
 
 const AuthContext = createContext(null)
 
@@ -41,7 +42,6 @@ export function AuthProvider({ children }) {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'ngrok-skip-browser-warning': 'true',
         }
       })
       .then(res => {
@@ -54,10 +54,14 @@ export function AuthProvider({ children }) {
         if (role === 'participant') {
           role = 'student'
         }
+        const avatarImg = profile.profile_image || profile.avatar_url || profile.avatarUrl || null
         const updatedUser = {
           ...profile,
           name: profile.full_name || profile.name || profile.fullName || profile.username || profile.email?.split('@')[0] || 'User',
           role,
+          avatarUrl: avatarImg,
+          profile_image: avatarImg,
+          avatar: avatarImg || profile.avatar || (profile.full_name ? profile.full_name.substring(0, 2).toUpperCase() : 'CC')
         }
         setSession(prev => {
           if (!prev) return null
@@ -67,8 +71,7 @@ export function AuthProvider({ children }) {
         })
       })
       .catch(err => {
-        console.warn('[AuthContext] Failed to sync profile with /auth/me:', err)
-      })
+              })
     }
   }, [session?.token])
 
@@ -80,7 +83,15 @@ export function AuthProvider({ children }) {
     setSession(s)
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    const refreshToken = getRefreshToken()
+    if (refreshToken) {
+      try {
+        await authService.logout(refreshToken)
+      } catch (err) {
+        // fail gracefully to ensure user is logged out locally
+      }
+    }
     clearTokens()
     sessionStorage.removeItem(SESSION_KEY)
     setSession(null)

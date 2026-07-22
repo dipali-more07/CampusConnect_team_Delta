@@ -149,8 +149,12 @@ export default function DashboardTopBar({
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center gap-1.5 pl-1.5 pr-1.5 sm:pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#1a3050] bg-transparent cursor-pointer hover:bg-slate-50 dark:hover:bg-[#162640] transition-all duration-150"
           >
-            <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0">
-              {user?.avatar || 'DP'}
+            <div className="w-7 h-7 rounded-full bg-violet-500 flex items-center justify-center text-white text-[11px] font-bold shrink-0 overflow-hidden">
+              {(user?.avatarUrl || user?.profile_image || (typeof user?.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http')))) ? (
+                <img src={user?.avatarUrl || user?.profile_image || user?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                user?.avatar || (user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'DP')
+              )}
             </div>
             <span className="hidden sm:inline text-[13px] font-semibold text-slate-800 dark:text-[#e8f0fe] max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap">
               {user?.name || 'Dr. Priya Sharma'}
