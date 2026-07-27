@@ -77,7 +77,8 @@ export default function OrganizersPage({ tokens }) {
       email: '',
       phone: '',
       collegeId: '',
-      password: ''
+      password: '',
+      gender: ''
     })
     setErrors({})
     setModalOpen(true)
@@ -86,12 +87,13 @@ export default function OrganizersPage({ tokens }) {
   const openEdit = (o) => {
     setEditing(o)
     setForm({
-      name: o.name,
-      department: o.department,
-      email: o.email,
-      phone: o.phone || '',
-      collegeId: o.collegeId || '',
-      password: ''
+      name: o.name || o.full_name || '',
+      department: o.department || '',
+      email: o.email || '',
+      phone: o.phone || o.mobile || o.phone_number || o.mobile_number || '',
+      collegeId: o.collegeId || o.college_id || o.college_code || o.collegeCode || '',
+      password: '',
+      gender: (o.gender || 'male').toLowerCase()
     })
     setErrors({})
     setModalOpen(true)

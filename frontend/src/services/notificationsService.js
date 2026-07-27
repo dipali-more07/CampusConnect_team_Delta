@@ -159,7 +159,7 @@ function mapNotification(n) {
  */
 async function apiFetchNotifications() {
   try {
-    const res = await fetch(`${API_BASE}/notifications/`, {
+    const res = await fetch(`${API_BASE}/notifications`, {
       method: 'GET',
       headers: authHeaders(),
     })
@@ -216,7 +216,7 @@ async function apiMarkRead(ids) {
  */
 async function apiDelete(id) {
   try {
-    const res = await fetch(`${API_BASE}/notifications/${id}/`, {
+    const res = await fetch(`${API_BASE}/notifications/${id}`, {
       method: 'DELETE',
       headers: authHeaders(),
     })

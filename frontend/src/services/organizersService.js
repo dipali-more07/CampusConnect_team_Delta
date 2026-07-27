@@ -1,3 +1,5 @@
+import { fetchWithAuth } from '../utils/apiClient'
+
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 
@@ -78,14 +80,20 @@ async function mockDelete(id) {
 
 function mapOrganizer(o) {
   if (!o) return null
+  const prof = o.profile || {}
+  const u = o.user || {}
   return {
-    id: o.user_id || o.id,
-    name: o.full_name || o.name || '',
-    email: o.email || '',
-    phone: o.phone || '',
-    department: o.department || '',
-    collegeId: o.college_id || o.collegeId || '',
-    office: o.office || o.office_location || '',
+    ...o,
+    id: o.user_id || o.id || prof.id || u.id,
+    name: o.full_name || o.name || prof.full_name || prof.name || u.full_name || u.name || '',
+    email: o.email || prof.email || u.email || '',
+    phone: o.phone || o.mobile || o.phone_number || o.mobile_number || prof.phone || prof.mobile || u.phone || u.mobile || '',
+    gender: (o.gender || prof.gender || u.gender || '').toLowerCase(),
+    department: o.department || prof.department || u.department || '',
+    collegeId: o.college_id || o.collegeId || o.college_code || o.collegeCode || prof.college_id || prof.collegeId || '',
+    bio: o.bio || prof.bio || u.bio || '',
+    avatarUrl: o.profile_image || o.avatar_url || o.avatarUrl || prof.profile_image || prof.avatar_url || null,
+    office: o.office || o.office_location || prof.office || '',
     role: o.role || 'Organizer',
     eventsManaged: o.events_managed || o.eventsManaged || 0,
     avatarColor: o.avatarColor || '#615FFF'
@@ -95,7 +103,7 @@ function mapOrganizer(o) {
 /* ── REAL API HANDLERS ─────────────────────────────────────────── */
 async function apiFetchAll() {
   try {
-    const res = await fetch(`${API_BASE}/users/organizers`, { headers: authHeaders() })
+    const res = await fetchWithAuth(`${API_BASE}/users/organizers`, { method: 'GET' })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch organizers.' }
     const orgsArray = Array.isArray(data.data) ? data.data : Array.isArray(data.organizers) ? data.organizers : []
@@ -113,12 +121,12 @@ async function apiCreate(payload) {
       password: payload.password,
       full_name: payload.name,
       phone: payload.phone,
+      gender: (payload.gender || '').toLowerCase(),
       department: payload.department,
       college_id: payload.collegeId
     }
-    const res = await fetch(`${API_BASE}/users/organizer`, {
+    const res = await fetchWithAuth(`${API_BASE}/users/organizer`, {
       method: 'POST',
-      headers: authHeaders(),
       body: JSON.stringify(backendPayload),
     })
     const data = await parseJSON(res)
@@ -136,12 +144,12 @@ async function apiUpdate(id, payload) {
       email: payload.email,
       full_name: payload.name,
       phone: payload.phone,
+      gender: (payload.gender || '').toLowerCase(),
       department: payload.department,
       college_id: payload.collegeId
     }
-    const res = await fetch(`${API_BASE}/organizers/${id}`, {
+    const res = await fetchWithAuth(`${API_BASE}/organizers/${id}`, {
       method: 'PUT',
-      headers: authHeaders(),
       body: JSON.stringify(backendPayload),
     })
     const data = await parseJSON(res)
@@ -155,9 +163,8 @@ async function apiUpdate(id, payload) {
 
 async function apiDelete(id) {
   try {
-    const res = await fetch(`${API_BASE}/organizers/${id}`, {
+    const res = await fetchWithAuth(`${API_BASE}/organizers/${id}`, {
       method: 'DELETE',
-      headers: authHeaders(),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to delete organizer.' }
@@ -169,8 +176,8 @@ async function apiDelete(id) {
 
 async function mockGetProfile() {
   await new Promise(r => setTimeout(r, 200))
-  const sessionRaw = sessionStorage.getItem('cc_session')
   let email = 'priya.s@university.edu'
+  const sessionRaw = sessionStorage.getItem('cc_session')
   if (sessionRaw) {
     try {
       const s = JSON.parse(sessionRaw)
@@ -184,13 +191,63 @@ async function mockGetProfile() {
 
 async function apiGetProfile() {
   try {
-    const res = await fetch(`${API_BASE}/organizers/me`, { headers: authHeaders() })
+    let res = await fetchWithAuth(`${API_BASE}/organizers/me`)
+    if (!res.ok) {
+      res = await fetchWithAuth(`${API_BASE}/auth/me`)
+    }
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch organizer profile.' }
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer) }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+async function mockUpdateProfile(payload) {
+  await new Promise(r => setTimeout(r, 300))
+  const organizers = getMock()
+  if (organizers.length > 0) {
+    organizers[0] = { ...organizers[0], ...payload }
+    saveMock(organizers)
+  }
+  return { success: true, message: 'Profile updated successfully.' }
+}
+
+async function apiUpdateProfile(payload) {
+  try {
+    const backendPayload = {
+      full_name: payload.name,
+      email: payload.email,
+      phone: payload.phone,
+      mobile: payload.phone,
+      gender: payload.gender ? payload.gender.toLowerCase() : null,
+      department: payload.department,
+      bio: payload.bio || '',
+      profile_picture: payload.avatarUrl || payload.profile_image || null
+    }
+    let res = await fetchWithAuth(`${API_BASE}/organizers/me`, {
+      method: 'PUT',
+      body: JSON.stringify(backendPayload)
+    })
+    if (!res.ok) {
+      res = await fetchWithAuth(`${API_BASE}/auth/me`, {
+        method: 'PUT',
+        body: JSON.stringify(backendPayload)
+      })
+    }
+    if (!res.ok) {
+      res = await fetchWithAuth(`${API_BASE}/auth/me`, {
+        method: 'PATCH',
+        body: JSON.stringify(backendPayload)
+      })
+    }
+    const data = await parseJSON(res)
+    if (!res.ok) return { success: false, message: data.message || 'Failed to update profile.' }
+    const rawOrganizer = data.data || data.organizer || data
+    return { success: true, organizer: mapOrganizer(rawOrganizer), message: 'Profile updated successfully.' }
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -210,6 +267,9 @@ const organizersService = {
 
   getProfile: () =>
     USE_MOCK ? mockGetProfile() : apiGetProfile(),
+
+  updateProfile: (data) =>
+    USE_MOCK ? mockUpdateProfile(data) : apiUpdateProfile(data),
 }
 
 export default organizersService

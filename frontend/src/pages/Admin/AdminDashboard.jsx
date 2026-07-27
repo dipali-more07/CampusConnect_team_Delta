@@ -101,34 +101,36 @@ export default function AdminDashboard() {
   const [statsLoading, setStatsLoading] = useState(true)
 
   // Enriched = raw data + icon/color added by frontend (type mapping)
-  const notifications = rawNotifications.map(enrichNotification)
+  const notifications = (Array.isArray(rawNotifications) ? rawNotifications : []).map(enrichNotification)
   const unreadCount = notifications.filter(n => n.unread).length
 
   const fetchNotifs = useCallback((isInitial = false) => {
     notificationsService.fetchAll().then(res => {
-      if (!res.success) {
+      if (!res?.success || !Array.isArray(res?.notifications)) {
         if (isInitial) setNotifLoading(false)
         return
       }
 
-      const incoming = res.notifications
-      const prev = prevNotifsRef.current
+      const incoming = res.notifications || []
+      const prev = prevNotifsRef.current || []
 
       // Build a quick fingerprint: sorted IDs joined + unread count
       const fingerprint = (list) =>
-        list.map(n => `${n.id}:${n.unread ? 1 : 0}`).sort().join(',')
+        (Array.isArray(list) ? list : []).map(n => `${n.id}:${n.unread ? 1 : 0}`).sort().join(',')
 
       const hasChanged =
-        prev === null ||
+        prevNotifsRef.current === null ||
         prev.length !== incoming.length ||
         fingerprint(prev) !== fingerprint(incoming)
 
       if (hasChanged) {
         prevNotifsRef.current = incoming
         setRawNotifications(incoming)
-        setNotifStats(res.stats)
+        setNotifStats(res.stats || {})
       }
 
+      if (isInitial) setNotifLoading(false)
+    }).catch(() => {
       if (isInitial) setNotifLoading(false)
     })
   }, [])
@@ -143,10 +145,12 @@ export default function AdminDashboard() {
     setStatsLoading(true)
     dashboardService.fetchStats().then(res => {
       if (cancelled) return
-      if (res.success) {
+      if (res?.success && Array.isArray(res?.stats)) {
         setDashboardStats(enrichStats(res.stats))
       }
       setStatsLoading(false)
+    }).catch(() => {
+      if (!cancelled) setStatsLoading(false)
     })
     return () => { cancelled = true }
   }, [])

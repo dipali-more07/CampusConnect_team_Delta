@@ -1,6 +1,7 @@
 import { 
-  Calendar, Check, X, Eye, Pencil, Trash2, ChevronLeft, ChevronRight 
+  Calendar, Check, X, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, CheckCircle2, UserCheck, User, Sparkles 
 } from 'lucide-react'
+import { useAuth } from '../../../context/AuthContext'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 
 export default function EventsTable({
@@ -24,6 +25,7 @@ export default function EventsTable({
   onOpenApprovalConfirm
 }) {
   const BRAND = tokens?.brand || DEFAULT_BRAND
+  const { user } = useAuth() || {}
 
   const cardStyle = {
     background: tokens.card,
@@ -86,10 +88,46 @@ export default function EventsTable({
             ) : (
               paginatedEvents.map((event, i) => {
                 const isApproved = (event.approvalStatus || 'Approved') === 'Approved'
-                const effectiveRegCount = isApproved ? (event.registrationsCount || 0) : 0
+                const effectiveRegCount = isApproved ? (event.total_registrations || event.registration_count || event.registrationsCount || 0) : 0
                 const regPercent = isApproved && event.capacity ? Math.min(Math.round((effectiveRegCount / event.capacity) * 100), 100) : 0
                 const badge = getStatusBadgeStyles(event.status)
-                
+
+                // Check if event is finished/completed (by status or past date)
+                const isCompleted = (() => {
+                  const st = String(event.status || '').toLowerCase()
+                  if (st === 'completed' || st === 'finished') return true
+                  const rawDate = event.start_datetime || event.startDateTime || event.date || event.event_date
+                  if (rawDate) {
+                    try {
+                      const d = new Date(rawDate)
+                      if (!isNaN(d.getTime())) {
+                        if (!String(rawDate).includes('T') && !String(rawDate).includes(':')) {
+                          d.setHours(23, 59, 59, 999)
+                        }
+                        return d < new Date()
+                      }
+                    } catch (_) {}
+                  }
+                  return false
+                })()
+
+                const isMyEvent = (() => {
+                  if (!user) return false
+                  const currentUserId = String(user.id || user.user_id || user.student_id || '').toLowerCase()
+                  const currentUserEmail = String(user.email || '').toLowerCase()
+                  const currentUserName = String(user.name || user.full_name || user.username || '').toLowerCase()
+                  const currentUserRole = String(user.role || user.userType || '').toLowerCase()
+
+                  const evOrganizerId = String(event.organizer_id || event.organizerId || event.created_by || event.user_id || '').toLowerCase()
+                  const evOrganizer = String(event.organizer || event.organizer_name || event.organized_by || '').toLowerCase()
+
+                  if (currentUserId && evOrganizerId && currentUserId === evOrganizerId) return true
+                  if (currentUserName && evOrganizer && (evOrganizer.includes(currentUserName) || currentUserName.includes(evOrganizer))) return true
+                  if (currentUserEmail && evOrganizer && evOrganizer.includes(currentUserEmail)) return true
+                  if (currentUserRole.includes('organizer') && (evOrganizer === 'organizer' || evOrganizer === 'oragnizer')) return true
+                  return false
+                })()
+
                 return (
                   <tr 
                     key={event.id}
@@ -103,8 +141,33 @@ export default function EventsTable({
 
                     {/* Name + Organizer */}
                     <td className="px-5 py-4">
-                      <div className="text-[13.5px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{event.name}</div>
-                      <div className="text-[11px] mt-0.5 font-medium" style={{ color: dark ? '#7a98bb' : '#64748b' }}>{event.organizer}</div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-[13.5px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{event.name}</div>
+                        {isMyEvent && (
+                          <span 
+                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border shadow-xs transition-all duration-200"
+                            style={{
+                              background: dark 
+                                ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(59, 130, 246, 0.18))' 
+                                : 'linear-gradient(135deg, #eef2ff, #eff6ff)',
+                              color: dark ? '#a5b4fc' : '#4338ca',
+                              borderColor: dark ? 'rgba(165, 180, 252, 0.35)' : '#c7d2fe',
+                            }}
+                            title="Created & managed by you"
+                          >
+                            <Sparkles size={10} className="text-indigo-500 dark:text-indigo-400" />
+                            <span>My Event</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] mt-0.5 font-medium flex items-center gap-1" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                        <span>{event.organizer}</span>
+                        {isMyEvent && (
+                          <span className="font-extrabold text-indigo-500 dark:text-indigo-400 text-[10.5px]">
+                            (You)
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Category & Type */}
@@ -156,12 +219,26 @@ export default function EventsTable({
 
                     {/* Status */}
                     <td className="px-5 py-4">
-                      <span 
-                        className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
-                        style={{ background: badge.bg, color: badge.text }}
-                      >
-                        {event.status}
-                      </span>
+                      {isCompleted ? (
+                        <span 
+                          className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border"
+                          style={{
+                            background: dark ? 'rgba(168, 85, 247, 0.15)' : '#f3e8ff',
+                            color: dark ? '#c084fc' : '#7e22ce',
+                            borderColor: dark ? 'rgba(168, 85, 247, 0.3)' : '#e9d5ff'
+                          }}
+                        >
+                          <CheckCircle2 size={11} />
+                          Completed
+                        </span>
+                      ) : (
+                        <span 
+                          className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
+                          style={{ background: badge.bg, color: badge.text }}
+                        >
+                          {event.status}
+                        </span>
+                      )}
                     </td>
 
                     {/* Admin Approval Switch / Badge */}
@@ -212,16 +289,28 @@ export default function EventsTable({
                           <Eye size={12.5} />
                         </button>
                         
-                        <button
-                          onClick={(e) => onOpenEdit(event, e)}
-                          title="Edit event"
-                          className="w-[28px] h-[28px] rounded-lg bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
-                          style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#7a98bb' : '#94a3b8' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#7a98bb' : '#94a3b8' }}
-                        >
-                          <Pencil size={12.5} />
-                        </button>
+                        {isCompleted ? (
+                          <button
+                            disabled
+                            onClick={(e) => e.stopPropagation()}
+                            title="Completed events cannot be edited"
+                            className="w-[28px] h-[28px] rounded-lg bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed flex items-center justify-center opacity-40 transition-all duration-150"
+                            style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#475569' : '#94a3b8' }}
+                          >
+                            <Pencil size={12.5} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => onOpenEdit(event, e)}
+                            title="Edit event"
+                            className="w-[28px] h-[28px] rounded-lg bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
+                            style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#7a98bb' : '#94a3b8' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#7a98bb' : '#94a3b8' }}
+                          >
+                            <Pencil size={12.5} />
+                          </button>
+                        )}
 
                         <button
                           onClick={(e) => onOpenDelete(event, e)}

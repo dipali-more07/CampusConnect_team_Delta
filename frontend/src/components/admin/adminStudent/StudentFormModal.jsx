@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Eye, EyeOff, User, Mail, Phone, Building, BookOpen, GraduationCap, Lock } from 'lucide-react'
 
 export default function StudentFormModal({
   modalOpen,
@@ -14,18 +15,31 @@ export default function StudentFormModal({
   dark,
   BRAND,
   inpStyle,
-  DEPTS,
-  YEARS
+  DEPTS = ['CSE', 'ECE', 'ME', 'MBA', 'EEE', 'Civil'],
+  YEARS = ['1st', '2nd', '3rd', '4th', '5th', '6th']
 }) {
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
   if (!modalOpen) return null
+
+  // Ensure year options include 1st to 6th
+  const yearOptions = (YEARS || []).filter(y => y !== 'All')
+  const defaultYears = ['1st', '2nd', '3rd', '4th', '5th', '6th']
+  defaultYears.forEach(y => {
+    if (!yearOptions.includes(y)) yearOptions.push(y)
+  })
+
+  const deptOptions = (DEPTS || []).filter(d => d !== 'All')
+  const genderOptions = ['Select Gender', 'Male', 'Female', 'Other']
 
   return createPortal(
     <div
-      className="fixed inset-0 z-9999 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5"
+      className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6"
       onClick={e => { if (e.target === e.currentTarget) setModalOpen(false) }}
     >
       <div
-        className="rounded-[24px] w-full max-w-[520px] overflow-hidden"
+        className="rounded-[24px] w-full max-w-[580px] overflow-hidden flex flex-col max-h-[90vh]"
         style={{
           background: dark ? '#0c1829' : '#fff',
           border: `1px solid ${tokens.border}`,
@@ -33,75 +47,249 @@ export default function StudentFormModal({
           animation: 'slideUp 0.25s ease'
         }}
       >
-        <div className="flex items-center justify-between px-7 py-5" style={{ borderBottom: `1px solid ${tokens.border}` }}>
-          <h2 className="text-[18px] font-extrabold m-0" style={{ color: tokens.txtPri }}>
-            {editing ? `Edit — ${editing.rollNo}` : 'Add New Student'}
-          </h2>
+        {/* Header */}
+        <div className="flex items-center justify-between px-7 py-4 border-b shrink-0" style={{ borderColor: tokens.border }}>
+          <div>
+            <h2 className="text-[18px] font-extrabold m-0" style={{ color: tokens.txtPri }}>
+              {editing ? `Edit Student — ${editing.rollNo || ''}` : 'Add New Student'}
+            </h2>
+            <p className="text-[12px] font-semibold text-slate-400 m-0 mt-0.5">
+              {editing ? 'Update student account details' : 'Enter student details to create a new account'}
+            </p>
+          </div>
           <button
             onClick={() => setModalOpen(false)}
-            className="w-8 h-8 rounded-full border-none bg-transparent cursor-pointer flex items-center justify-center"
-            style={{ color: tokens.txtSec }}
-            onMouseEnter={e => e.currentTarget.style.background = tokens.hoverBg}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            className="w-8 h-8 rounded-full border-none bg-transparent cursor-pointer flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-white"
           >
             <X size={18} />
           </button>
         </div>
-        <div className="px-7 py-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {[
-            { key: 'name', label: 'Full Name', placeholder: 'e.g. Arjun Patel', col: 2 },
-            { key: 'rollNo', label: 'Roll Number', placeholder: 'e.g. 21CS001' },
-            { key: 'email', label: 'Email', placeholder: 'e.g. arjun@college.edu' },
-            { key: 'phone', label: 'Phone', placeholder: '+91 98765 43210' },
-            ...(!editing ? [{ key: 'password', label: 'Password', placeholder: 'Enter password', type: 'password', col: 2 }] : [])
-          ].map(({ key, label, placeholder, col, type }) => (
-            <div key={key} style={{ gridColumn: col === 2 ? '1 / -1' : undefined }}>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>{label}</label>
+
+        {/* Scrollable Form Body */}
+        <div className="px-7 py-5 overflow-y-auto space-y-4">
+          
+          {/* Full Name */}
+          <div>
+            <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Full Name *</label>
+            <div className="relative">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                <User size={15} />
+              </span>
               <input
-                type={type || 'text'}
-                value={form[key]}
-                onChange={e => {
-                  let val = e.target.value
-                  if (key === 'phone') {
-                    val = val.replace(/\D/g, '').slice(0, 10)
-                  }
-                  setForm(p => ({ ...p, [key]: val }))
-                }}
-                placeholder={placeholder}
-                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
-                style={{ ...inpStyle, borderColor: errors[key] ? '#ef4444' : tokens.border }}
-                onFocus={e => {
-                  e.target.style.borderColor = BRAND
-                  e.target.style.boxShadow = `0 0 0 3px ${BRAND}20`
-                }}
-                onBlur={e => {
-                  e.target.style.borderColor = errors[key] ? '#ef4444' : tokens.border
-                  e.target.style.boxShadow = 'none'
-                }}
+                type="text"
+                value={form.name || ''}
+                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. John Doe"
+                className="w-full pl-10 pr-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                style={{ ...inpStyle, borderColor: errors.name ? '#ef4444' : tokens.border }}
               />
-              {errors[key] && <span className="text-[11px] text-red-500 mt-1 block">{errors[key]}</span>}
             </div>
-          ))}
-          {[
-            ['department', 'Department', DEPTS.filter(d => d !== 'All')],
-            ['year', 'Year', YEARS.filter(y => y !== 'All')]
-          ].map(([key, label, opts]) => (
-            <div key={key}>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>{label}</label>
+            {errors.name && <span className="text-[11px] text-red-500 mt-1 block">{errors.name}</span>}
+          </div>
+
+          {/* Email Address & Phone */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Email Address *</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Mail size={15} />
+                </span>
+                <input
+                  type="email"
+                  value={form.email || ''}
+                  onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
+                  placeholder="yourname@gmail.com"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                  style={{ ...inpStyle, borderColor: errors.email ? '#ef4444' : tokens.border }}
+                />
+              </div>
+              {errors.email && <span className="text-[11px] text-red-500 mt-1 block">{errors.email}</span>}
+            </div>
+
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Mobile Number</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Phone size={15} />
+                </span>
+                <input
+                  type="text"
+                  value={form.phone || ''}
+                  onChange={e => {
+                    const val = e.target.value.replace(/\D/g, '').slice(0, 10)
+                    setForm(p => ({ ...p, phone: val }))
+                  }}
+                  placeholder="9876543210"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                  style={{ ...inpStyle, borderColor: tokens.border }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* College Name & Course Name */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>College Name</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <Building size={15} />
+                </span>
+                <input
+                  type="text"
+                  value={form.collegeName || ''}
+                  onChange={e => setForm(p => ({ ...p, collegeName: e.target.value }))}
+                  placeholder="e.g. IIT Bombay"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                  style={{ ...inpStyle, borderColor: tokens.border }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Course Name</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <BookOpen size={15} />
+                </span>
+                <input
+                  type="text"
+                  value={form.courseName || ''}
+                  onChange={e => setForm(p => ({ ...p, courseName: e.target.value }))}
+                  placeholder="e.g. B.Tech"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                  style={{ ...inpStyle, borderColor: tokens.border }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Department & Year of Study */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Department</label>
               <select
-                value={form[key]}
-                onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))}
-                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all appearance-none cursor-pointer"
+                value={form.department || deptOptions[0]}
+                onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
                 style={inpStyle}
               >
-                {opts.map(o => (
-                  <option key={o} value={o}>{o}</option>
+                {deptOptions.map(d => (
+                  <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
-          ))}
+
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Year of Study</label>
+              <select
+                value={form.year || '1st'}
+                onChange={e => setForm(p => ({ ...p, year: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer font-semibold"
+                style={inpStyle}
+              >
+                {yearOptions.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Gender & Roll Number */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Gender</label>
+              <select
+                value={form.gender || 'Select Gender'}
+                onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}
+                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
+                style={inpStyle}
+              >
+                {genderOptions.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Roll Number / ID *</label>
+              <div className="relative">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                  <GraduationCap size={15} />
+                </span>
+                <input
+                  type="text"
+                  value={form.rollNo || ''}
+                  onChange={e => setForm(p => ({ ...p, rollNo: e.target.value }))}
+                  placeholder="e.g. 21CS001"
+                  className="w-full pl-10 pr-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                  style={{ ...inpStyle, borderColor: errors.rollNo ? '#ef4444' : tokens.border }}
+                />
+              </div>
+              {errors.rollNo && <span className="text-[11px] text-red-500 mt-1 block">{errors.rollNo}</span>}
+            </div>
+          </div>
+
+          {/* Password & Confirm Password (with Eye Toggle) */}
+          {!editing && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Password *</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Lock size={15} />
+                  </span>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password || ''}
+                    onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                    placeholder="Enter password"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                    style={{ ...inpStyle, borderColor: errors.password ? '#ef4444' : tokens.border }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(prev => !prev)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {errors.password && <span className="text-[11px] text-red-500 mt-1 block">{errors.password}</span>}
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Confirm Password *</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                    <Lock size={15} />
+                  </span>
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={form.confirmPassword || ''}
+                    onChange={e => setForm(p => ({ ...p, confirmPassword: e.target.value }))}
+                    placeholder="Confirm password"
+                    className="w-full pl-10 pr-10 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
+                    style={{ ...inpStyle, borderColor: errors.confirmPassword ? '#ef4444' : tokens.border }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(prev => !prev)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                  >
+                    {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {errors.confirmPassword && <span className="text-[11px] text-red-500 mt-1 block">{errors.confirmPassword}</span>}
+              </div>
+            </div>
+          )}
+
         </div>
-        <div className="px-7 pb-6 flex gap-3">
+
+        {/* Footer */}
+        <div className="px-7 py-4 border-t flex gap-3 shrink-0" style={{ borderColor: tokens.border }}>
           <button
             onClick={() => setModalOpen(false)}
             className="flex-1 py-3 rounded-xl text-[13px] font-bold border cursor-pointer transition-all"

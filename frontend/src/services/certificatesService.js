@@ -1,6 +1,7 @@
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 
+import { downloadCertificatePDF } from '../utils/pdfGenerator'
 import defaultCertificates from '../data/certificates.json'
 
 function authHeaders() {
@@ -119,8 +120,9 @@ async function mockVerify(verifyCode) {
 }
 
 async function mockDownload(certificateNumber) {
-  await new Promise(r => setTimeout(r, 500))
-  return { success: true, message: 'Mock download started', url: '#' }
+  await new Promise(r => setTimeout(r, 400))
+  const blobUrl = downloadCertificatePDF({ certCode: certificateNumber })
+  return { success: true, message: 'PDF download started', url: blobUrl }
 }
 
 /* ── REAL API FUNCTIONS ────────────────────────────────────────── */
@@ -270,6 +272,47 @@ async function apiSaveTemplate(templateData) {
   }
 }
 
+/* ── PERFORMANCE API ───────────────────────────────────────────── */
+
+async function mockFetchMyPerformance() {
+  await new Promise(r => setTimeout(r, 300))
+  return {
+    success: true,
+    data: {
+      user_id: 'mock-user-1',
+      performance_score: 320,
+      performance_level: 'Level 3',
+      badge: 'Silver Performer',
+      total_certificates: 4,
+      total_attended_events: 6,
+      certificate_breakdown: { participation: 3, merit_or_winner: 1, excellence: 0 },
+      recent_certificates: []
+    }
+  }
+}
+
+async function apiFetchMyPerformance() {
+  try {
+    const res = await fetch(`${API_BASE}/certificates/performance`, { headers: authHeaders() })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { success: false, data: null, message: data.message || 'Failed to fetch performance.' }
+    return { success: true, data: data.data || data }
+  } catch (err) {
+    return { success: false, data: null, message: 'Server unreachable.' }
+  }
+}
+
+async function apiFetchUserPerformance(userId) {
+  try {
+    const res = await fetch(`${API_BASE}/certificates/user/${userId}/performance`, { headers: authHeaders() })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) return { success: false, data: null, message: data.message || 'Failed to fetch performance.' }
+    return { success: true, data: data.data || data }
+  } catch (err) {
+    return { success: false, data: null, message: 'Server unreachable.' }
+  }
+}
+
 /* ── SERVICE EXPORT ────────────────────────────────────────────── */
 const certificatesService = {
   fetchAll: () =>
@@ -289,7 +332,7 @@ const certificatesService = {
 
   verify: (verifyCode) =>
     USE_MOCK ? mockVerify(verifyCode) : apiVerify(verifyCode),
-    
+
   download: (certificateNumber) =>
     USE_MOCK ? mockDownload(certificateNumber) : apiDownload(certificateNumber),
 
@@ -297,7 +340,16 @@ const certificatesService = {
     USE_MOCK ? Promise.resolve({ success: true, templates: [] }) : apiFetchTemplates(),
 
   saveTemplate: (templateData) =>
-    USE_MOCK ? Promise.resolve({ success: true, template: templateData }) : apiSaveTemplate(templateData)
+    USE_MOCK ? Promise.resolve({ success: true, template: templateData }) : apiSaveTemplate(templateData),
+
+  /** GET /api/v1/certificates/performance — logged-in student */
+  fetchMyPerformance: () =>
+    USE_MOCK ? mockFetchMyPerformance() : apiFetchMyPerformance(),
+
+  /** GET /api/v1/certificates/user/{user_id}/performance */
+  fetchUserPerformance: (userId) =>
+    USE_MOCK ? mockFetchMyPerformance() : apiFetchUserPerformance(userId),
 }
 
 export default certificatesService
+

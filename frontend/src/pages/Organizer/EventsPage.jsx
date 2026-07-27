@@ -13,15 +13,10 @@ import DeleteConfirmModal from '../../components/admin/adminEvent/DeleteConfirmM
 import ApprovalConfirmModal from '../../components/admin/adminEvent/ApprovalConfirmModal'
 import ImportModal from '../../components/admin/adminEvent/ImportModal'
 
-// Helpers to convert timezone offset-aware dates to offset-naive dates
+// Helpers to format dates directly in local browser timezone (naive dates)
 const formatLocalDateTimePicker = (dateTimeStr) => {
   if (!dateTimeStr) return ''
-  let dateStr = dateTimeStr
-  // If it does not end with Z or has no offset, append Z so Date constructs it as UTC
-  if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-')) {
-    dateStr = dateStr + 'Z'
-  }
-  const d = new Date(dateStr)
+  const d = new Date(dateTimeStr)
   if (isNaN(d.getTime())) return ''
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -35,12 +30,12 @@ const formatNaiveDateTime = (dateTimeStr) => {
   if (!dateTimeStr) return null
   const d = new Date(dateTimeStr)
   if (isNaN(d.getTime())) return null
-  const year = d.getUTCFullYear()
-  const month = String(d.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(d.getUTCDate()).padStart(2, '0')
-  const hours = String(d.getUTCHours()).padStart(2, '0')
-  const minutes = String(d.getUTCMinutes()).padStart(2, '0')
-  const seconds = String(d.getUTCSeconds()).padStart(2, '0')
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const hours = String(d.getHours()).padStart(2, '0')
+  const minutes = String(d.getMinutes()).padStart(2, '0')
+  const seconds = String(d.getSeconds()).padStart(2, '0')
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
 }
 
@@ -203,6 +198,26 @@ export default function EventsPage({ tokens }) {
   // Open Edit Modal
   const handleOpenEdit = (event, e) => {
     if (e) e.stopPropagation()
+
+    // Check if event is completed
+    const st = String(event.status || '').toLowerCase()
+    const rawDate = event.start_datetime || event.startDateTime || event.date || event.event_date
+    let isCompleted = st === 'completed' || st === 'finished'
+    if (!isCompleted && rawDate) {
+      try {
+        const d = new Date(rawDate)
+        if (!isNaN(d.getTime())) {
+          if (!String(rawDate).includes('T') && !String(rawDate).includes(':')) d.setHours(23, 59, 59, 999)
+          isCompleted = d < new Date()
+        }
+      } catch (_) {}
+    }
+
+    if (isCompleted) {
+      showToast('Completed events cannot be edited.', 'error')
+      return
+    }
+
     setSelectedEvent(event)
     setFormState({
       name: event.name || event.event_name || '',
@@ -220,7 +235,18 @@ export default function EventsPage({ tokens }) {
       status: event.status || 'Upcoming',
       description: event.description || '',
       registrationDeadline: formatLocalDateTimePicker(event.registration_deadline || event.reg_deadline || event.registrationDeadline),
-      regDateTime: formatLocalDateTimePicker(event.reg_date_time || event.regDateTime || ''),
+      regDateTime: formatLocalDateTimePicker(
+        event.regDateTime ||
+        event.registrationStartDateTime ||
+        event.registration_start_datetime ||
+        event.registration_start_date ||
+        event.reg_start_datetime ||
+        event.reg_date_time ||
+        event.created_at ||
+        event.start_datetime ||
+        event.startDateTime ||
+        event.date
+      ),
       banner: event.banner || null,
     })
     setFormErrors({})

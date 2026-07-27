@@ -47,7 +47,7 @@ export default function DashboardTopBar({
 
   return (
     <header className="sticky top-0 z-20 bg-white dark:bg-[#0c1829] border-b border-slate-200 dark:border-[#1a3050] px-4 sm:px-6 py-3 flex items-center transition-all duration-300 shadow-sm dark:shadow-[0_2px_20px_rgba(0,0,0,0.4)]">
-      
+
       {/* Mobile Sidebar Hamburger Toggle & Logo */}
       {isMobile && (
         <div className="flex items-center gap-2.5 mr-3 shrink-0">
@@ -61,7 +61,7 @@ export default function DashboardTopBar({
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          
+
           <div
             className="flex items-center gap-2 cursor-pointer"
             onMouseEnter={() => setLogoHover(true)}

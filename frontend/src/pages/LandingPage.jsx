@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import campusHero from '../assets/campus-hero.png'
 import campusAuditorium from '../assets/campus-auditorium.png'
 import dashboardLaptop from '../assets/dashboard-laptop.png'
-import { ArrowUpRight, Mail, CalendarCheck, MapPin,CalendarDays, LogIn, UserPlus } from 'lucide-react'
+import { ArrowUpRight, Mail, CalendarCheck, MapPin, CalendarDays, LogIn, UserPlus } from 'lucide-react'
 
 const BRAND = '#173dd1'
 
@@ -39,10 +39,12 @@ export default function LandingPage() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
+  const [showLoginPassword, setShowLoginPassword] = useState(false)
   const [isSignupOpen, setIsSignupOpen] = useState(false)
   const [signupName, setSignupName] = useState('')
   const [signupEmail, setSignupEmail] = useState('')
   const [signupPassword, setSignupPassword] = useState('')
+  const [showSignupPassword, setShowSignupPassword] = useState(false)
   const [signupRole, setSignupRole] = useState('Participant')
 
   useEffect(() => {
@@ -57,8 +59,8 @@ export default function LandingPage() {
       {/*NAVBAR*/}
       <header
         className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${scrolled
-            ? 'bg-white/90 backdrop-blur-lg shadow-sm border-b border-slate-100'
-            : 'bg-white/80 backdrop-blur-md'
+          ? 'bg-white/90 backdrop-blur-lg shadow-sm border-b border-slate-100'
+          : 'bg-white/80 backdrop-blur-md'
           }`}
       >
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -81,13 +83,13 @@ export default function LandingPage() {
               onClick={() => setIsSidebarOpen(true)}
               className="px-4 py-2 text-sm flex flex-row gap-2 font-bold text-[#173dd1] rounded-full hover:bg-[#173dd1]/10 transition-colors duration-200"
             >
-              <LogIn size={16}/> Log In
+              <LogIn size={16} /> Log In
             </button>
             <button
               onClick={() => setIsSignupOpen(true)}
               className="px-5 py-2 text-sm flex flex-row gap-2 font-bold bg-[#173dd1] text-white rounded-full hover:bg-[#122fb0] transition-colors duration-200 shadow-md shadow-[#173dd1]/20"
             >
-              <UserPlus size={16}/>Sign Up
+              <UserPlus size={16} />Sign Up
             </button>
           </div>
 
@@ -147,9 +149,9 @@ export default function LandingPage() {
               Get Started
             </button>
           </div>
-            <button className='px-7 py-3.5 text-sm absolute bottom right-0 font-medium border border-white text-white rounded-2xl bg-white/10 transition-colors'>
-              All-in-one event platform 
-            </button>
+          <button className='px-7 py-3.5 text-sm absolute bottom right-0 font-medium border border-white text-white rounded-2xl bg-white/10 transition-colors'>
+            All-in-one event platform
+          </button>
         </div>
       </section>
       {/* EVENTS SECTION*/}
@@ -211,7 +213,7 @@ export default function LandingPage() {
 
         {/* Empty state */}
         <div className="text-center py-20 rounded-2xl border border-dashed border-slate-200 bg-slate-50">
-          <div className="text-4xl mb-4 flex items-center justify-center"><CalendarDays size={55} color='#64748B'/></div>
+          <div className="text-4xl mb-4 flex items-center justify-center"><CalendarDays size={55} color='#64748B' /></div>
           <p className="text-slate-500 text-sm">No events found. Try adjusting your filters.</p>
         </div>
       </section>
@@ -327,7 +329,7 @@ export default function LandingPage() {
                 {['Home', 'Events', 'Dashboard', 'Profile'].map(l => (
                   <li key={l}>
                     <a href="#" className="text-sm font-semibold flex text-slate-600 hover:text-[#173dd1] transition-colors">
-                      {l} <ArrowUpRight size={15}/>
+                      {l} <ArrowUpRight size={15} />
                     </a>
                   </li>
                 ))}
@@ -341,13 +343,13 @@ export default function LandingPage() {
               </p>
               <ul className="flex flex-col gap-3">
                 <li className="flex items-center gap-2 text-sm text-slate-500">
-                  <span><Mail size={16} color='#173dd1'/></span> hello@imagine.bo
+                  <span><Mail size={16} color='#173dd1' /></span> hello@imagine.bo
                 </li>
                 <li className="flex items-center gap-2 text-sm text-slate-500">
-                  <span><MapPin size={16} color='#173dd1'/></span> Global Events, Online &amp; On-site
+                  <span><MapPin size={16} color='#173dd1' /></span> Global Events, Online &amp; On-site
                 </li>
                 <li className="flex items-center gap-2 text-sm text-slate-500">
-                  <span><CalendarCheck size={16} color='#173dd1'/></span> 24/7 Event Support
+                  <span><CalendarCheck size={16} color='#173dd1' /></span> 24/7 Event Support
                 </li>
               </ul>
             </div>
@@ -370,16 +372,14 @@ export default function LandingPage() {
       {/* Backdrop */}
       <div
         onClick={() => setIsSidebarOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${
-          isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
       />
 
       {/* Sidebar Panel */}
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-sm z-50 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
-          isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`fixed top-0 right-0 h-full w-full max-w-sm z-50 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-4 border-b border-slate-100">
@@ -401,13 +401,23 @@ export default function LandingPage() {
             onChange={e => setLoginEmail(e.target.value)}
             className="w-full px-4 py-2 rounded-lg border border-black text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#173dd1] focus:ring-2 focus:ring-[#173dd1]/20 transition"
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={loginPassword}
-            onChange={e => setLoginPassword(e.target.value)}
-            className="w-full px-4 py-2 rounded-lg border border-black text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#173dd1] focus:ring-2 focus:ring-[#173dd1]/20 transition"
-          />
+          <div className="relative flex items-center">
+            <input
+              type={showLoginPassword ? "text" : "password"}
+              placeholder="Password"
+              value={loginPassword}
+              onChange={e => setLoginPassword(e.target.value)}
+              className="w-full px-4 py-2 pr-10 rounded-lg border border-black text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#173dd1] focus:ring-2 focus:ring-[#173dd1]/20 transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowLoginPassword(prev => !prev)}
+              className="absolute right-3 text-slate-500 hover:text-slate-700 p-1 flex items-center justify-center transition-colors"
+              aria-label={showLoginPassword ? "Hide password" : "Show password"}
+            >
+              {showLoginPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+            </button>
+          </div>
           <button
             className="w-full py-3 text-sm font-bold bg-[#173dd1] text-white rounded-lg hover:bg-[#122fb0] transition-colors shadow-md shadow-[#173dd1]/20 mt-1"
           >
@@ -424,16 +434,14 @@ export default function LandingPage() {
       {/* Backdrop */}
       <div
         onClick={() => setIsSignupOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${
-          isSignupOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ${isSignupOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
       />
 
       {/* Signup Sidebar Panel */}
       <div
-        className={`fixed top-0 right-0 h-full w-full max-w-sm z-50 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
-          isSignupOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
+        className={`fixed top-0 right-0 h-full w-full max-w-sm z-50 bg-white shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${isSignupOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 pt-4 pb-4 border-b border-slate-100">
@@ -462,13 +470,23 @@ export default function LandingPage() {
             onChange={e => setSignupEmail(e.target.value)}
             className="w-full px-4 py-2 rounded-lg border border-black text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#173dd1] focus:ring-2 focus:ring-[#173dd1]/20 transition"
           />
-          <input
-            type="password"
-            placeholder="Password"
-            value={signupPassword}
-            onChange={e => setSignupPassword(e.target.value)}
-            className="w-full px-4 py-2 rounded-lg border border-black text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#173dd1] focus:ring-2 focus:ring-[#173dd1]/20 transition"
-          />
+          <div className="relative flex items-center">
+            <input
+              type={showSignupPassword ? "text" : "password"}
+              placeholder="Password"
+              value={signupPassword}
+              onChange={e => setSignupPassword(e.target.value)}
+              className="w-full px-4 py-2 pr-10 rounded-lg border border-black text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#173dd1] focus:ring-2 focus:ring-[#173dd1]/20 transition"
+            />
+            <button
+              type="button"
+              onClick={() => setShowSignupPassword(prev => !prev)}
+              className="absolute right-3 text-slate-500 hover:text-slate-700 p-1 flex items-center justify-center transition-colors"
+              aria-label={showSignupPassword ? "Hide password" : "Show password"}
+            >
+              {showSignupPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+            </button>
+          </div>
           <select
             value={signupRole}
             onChange={e => setSignupRole(e.target.value)}

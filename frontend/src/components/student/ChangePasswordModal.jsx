@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { X, Lock, Shield, Eye, EyeOff } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
@@ -52,7 +53,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
     }
   }
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-xs" onClick={onClose} />
@@ -99,7 +100,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
                 onClick={() => setShowCurrentPass(!showCurrentPass)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white bg-transparent border-none cursor-pointer"
               >
-                {showCurrentPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showCurrentPass ? <Eye size={16} /> : <EyeOff size={16} />}
               </button>
             </div>
           </div>
@@ -124,7 +125,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
                 onClick={() => setShowNewPass(!showNewPass)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white bg-transparent border-none cursor-pointer"
               >
-                {showNewPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showNewPass ? <Eye size={16} /> : <EyeOff size={16} />}
               </button>
             </div>
           </div>
@@ -149,7 +150,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
                 onClick={() => setShowConfirmPass(!showConfirmPass)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white bg-transparent border-none cursor-pointer"
               >
-                {showConfirmPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showConfirmPass ? <Eye size={16} /> : <EyeOff size={16} />}
               </button>
             </div>
           </div>
@@ -181,6 +182,7 @@ export default function ChangePasswordModal({ isOpen, onClose }) {
           to   { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   )
 }

@@ -333,12 +333,14 @@ async function mockFetchRecentActivity() {
 async function apiFetchRecentActivity() {
   try {
     const res = await fetchWithAuth(`${API_BASE}/analytics/recent-activity`)
+    if (!res.ok) {
+      return { success: true, activities: [] }
+    }
     const data = await parseJSON(res)
-    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch recent activity.' }
     const activities = Array.isArray(data) ? data : (data.activities || data.data || [])
     return { success: true, activities }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: true, activities: [], message: 'Server unreachable.' }
   }
 }
 

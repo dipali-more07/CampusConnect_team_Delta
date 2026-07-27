@@ -21,14 +21,13 @@ export function getAccessToken() {
 }
 
 export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_KEY) || ''
+  return localStorage.getItem(REFRESH_KEY) || localStorage.getItem('refresh_token') || sessionStorage.getItem(REFRESH_KEY) || sessionStorage.getItem('refresh_token') || ''
 }
 
 export function saveTokens(accessToken, refreshToken) {
   if (accessToken) {
     sessionStorage.setItem(TOKEN_KEY, accessToken)
     sessionStorage.setItem('token', accessToken)
-    // Also update the stored session
     try {
       const raw = sessionStorage.getItem(SESSION_KEY)
       if (raw) {
@@ -40,6 +39,7 @@ export function saveTokens(accessToken, refreshToken) {
   }
   if (refreshToken) {
     localStorage.setItem(REFRESH_KEY, refreshToken)
+    localStorage.setItem('refresh_token', refreshToken)
   }
 }
 
@@ -48,6 +48,7 @@ export function clearTokens() {
   sessionStorage.removeItem('token')
   sessionStorage.removeItem(SESSION_KEY)
   localStorage.removeItem(REFRESH_KEY)
+  localStorage.removeItem('refresh_token')
 }
 
 // ── Refresh token call ───────────────────────────────────────────
@@ -57,39 +58,46 @@ async function doRefresh() {
   const refreshToken = getRefreshToken()
   if (!refreshToken) return null
 
-  // We will try three different formats for maximum compatibility with the backend:
-  // 1. Authorization: Bearer <refresh_token> (Standard)
-  // 2. Authorization: <refresh_token> (Raw token in header)
-  // 3. Body: { refresh_token: <refresh_token> } (Fallback)
-  const formats = [
+  // 1. Primary Swagger Spec: POST /auth/refresh with body { "refresh_token": "..." }
+  // 2. Alternative Authorization Header formats
+  const attempts = [
     {
       headers: {
-        'Authorization': `Bearer ${refreshToken}`,
-        'authorization': `Bearer ${refreshToken}`,
-      }
-    },
-    {
-      headers: {
-        'Authorization': refreshToken,
-        'authorization': refreshToken,
-      }
-    },
-    {
-      headers: {},
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify({ refresh_token: refreshToken })
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${refreshToken}`,
+      },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    },
+    {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${refreshToken}`,
+      }
     }
   ]
 
-  for (const format of formats) {
+  for (const attempt of attempts) {
     try {
-      const res = await fetch(`${API_BASE}/auth/refresh`, {
+      let res = await fetch(`${API_BASE}/auth/refresh`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...format.headers,
-        },
-        ...(format.body ? { body: format.body } : {}),
+        headers: attempt.headers,
+        ...(attempt.body ? { body: attempt.body } : {})
       })
+
+      // Trailing slash 307 fallback
+      if (res.status === 307 || (!res.ok && res.status === 404)) {
+        res = await fetch(`${API_BASE}/auth/refresh/`, {
+          method: 'POST',
+          headers: attempt.headers,
+          ...(attempt.body ? { body: attempt.body } : {})
+        })
+      }
 
       if (res.ok) {
         const data = await res.json().catch(() => ({}))
@@ -105,15 +113,14 @@ async function doRefresh() {
           data.data?.refresh_token ||
           data.refresh_token ||
           data.refreshToken ||
-          refreshToken // fallback to current if not rotated
+          refreshToken
 
         if (newAccessToken) {
           saveTokens(newAccessToken, newRefreshToken)
           return newAccessToken
         }
       }
-    } catch (err) {
-          }
+    } catch (_err) {}
   }
 
   return null
@@ -127,6 +134,10 @@ async function doRefresh() {
  *   - On 401: refreshes token and retries once
  *   - On refresh failure: clears session and redirects to /
  */
+import { encryptPayload, decryptPayload } from './payloadCrypto'
+
+export { encryptPayload, decryptPayload }
+
 export async function fetchWithAuth(url, options = {}) {
   const makeHeaders = (token) => ({
     'Content-Type': 'application/json',
@@ -136,6 +147,17 @@ export async function fetchWithAuth(url, options = {}) {
 
   const token = getAccessToken()
   let res = await fetch(url, { ...options, headers: makeHeaders(token) })
+
+  // Handle FastAPI 307 Temporary Redirect / trailing slash mismatch
+  if (res.status === 307 || (!res.ok && res.status === 404)) {
+    const altUrl = url.endsWith('/') ? url.slice(0, -1) : `${url}/`
+    try {
+      const altRes = await fetch(altUrl, { ...options, headers: makeHeaders(token) })
+      if (altRes.ok || altRes.status !== 404) {
+        res = altRes
+      }
+    } catch (_e) {}
+  }
 
   // Not 401 — return as-is
   if (res.status !== 401) return res

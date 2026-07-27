@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Award, Download, ExternalLink, Search, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
+import { downloadCertificatePDF } from '../../utils/pdfGenerator'
 
 export default function StudentCertificatesView({ tokens, user }) {
   const { accentColor } = useTheme()
@@ -64,26 +65,26 @@ export default function StudentCertificatesView({ tokens, user }) {
                   <Award size={24} />
                 </div>
                 <span className="text-[11px] font-mono font-bold px-3 py-1 rounded-full bg-slate-100 dark:bg-[#162640] text-slate-500 dark:text-[#7a98bb] border border-slate-200 dark:border-[#1a3050]">
-                  {cert.verifyCode}
+                  {cert.verifyCode || cert.certificate_number || 'CC-2026-VAL'}
                 </span>
               </div>
 
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                {cert.position}
+                {cert.position || 'Certificate of Participation'}
               </span>
 
               <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-2 mb-1 tracking-tight">
-                {cert.event}
+                {cert.event || cert.event_name || cert.title || 'Campus Event'}
               </h3>
               <p className="text-xs font-medium text-slate-500 dark:text-[#7a98bb] m-0">
-                Issued on: {cert.issueDate} • Department: {user?.department || 'Computer Science'}
+                Issued on: {cert.issueDate || cert.generated_at || 'N/A'} • Department: {user?.department || 'Computer Science'}
               </p>
             </div>
 
             {/* Actions */}
             <div className="mt-6 pt-4 border-t border-slate-100 dark:border-[#1a3050] flex items-center gap-3">
               <button
-                onClick={() => setSelectedCert(cert)}
+                onClick={() => downloadCertificatePDF({ ...cert, userName: user?.name })}
                 className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90"
                 style={{ background: BRAND }}
               >
@@ -126,7 +127,7 @@ export default function StudentCertificatesView({ tokens, user }) {
                 Close
               </button>
               <button
-                onClick={() => setSelectedCert(null)}
+                onClick={() => downloadCertificatePDF({ ...selectedCert, userName: user?.name })}
                 className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer"
                 style={{ background: BRAND }}
               >

@@ -1,3 +1,5 @@
+import { saveTokens } from '../utils/apiClient'
+
 /* eslint-disable no-unused-vars, no-empty */
 import users from '../data/users.json'
 
@@ -35,6 +37,25 @@ async function mockLogin(email, password) {
     return { success: false, message: 'Invalid email or password.' }
   }
 
+  // Check if student account is suspended
+  try {
+    const localStudents = localStorage.getItem('cc_students_v1')
+    if (localStudents) {
+      const list = JSON.parse(localStudents)
+      const currentStudent = list.find(s =>
+        String(s.id) === String(user.id) ||
+        (s.email && user.email && s.email.toLowerCase() === user.email.toLowerCase())
+      )
+      if (currentStudent && currentStudent.status === 'Suspended') {
+        return { success: false, message: 'Your account has been suspended by the administration. Please contact your campus admin.' }
+      }
+    }
+  } catch (_e) { }
+
+  if (user.status === 'Suspended' || user.is_active === false) {
+    return { success: false, message: 'Your account has been suspended by the administration. Please contact your campus admin.' }
+  }
+
   // Strip password before storing
   const { password: _pwd, ...safeUser } = user
 
@@ -51,7 +72,7 @@ async function mockRegister(payload) {
   const { name, email, mobile, college, course, department, password, role = 'student' } = payload
 
   const userList = getMockUsers()
-  
+
   // Duplicate check
   const duplicate = userList.find(u => u.email.toLowerCase() === email.toLowerCase())
   if (duplicate) {
@@ -61,7 +82,7 @@ async function mockRegister(payload) {
   // Generate a mock code and save it in sessionStorage for verification
   const mockCode = String(Math.floor(100000 + Math.random() * 900000))
   sessionStorage.setItem(`mock_otp_${email.toLowerCase()}`, mockCode)
-  
+
   // Add user
   const newUser = {
     id: userList.length + 1,
@@ -121,13 +142,15 @@ async function mockForgotPassword(email) {
   return { success: true, message: `Password reset link sent to ${email}` }
 }
 
+import { encryptPayload } from '../utils/payloadCrypto'
+
 /* ── REAL API LOGIN ─────────────────────────────────────── */
 async function apiLogin(email, password) {
   try {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({ email, password }),
     })
@@ -142,9 +165,9 @@ async function apiLogin(email, password) {
     const token = data.data?.access_token || data.token || data.accessToken || data.data?.token || ''
     const refreshToken = data.data?.refresh_token || data.refresh_token || data.refreshToken || ''
 
-    // Store refresh token immediately for auto-refresh to work
-    if (refreshToken) {
-      localStorage.setItem('cc_refresh_token', refreshToken)
+    // Store tokens immediately for auto-refresh to work
+    if (token || refreshToken) {
+      saveTokens(token, refreshToken)
     }
 
     let user = null
@@ -153,38 +176,60 @@ async function apiLogin(email, password) {
         const meRes = await fetch(`${API_BASE}/auth/me`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': `Bearer ${token}`
           }
         })
         if (meRes.ok) {
           const meData = await meRes.json()
-          const profile = meData.data || meData
-          let role = (profile.role || profile.userType || profile.roleName || 'student').toString().toLowerCase()
-          if (role === 'participant') {
-            role = 'student'
-          }
+          const rawProfile = meData.data?.user || meData.user || meData.data || meData
+          const rawRole = (
+            rawProfile.role || rawProfile.role_name || rawProfile.roleName || 
+            rawProfile.userType || rawProfile.user_type || meData.data?.role || meData.role || ''
+          ).toString().toLowerCase()
+
+          let role = 'student'
+          if (['admin', 'superadmin', 'super_admin'].includes(rawRole)) role = 'admin'
+          else if (['organizer', 'event_organizer'].includes(rawRole)) role = 'organizer'
+          else if (['student', 'participant'].includes(rawRole)) role = 'student'
+          else if (email.toLowerCase().includes('admin')) role = 'admin'
+          else if (email.toLowerCase().includes('organizer')) role = 'organizer'
+
           user = {
-            ...profile,
-            name: profile.full_name || profile.name || profile.fullName || profile.username || profile.email?.split('@')[0] || 'User',
+            ...rawProfile,
+            name: rawProfile.full_name || rawProfile.name || rawProfile.fullName || rawProfile.username || email.split('@')[0] || 'User',
             role,
           }
         }
       } catch (meErr) {
-              }
+      }
     }
 
     // Fallback user object if /me failed or returned nothing
     if (!user) {
+      const loginProfile = data.data?.user || data.user || data.data || data
+      const rawRole = (
+        loginProfile.role || loginProfile.role_name || loginProfile.roleName || 
+        loginProfile.userType || loginProfile.user_type || data.data?.role || data.role || ''
+      ).toString().toLowerCase()
+
+      let role = 'student'
+      if (['admin', 'superadmin', 'super_admin'].includes(rawRole)) role = 'admin'
+      else if (['organizer', 'event_organizer'].includes(rawRole)) role = 'organizer'
+      else if (['student', 'participant'].includes(rawRole)) role = 'student'
+      else if (email.toLowerCase().includes('admin')) role = 'admin'
+      else if (email.toLowerCase().includes('organizer')) role = 'organizer'
+
       user = {
+        ...loginProfile,
         email,
-        name: email.split('@')[0] || 'User',
-        role: 'student'
+        name: loginProfile.full_name || loginProfile.name || loginProfile.fullName || email.split('@')[0] || 'User',
+        role
       }
     }
 
     return { success: true, user, token, refreshToken }
   } catch (err) {
-        return { success: false, message: `API Login Error: ${err.message || err}` }
+    return { success: false, message: `API Login Error: ${err.message || err}` }
   }
 }
 
@@ -227,7 +272,7 @@ async function apiRegister(payload) {
     const rawUser = data.user || data.data?.user || (data.data && typeof data.data === 'object' ? data.data : data)
     return { success: true, user: rawUser, message: data.message || 'Registration successful!' }
   } catch (err) {
-        return { success: false, message: 'Unable to reach server. Check your connection.' }
+    return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
 
@@ -273,7 +318,7 @@ async function apiVerifyEmail(email, code) {
 
     return { success: true, message: data.message || 'Email verified successfully!' }
   } catch (err) {
-        return { success: false, message: 'Unable to reach server. Check your connection.' }
+    return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
 
@@ -296,7 +341,7 @@ async function apiResendCode(email) {
 
     return { success: true, message: data.message || 'Verification code resent successfully!' }
   } catch (err) {
-        return { success: false, message: 'Unable to reach server. Check your connection.' }
+    return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
 

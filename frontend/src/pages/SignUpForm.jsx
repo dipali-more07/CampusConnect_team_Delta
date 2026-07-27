@@ -302,9 +302,8 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
                 onChange={e => setGender(e.target.value)}
                 required
                 className={`w-full px-3.5 py-2 rounded-lg border text-sm text-slate-700 bg-white placeholder-slate-400
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer ${
-                  errors.gender ? 'border-red-500 bg-red-50/50' : 'border-slate-200'
-                }`}
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer ${errors.gender ? 'border-red-500 bg-red-50/50' : 'border-slate-200'
+                  }`}
               >
                 <option value="" disabled>Select Gender</option>
                 <option value="male">Male</option>
@@ -317,7 +316,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
               <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.gender}</p>
             )}
           </div>
-            
+
           {/* Year of Study */}
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">
@@ -359,7 +358,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
               onClick={() => setShowPass(!showPass)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
             >
-              {showPass ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showPass ? <Eye size={15} /> : <EyeOff size={15} />}
             </button>
           </div>
           {errors.password && (
@@ -389,7 +388,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
               onClick={() => setShowConfirmPass(!showConfirmPass)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
             >
-              {showConfirmPass ? <EyeOff size={15} /> : <Eye size={15} />}
+              {showConfirmPass ? <Eye size={15} /> : <EyeOff size={15} />}
             </button>
           </div>
           {errors.confirmPassword && (
@@ -496,17 +495,16 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
                   type="button"
                   onClick={handleResendCode}
                   disabled={resendCountdown > 0 || resendLoading}
-                  className={`font-bold transition-colors cursor-pointer border-none bg-transparent outline-none p-0 ${
-                    resendCountdown > 0 || resendLoading
+                  className={`font-bold transition-colors cursor-pointer border-none bg-transparent outline-none p-0 ${resendCountdown > 0 || resendLoading
                       ? 'text-slate-400 cursor-not-allowed'
                       : 'text-indigo-600 hover:text-indigo-800 hover:underline'
-                  }`}
+                    }`}
                 >
                   {resendLoading
                     ? 'Sending…'
                     : resendCountdown > 0
-                    ? `Resend Code (${resendCountdown}s)`
-                    : 'Resend Code'}
+                      ? `Resend Code (${resendCountdown}s)`
+                      : 'Resend Code'}
                 </button>
               </div>
 

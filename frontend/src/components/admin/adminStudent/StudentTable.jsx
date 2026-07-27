@@ -73,7 +73,9 @@ export default function StudentTable({
                     <td className="px-5 py-3.5 text-[13px] font-bold" style={{ color: tokens.txtPri }}>{s.eventsAttended}</td>
                     <td className="px-5 py-3.5 min-w-[130px]">
                       <div className="flex items-center gap-2">
-                        <span className="text-[13px] font-bold min-w-[36px]" style={{ color: attColor }}>{s.attendancePercent}%</span>
+                        <span className="text-[13px] font-bold min-w-[36px]" style={{ color: attColor }}>
+                          {Number(s.attendancePercent || 0).toFixed(1)}%
+                        </span>
                         <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: dark ? '#1a3050' : '#e2e8f0' }}>
                           <div className="h-full rounded-full" style={{ width: `${s.attendancePercent}%`, background: attColor }} />
                         </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import {
   MapPin, Clock, ExternalLink,
-  UserPlus, CheckSquare, Calendar, Award, Send, XCircle
+  UserPlus, CheckSquare, Calendar, Award, Send, XCircle, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { UPCOMING_EVENTS, RECENT_ACTIVITY, BRAND } from '../../../data/dashboardData'
 import analyticsService from '../../../services/analyticsService'
@@ -41,6 +41,8 @@ const formatTime = (ts) => {
 export default function BottomRow({ dark }) {
   const [activities, setActivities] = useState([])
   const [upcomingEvents, setUpcomingEvents] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 5
 
   useEffect(() => {
     const loadActivities = async () => {
@@ -59,8 +61,31 @@ export default function BottomRow({ dark }) {
     }
     const loadUpcoming = async () => {
       const res = await eventsService.fetchUpcoming(3)
-      if (res.success && res.events && res.events.length > 0) {
-        setUpcomingEvents(res.events)
+      if (res.success && Array.isArray(res.events) && res.events.length > 0) {
+        const COLORS = ['#615FFF', '#0284c7', '#00BC7D', '#FE9A00', '#ef4444', '#a855f7']
+        const mapped = res.events.map((ev, idx) => {
+          let monthStr = 'AUG'
+          let dayStr = '15'
+          if (ev.date || ev.start_date) {
+            try {
+              const dObj = new Date(ev.date || ev.start_date)
+              if (!isNaN(dObj.getTime())) {
+                monthStr = dObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+                dayStr = String(dObj.getDate())
+              }
+            } catch {}
+          }
+          return {
+            ...ev,
+            title: ev.title || ev.name || ev.event_name || 'Event',
+            color: ev.color || COLORS[idx % COLORS.length],
+            month: ev.month || monthStr,
+            day: ev.day || dayStr,
+            registered: Number(ev.registered || ev.registrationsCount || ev.registrations_count || 0),
+            capacity: Number(ev.capacity || 500),
+          }
+        })
+        setUpcomingEvents(mapped)
       } else {
         setUpcomingEvents([])
       }
@@ -87,6 +112,7 @@ export default function BottomRow({ dark }) {
           {upcomingEvents.length > 0 ? (
             upcomingEvents.map(ev => {
               const pct = ev.capacity > 0 ? Math.round((ev.registered / ev.capacity) * 100) : 0
+              const eventTitle = ev.title || ev.name || ev.event_name || 'Event'
               return (
                 <div
                   key={ev.id}
@@ -109,7 +135,7 @@ export default function BottomRow({ dark }) {
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-slate-900 dark:text-[#e8f0fe] m-0 whitespace-nowrap overflow-hidden text-ellipsis">{ev.title}</p>
+                    <p className="text-[13px] font-bold text-slate-900 dark:text-[#e8f0fe] m-0 whitespace-nowrap overflow-hidden text-ellipsis">{eventTitle}</p>
                     <div className="flex gap-3 mt-1">
                       <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
                         <MapPin size={10} /> {ev.venue}
@@ -150,48 +176,109 @@ export default function BottomRow({ dark }) {
       </div>
 
       {/* ── Recent Activity ── */}
-      <div
-        className="bg-white dark:bg-[#0f1e30] rounded-2xl border border-slate-200 dark:border-[#1a3050] p-5 transition-all duration-300"
-        style={{ boxShadow: dark ? '0 4px 24px rgba(0,0,0,0.4)' : '0 1px 4px rgba(0,0,0,0.06)' }}
-      >
-        <h2 className="text-[15px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0 mb-4">Recent Activity</h2>
+      {(() => {
+        const totalPages = Math.ceil(activities.length / itemsPerPage) || 1
+        const startIndex = (currentPage - 1) * itemsPerPage
+        const endIndex = startIndex + itemsPerPage
+        const paginatedActivities = activities.slice(startIndex, endIndex)
 
-        <div className="flex flex-col">
-          {activities.length > 0 ? (
-            activities.map((act, idx) => {
-              const { icon: Icon, color: iconColor } = resolveActivityIcon(act.type, act.text)
-              const isLast = idx === activities.length - 1
-              return (
-                <div key={act.id || idx} className="flex gap-3">
-                  <div className="flex flex-col items-center shrink-0">
-                    <div
-                      className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0"
-                      style={{
-                        background: `${iconColor}20`,
-                        border: `1.5px solid ${iconColor}50`,
-                      }}
-                    >
-                      <Icon size={14} style={{ color: iconColor }} />
-                    </div>
-                    {!isLast && (
-                      <div className="w-0.5 flex-1 min-h-[10px] my-1 rounded-full bg-slate-200 dark:bg-[#162640]" />
-                    )}
-                  </div>
+        return (
+          <div
+            className="bg-white dark:bg-[#0f1e30] rounded-2xl border border-slate-200 dark:border-[#1a3050] p-5 transition-all duration-300 flex flex-col justify-between"
+            style={{ boxShadow: dark ? '0 4px 24px rgba(0,0,0,0.4)' : '0 1px 4px rgba(0,0,0,0.06)' }}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-[15px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0">Recent Activity</h2>
+                {activities.length > 0 && (
+                  <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">
+                    {activities.length} total
+                  </span>
+                )}
+              </div>
 
-                  <div className={`flex-1 min-w-0 pt-1 ${isLast ? '' : 'pb-4'}`}>
-                    <p className="text-[12px] text-slate-800 dark:text-[#c8daf0] font-medium m-0 leading-relaxed">{act.text}</p>
-                    <p className="text-[10.5px] text-slate-400 dark:text-[#3d5470] mt-1 font-medium">{act.time}</p>
+              <div className="flex flex-col min-h-[300px]">
+                {paginatedActivities.length > 0 ? (
+                  paginatedActivities.map((act, idx) => {
+                    const { icon: Icon, color: iconColor } = resolveActivityIcon(act.type, act.text)
+                    const isLast = idx === paginatedActivities.length - 1
+                    return (
+                      <div key={act.id || idx} className="flex gap-3">
+                        <div className="flex flex-col items-center shrink-0">
+                          <div
+                            className="w-[34px] h-[34px] rounded-full flex items-center justify-center shrink-0"
+                            style={{
+                              background: `${iconColor}20`,
+                              border: `1.5px solid ${iconColor}50`,
+                            }}
+                          >
+                            <Icon size={14} style={{ color: iconColor }} />
+                          </div>
+                          {!isLast && (
+                            <div className="w-0.5 flex-1 min-h-[10px] my-1 rounded-full bg-slate-200 dark:bg-[#162640]" />
+                          )}
+                        </div>
+
+                        <div className={`flex-1 min-w-0 pt-1 ${isLast ? '' : 'pb-4'}`}>
+                          <p className="text-[12px] text-slate-800 dark:text-[#c8daf0] font-medium m-0 leading-relaxed">{act.text}</p>
+                          <p className="text-[10.5px] text-slate-400 dark:text-[#3d5470] mt-1 font-medium">{act.time}</p>
+                        </div>
+                      </div>
+                    )
+                  })
+                ) : (
+                  <div className="text-center py-10 text-[13px] font-medium text-slate-400 dark:text-[#7a98bb]">
+                    No recent activities found
                   </div>
-                </div>
-              )
-            })
-          ) : (
-            <div className="text-center py-10 text-[13px] font-medium text-slate-400 dark:text-[#7a98bb]">
-              No recent activities found
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Pagination Controls */}
+            {activities.length > itemsPerPage && (
+              <div className="flex items-center justify-between pt-4 mt-2 border-t border-slate-100 dark:border-[#1a3050]">
+                <span className="text-[11.5px] font-semibold text-slate-400 dark:text-[#7a98bb]">
+                  {startIndex + 1}-{Math.min(endIndex, activities.length)} of {activities.length}
+                </span>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-[#7a98bb] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#162640] transition-colors cursor-pointer"
+                    title="Previous page"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-7 h-7 rounded-lg text-[11.5px] font-extrabold transition-colors cursor-pointer ${
+                        currentPage === page
+                          ? 'bg-[#615FFF] text-white shadow-xs'
+                          : 'text-slate-600 dark:text-[#7a98bb] hover:bg-slate-100 dark:hover:bg-[#162640]'
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-[#7a98bb] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#162640] transition-colors cursor-pointer"
+                    title="Next page"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
     </div>
   )

@@ -7,6 +7,7 @@ import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import paymentsService from '../../services/paymentsService'
 import studentService from '../../services/studentService'
+import { processRazorpayPayment } from '../../utils/paymentUtils'
 
 /* ── Status helpers ───────────────────────────────────────── */
 function statusConfig(status) {
@@ -51,42 +52,51 @@ export default function PaymentsPage({ tokens, user }) {
     try {
       const regId = p.registrationId || p.registration_id || p.id
       const res = await studentService.initiatePayment(regId)
-      if (res.success) {
-        const { payment_id, transaction_id } = res.data || {}
-        const confirmRes = await studentService.confirmPayment(payment_id || p.id, {
-          razorpay_payment_id: `pay_mock_${Math.random().toString(36).substr(2, 9)}`,
-          razorpay_order_id: transaction_id || `order_mock_${Math.random().toString(36).substr(2, 9)}`,
-          razorpay_signature: `sig_mock_${Math.random().toString(36).substr(2, 9)}`
-        })
-        if (confirmRes.success) {
-          // Update sessionStorage status if present
+      if (!res.success) {
+        const msg = String(res.message || res.detail || '').toLowerCase()
+        if (msg.includes('already') || msg.includes('completed') || msg.includes('paid')) {
+          showToast('Payment has already been completed! 🎉', 'success')
+          try {
+            const stored = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
+            const updated = stored.map(item => (item.id === p.id || item.event_id === p.eventId) ? { ...item, payment_status: 'Success', status: 'Success' } : item)
+            sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
+          } catch (_sErr) { }
+
+          setPayments(prev => prev.map(item => item.id === p.id ? { ...item, status: 'Success' } : item))
+          setPayingId(null)
+          return
+        }
+        showToast(res.message || 'Payment initiation failed.', 'error')
+        setPayingId(null)
+        return
+      }
+
+      const { payment_id, transaction_id, amount } = res.data || {}
+
+      await processRazorpayPayment({
+        payment_id,
+        transaction_id,
+        amount: amount || p.amount,
+        eventTitle: p.eventName || p.title || 'Event Registration',
+        onSuccess: async () => {
           try {
             const stored = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
             const updated = stored.map(item => (item.id === p.id || item.event_id === p.eventId) ? { ...item, payment_status: 'Success', status: 'Success', payment_method: 'UPI' } : item)
             sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
-          } catch (storageErr) {}
+          } catch (storageErr) { }
 
           showToast('Payment completed successfully!', 'success')
           const updated = await paymentsService.fetchMy()
           if (updated.success) setPayments(updated.payments)
-        } else {
-          showToast(confirmRes.message || 'Payment failed', 'error')
+          setPayingId(null)
+        },
+        onError: (errMsg) => {
+          showToast(errMsg || 'Payment failed.', 'error')
+          setPayingId(null)
         }
-      } else {
-        // Fallback for mock or local pending payment
-        try {
-          const stored = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
-          const updated = stored.map(item => (item.id === p.id || item.event_id === p.eventId) ? { ...item, payment_status: 'Success', status: 'Success', payment_method: 'UPI' } : item)
-          sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
-        } catch (storageErr) {}
-
-        showToast('Payment completed successfully!', 'success')
-        const updated = await paymentsService.fetchMy()
-        if (updated.success) setPayments(updated.payments)
-      }
+      })
     } catch (err) {
       showToast('Payment error occurred', 'error')
-    } finally {
       setPayingId(null)
     }
   }
@@ -341,14 +351,14 @@ export default function PaymentsPage({ tokens, user }) {
                       {sc.label}
                     </span>
 
-                    {(p.status || '').toLowerCase() === 'pending' && (
+                    {((p.status || '').toLowerCase() === 'pending' || (p.status || '').toLowerCase() === 'failed' || (p.status || '').toLowerCase() === 'failure') && (
                       <button
                         onClick={(e) => handlePayNow(e, p)}
                         disabled={payingId === p.id}
                         className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-white border-none cursor-pointer hover:opacity-90 transition-opacity"
-                        style={{ background: BRAND }}
+                        style={{ background: (p.status || '').toLowerCase().includes('fail') ? '#ef4444' : BRAND }}
                       >
-                        {payingId === p.id ? 'Processing...' : 'Pay Now'}
+                        {payingId === p.id ? 'Processing...' : (p.status || '').toLowerCase().includes('fail') ? 'Retry Payment' : 'Pay Now'}
                       </button>
                     )}
                   </div>

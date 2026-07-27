@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Image, Loader2 } from 'lucide-react'
+import { X, Image, Loader2, Crop } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
+import ImageCropperModal from '../../common/ImageCropperModal'
 
 export default function EventFormModal({
   dark,
@@ -16,6 +18,9 @@ export default function EventFormModal({
   eventTypes,
   onSaveEvent
 }) {
+  const [cropperOpen, setCropperOpen] = useState(false)
+  const [rawBannerSrc, setRawBannerSrc] = useState(null)
+
   if (!open) return null
 
   const BRAND = tokens?.brand || DEFAULT_BRAND
@@ -366,7 +371,8 @@ export default function EventFormModal({
                 if (file) {
                   const reader = new FileReader()
                   reader.onloadend = () => {
-                    setFormState(p => ({ ...p, banner: reader.result }))
+                    setRawBannerSrc(reader.result)
+                    setCropperOpen(true)
                   }
                   reader.readAsDataURL(file)
                 }
@@ -386,7 +392,8 @@ export default function EventFormModal({
                 if (file) {
                   const reader = new FileReader()
                   reader.onloadend = () => {
-                    setFormState(p => ({ ...p, banner: reader.result }))
+                    setRawBannerSrc(reader.result)
+                    setCropperOpen(true)
                   }
                   reader.readAsDataURL(file)
                 }
@@ -399,18 +406,34 @@ export default function EventFormModal({
                     alt="Banner preview" 
                     className="max-h-[140px] rounded-lg object-cover mb-2 w-full"
                   />
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      setFormState(p => ({ ...p, banner: null }))
-                    }}
-                    className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 border-none cursor-pointer flex items-center justify-center"
-                  >
-                    <X size={14} />
-                  </button>
-                  <span className="text-[12px] font-bold text-slate-500">Click or drag to replace image</span>
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setRawBannerSrc(formState.banner)
+                        setCropperOpen(true)
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-1.5 border-none cursor-pointer flex items-center justify-center shadow-md transition-transform hover:scale-105"
+                      title="Crop Poster"
+                    >
+                      <Crop size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        setFormState(p => ({ ...p, banner: null }))
+                      }}
+                      className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 border-none cursor-pointer flex items-center justify-center shadow-md transition-transform hover:scale-105"
+                      title="Remove Image"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                  <span className="text-[12px] font-bold text-slate-500">Click to replace or tap crop icon to adjust poster</span>
                 </div>
               ) : (
                 <>
@@ -419,12 +442,25 @@ export default function EventFormModal({
                     Drop event banner here or <span className="text-blue-500 font-bold hover:underline">browse</span>
                   </div>
                   <div className="text-[11px] mt-1" style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>
-                    PNG, JPG up to 5MB
+                    PNG, JPG up to 5MB (Supports Image Cropping)
                   </div>
                 </>
               )}
             </label>
           </div>
+
+          <ImageCropperModal
+            isOpen={cropperOpen}
+            onClose={() => setCropperOpen(false)}
+            imageSrc={rawBannerSrc}
+            cropShape="rect"
+            cropTitle="Crop Event Poster"
+            BRAND={BRAND}
+            onCropComplete={(croppedUrl) => {
+              setFormState(p => ({ ...p, banner: croppedUrl }))
+              setCropperOpen(false)
+            }}
+          />
 
         </div>
 

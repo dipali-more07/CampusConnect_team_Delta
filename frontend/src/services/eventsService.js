@@ -219,6 +219,7 @@ function mapEvent(e) {
   return {
     id: e.event_id || e.id,
     name: e.event_name || e.name || e.title || '',
+    title: e.title || e.event_name || e.name || '',
     organizer: e.organizer_name || e.organized_by || (typeof e.organizer === 'object' ? e.organizer?.name || e.organizer?.full_name || '' : e.organizer) || '',
     category: e.category ? (e.category.charAt(0).toUpperCase() + e.category.slice(1)) : 'General',
     eventType: e.event_type || e.eventType || 'offline',
@@ -230,7 +231,7 @@ function mapEvent(e) {
     end_datetime: e.end_datetime,
     capacity: e.capacity || e.max_participants || 500,
     fees: e.fees ?? e.fee ?? e.registration_fee ?? e.event_fee ?? 0,
-    registrationsCount: e.registrationsCount || e.registrations_count || 0,
+    registrationsCount: e.registrationsCount || e.total_registrations || e.registration_count || e.registrations_count || 0,
     status: e.status || 'Upcoming',
     approvalStatus: (() => {
       const raw = e.approval_status || e.approvalStatus || 'Approved'
@@ -238,7 +239,10 @@ function mapEvent(e) {
     })(),
     description: e.description || '',
     registrationDeadline: e.registration_deadline || e.reg_deadline || e.registrationDeadline || '',
+    regDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
+    registrationStartDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
     banner: e.poster || e.banner || null,
+    created_at: e.created_at || e.createdAt || null,
   }
 }
 
@@ -263,39 +267,29 @@ async function apiFetchEvents() {
 
 async function apiFetchUpcomingEvents(limit = 10) {
   try {
-    const res = await fetchWithAuth(`${API_BASE}/events/upcoming?limit=${limit}`, { method: 'GET' })
-    const data = await parseJSON(res)
-    if (!res.ok) {
-            return { success: false, events: [] }
+    let res = await fetchWithAuth(`${API_BASE}/events/upcoming?limit=${limit}`, { method: 'GET' })
+    if (res.ok) {
+      const data = await parseJSON(res)
+      const eventsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : (data.events || []))
+      if (eventsArray.length > 0) {
+        const mapped = eventsArray.map(e => mapEvent(e))
+        return { success: true, events: mapped }
+      }
     }
-    const eventsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])
-    const mapped = eventsArray.map(e => {
-      const mappedEv = mapEvent(e)
-      
-      let monthStr = 'AUG'
-      let dayStr = '15'
-      if (mappedEv.date) {
-        try {
-          const dObj = new Date(mappedEv.date)
-          if (!isNaN(dObj.getTime())) {
-            monthStr = dObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-            dayStr = String(dObj.getDate())
-          }
-        } catch { }
-      }
-      return {
-        ...mappedEv,
-        title: mappedEv.name || mappedEv.title || 'Event',
-        month: monthStr,
-        day: dayStr,
-        registered: Number(mappedEv.registrationsCount || 0),
-        capacity: Number(mappedEv.capacity || 500),
-        color: '#615FFF'
-      }
-    })
-    return { success: true, events: mapped }
+
+    // Fallback: If /events/upcoming returns 500/404 on server, fetch main /events list
+    const allRes = await apiFetchEvents()
+    if (allRes.success && Array.isArray(allRes.events)) {
+      const now = new Date()
+      const upcoming = allRes.events
+        .filter(e => !e.date || new Date(e.date) >= now || (e.status || '').toLowerCase() === 'upcoming' || (e.status || '').toLowerCase() === 'published')
+        .slice(0, limit)
+      return { success: true, events: upcoming.length > 0 ? upcoming : allRes.events.slice(0, limit) }
+    }
+
+    return { success: false, events: [] }
   } catch (err) {
-        return { success: false, events: [], message: 'Server unreachable.' }
+    return { success: false, events: [], message: 'Server unreachable.' }
   }
 }
 
@@ -459,7 +453,11 @@ async function mockFetchAttendance(eventId) {
 /* ── REAL API REGISTRATIONS ──────────────────────────────────── */
 async function apiFetchRegistrations(eventId) {
   try {
-    // Correct endpoint: GET /registrations/event/{event_id}
+    const userRole = sessionStorage.getItem('cc_role') || sessionStorage.getItem('role') || ''
+    if (userRole.toLowerCase() === 'student') {
+      return { success: true, registrations: [] }
+    }
+
     const res = await fetchWithAuth(
       `${API_BASE}/registrations/event/${eventId}?page=1&size=500`,
       { method: 'GET' }
@@ -467,14 +465,13 @@ async function apiFetchRegistrations(eventId) {
     const data = await parseJSON(res)
 
     if (!res.ok) {
-      return { success: false, message: data.message || 'Failed to fetch registrations.' }
+      return { success: false, registrations: [], message: data.message || 'Failed to fetch registrations.' }
     }
 
-    // Backend may return registrations in various formats
     const regs = data.registrations || data.data || data.items || data || []
     return { success: true, registrations: Array.isArray(regs) ? regs : [] }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, registrations: [], message: 'Server unreachable.' }
   }
 }
 
@@ -593,17 +590,6 @@ const eventsService = {
 
   create: (payload) =>
     USE_MOCK ? mockCreateEvent(payload) : apiCreateEvent(payload),
-
-
-
-
-
-
-
-
-
-
-
     
   update: (id, payload) =>
     USE_MOCK ? mockUpdateEvent(id, payload) : apiUpdateEvent(id, payload),

@@ -1,6 +1,6 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { X, Loader2 } from 'lucide-react'
+import { X, Loader2, Eye, EyeOff } from 'lucide-react'
 
 export default function OrganizerFormModal({
   modalOpen,
@@ -16,6 +16,8 @@ export default function OrganizerFormModal({
   BRAND,
   inputStyle
 }) {
+  const [showPassword, setShowPassword] = useState(false)
+
   if (!modalOpen) return null
 
   return createPortal(
@@ -97,16 +99,28 @@ export default function OrganizerFormModal({
           {!editing && (
             <div>
               <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Password</label>
-              <input
-                type="password"
-                value={form.password}
-                onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                placeholder="Enter password (min 6 chars)"
-                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
-                style={{ ...inputStyle, borderColor: errors.password ? '#ef4444' : tokens.border }}
-                onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
-                onBlur={e => { e.target.style.borderColor = errors.password ? '#ef4444' : tokens.border; e.target.style.boxShadow = 'none' }}
-              />
+              <div className="relative flex items-center">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={form.password}
+                  onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
+                  placeholder="Enter password (min 6 chars)"
+                  className="w-full px-3.5 py-2.5 pr-10 rounded-xl text-[13px] outline-none border transition-all"
+                  style={{ ...inputStyle, borderColor: errors.password ? '#ef4444' : tokens.border }}
+                  onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+                  onBlur={e => { e.target.style.borderColor = errors.password ? '#ef4444' : tokens.border; e.target.style.boxShadow = 'none' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute right-3 bg-transparent border-none p-1 cursor-pointer flex items-center justify-center rounded-lg transition-colors"
+                  style={{ color: tokens.txtSec }}
+                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <Eye size={16} /> : <EyeOff size={16} />}
+                </button>
+              </div>
               {errors.password && <span className="text-[11px] text-red-500 mt-1 block">{errors.password}</span>}
             </div>
           )}
@@ -137,6 +151,23 @@ export default function OrganizerFormModal({
                 onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Gender</label>
+            <select
+              value={form.gender || ''}
+              onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}
+              className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
+              style={{ ...inputStyle, background: dark ? '#060e1c' : '#ffffff', color: !form.gender ? (dark ? '#7a98bb' : '#94a3b8') : tokens.txtPri }}
+              onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+              onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
+            >
+              <option value="" disabled>Select Gender</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other</option>
+            </select>
           </div>
 
           

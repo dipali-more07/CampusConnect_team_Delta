@@ -4,6 +4,8 @@ import settingsService from '../../services/settingsService'
 import organizersService from '../../services/organizersService'
 import { useToast } from '../../context/ToastContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useAuth } from '../../context/AuthContext'
+import { fetchWithAuth } from '../../utils/apiClient'
 
 // Sub-components
 import SettingsProfileTab from '../../components/admin/adminSettings/SettingsProfileTab'
@@ -13,6 +15,7 @@ import SettingsPermissionsTab from '../../components/admin/adminSettings/Setting
 
 export default function SettingsPage({ tokens }) {
   const { dark, setDark, accentColor, setAccentColor, fontSize, setFontSize, applyAppearance } = useTheme()
+  const { user } = useAuth() || {}
   const BRAND = tokens?.brand || accentColor || '#615FFF'
   const showToast = useToast()
   const fileInputRef = useRef(null)
@@ -44,6 +47,8 @@ export default function SettingsPage({ tokens }) {
     department: '',
     employeeId: '',
     phone: '',
+    gender: '',
+    bio: '',
     avatarColor: '#7c3aed',
     avatarUrl: null
   })
@@ -92,45 +97,84 @@ export default function SettingsPage({ tokens }) {
 
   const loadSettings = async () => {
     setLoading(true)
-    const orgProfileRes = await organizersService.getProfile()
-    const settingsRes = await settingsService.fetch()
 
-    if (orgProfileRes.success) {
-      const org = orgProfileRes.organizer
+    // 1. Try organizersService.getProfile()
+    let orgData = null
+    try {
+      const orgProfileRes = await organizersService.getProfile()
+      if (orgProfileRes && orgProfileRes.success && orgProfileRes.organizer) {
+        orgData = orgProfileRes.organizer
+      }
+    } catch (_) {}
+
+    // 2. Direct fetch from /auth/me or /organizers/me if service data was sparse
+    if (!orgData || !orgData.email) {
+      try {
+        const res = await fetchWithAuth(`${import.meta.env.VITE_API_BASE_URL}/auth/me`)
+        if (res && res.ok) {
+          const raw = await res.json()
+          const payload = raw.data?.user || raw.data || raw.user || raw
+          const prof = payload.profile || {}
+          orgData = {
+            id: payload.user_id || payload.id || prof.profile_id,
+            name: payload.full_name || payload.name || prof.full_name,
+            email: payload.email || prof.email,
+            phone: payload.phone || payload.mobile || prof.phone,
+            department: payload.department || prof.department,
+            gender: payload.gender || prof.gender || '',
+            bio: payload.bio || prof.bio || '',
+            avatarUrl: payload.profile_image || payload.profile_picture || prof.profile_picture || prof.profile_image
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 3. Fallback to AuthContext user object if available
+    if (!orgData && user) {
+      const prof = user.profile || {}
+      orgData = {
+        id: user.user_id || user.id,
+        name: user.full_name || user.name || prof.full_name,
+        email: user.email,
+        phone: user.phone || user.mobile || prof.phone,
+        department: user.department || prof.department,
+        gender: user.gender || prof.gender || '',
+        bio: user.bio || prof.bio || '',
+        avatarUrl: user.profile_image || user.profile_picture || user.avatarUrl
+      }
+    }
+
+    if (orgData) {
       setProfileForm(p => ({
         ...p,
-        id: org.id || '',
-        name: org.name || '',
-        email: org.email || '',
-        department: org.department || '',
-        phone: org.phone || '',
-        employeeId: org.collegeId || org.id || '',
-        avatarColor: org.avatarColor || '#615FFF'
+        id: orgData.id || p.id || '',
+        name: orgData.name || user?.name || user?.full_name || '',
+        email: orgData.email || user?.email || '',
+        department: orgData.department || user?.department || '',
+        phone: orgData.phone || user?.phone || user?.mobile || '',
+        gender: (orgData.gender || user?.gender || '').toLowerCase(),
+        bio: orgData.bio || user?.bio || '',
+        employeeId: orgData.collegeId || orgData.id || '',
+        avatarUrl: orgData.avatarUrl || user?.avatarUrl || p.avatarUrl,
+        avatarColor: orgData.avatarColor || '#615FFF'
       }))
-    } else if (settingsRes.success && settingsRes.settings.profile) {
-      setProfileForm(p => ({ ...p, ...settingsRes.settings.profile }))
     }
 
-    if (settingsRes.success) {
-      const fetchedApp = settingsRes.settings.appearance || {}
-      setAppearanceForm({
-        themeMode: fetchedApp.themeMode || (dark ? 'Dark' : 'Light'),
-        accentColor: fetchedApp.accentColor || accentColor || '#615FFF',
-        fontSize: fetchedApp.fontSize || fontSize || 'medium'
-      })
-      if (fetchedApp.themeMode || fetchedApp.accentColor || fetchedApp.fontSize) {
-        applyAppearance({
-          themeMode: fetchedApp.themeMode,
-          accentColor: fetchedApp.accentColor,
-          fontSize: fetchedApp.fontSize
+    try {
+      const settingsRes = await settingsService.fetch()
+      if (settingsRes && settingsRes.success) {
+        const fetchedApp = settingsRes.settings.appearance || {}
+        setAppearanceForm({
+          themeMode: fetchedApp.themeMode || (dark ? 'Dark' : 'Light'),
+          accentColor: fetchedApp.accentColor || accentColor || '#615FFF',
+          fontSize: fetchedApp.fontSize || fontSize || 'medium'
         })
+        if (settingsRes.settings.permissions) {
+          setPermissions(settingsRes.settings.permissions)
+        }
       }
-      if (settingsRes.settings.permissions) {
-        setPermissions(settingsRes.settings.permissions)
-      }
-    } else if (!orgProfileRes.success) {
-      showToast('Failed to fetch settings.', 'error')
-    }
+    } catch (_) {}
+
     setLoading(false)
   }
 
@@ -149,23 +193,48 @@ export default function SettingsPage({ tokens }) {
 
   const handleSaveProfile = async () => {
     setSaving(true)
-    let res
-    if (profileForm.id) {
-      res = await organizersService.update(profileForm.id, {
-        name: profileForm.name,
-        email: profileForm.email,
-        phone: profileForm.phone,
-        department: profileForm.department,
-        collegeId: profileForm.employeeId
-      })
-    } else {
-      res = await settingsService.updateProfile(profileForm)
+    let res = null
+    try {
+      res = await organizersService.updateProfile(profileForm)
+    } catch (_) {}
+
+    // Fallback: direct PUT to /auth/me or /organizers/me
+    if (!res || !res.success) {
+      try {
+        const backendPayload = {
+          full_name: profileForm.name,
+          email: profileForm.email,
+          phone: profileForm.phone,
+          mobile: profileForm.phone,
+          gender: profileForm.gender ? profileForm.gender.toLowerCase() : null,
+          department: profileForm.department,
+          bio: profileForm.bio || ''
+        }
+        let apiRes = await fetchWithAuth(`${import.meta.env.VITE_API_BASE_URL}/auth/me`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backendPayload)
+        })
+        if (!apiRes.ok) {
+          apiRes = await fetchWithAuth(`${import.meta.env.VITE_API_BASE_URL}/organizers/me`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(backendPayload)
+          })
+        }
+        if (apiRes.ok) {
+          const data = await apiRes.json().catch(() => ({}))
+          res = { success: true, message: data.message || 'Profile updated successfully.' }
+        }
+      } catch (_) {}
     }
+
     setSaving(false)
-    if (res.success) {
+    if (res && res.success) {
       showToast(res.message || 'Profile updated successfully.', 'success')
+      loadSettings()
     } else {
-      showToast(res.message || 'Failed to update profile.', 'error')
+      showToast(res?.message || 'Failed to update profile.', 'error')
     }
   }
 

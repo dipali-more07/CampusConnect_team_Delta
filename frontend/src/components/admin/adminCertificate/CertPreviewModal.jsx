@@ -1,6 +1,7 @@
 import React from 'react'
 import { createPortal } from 'react-dom'
 import { GraduationCap, X, Download, Copy } from 'lucide-react'
+import { downloadCertificatePDF } from '../../../utils/pdfGenerator'
 
 export default function CertPreviewModal({
   previewCert,
@@ -102,7 +103,15 @@ export default function CertPreviewModal({
           <button
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px"
             style={{ background: BRAND, boxShadow: '0 4px 14px rgba(97,95,255,0.4)' }}
-            onClick={() => showToast('PDF download started.', 'success')}
+            onClick={() => {
+              downloadCertificatePDF({
+                userName: previewCert.name || previewCert.user,
+                eventName: previewCert.event,
+                certCode: previewCert.verifyCode || previewCert.id,
+                issueDate: previewCert.date || previewCert.issueDate
+              })
+              if (showToast) showToast('PDF download started.', 'success')
+            }}
           >
             <Download size={14} /> Download PDF
           </button>

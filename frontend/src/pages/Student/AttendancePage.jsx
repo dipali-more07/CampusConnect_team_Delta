@@ -19,20 +19,26 @@ export default function AttendancePage({ tokens, user }) {
   const [hoveredPointIndex, setHoveredPointIndex] = useState(2)
 
   const [attendanceData, setAttendanceData] = useState(null)
+  const [analyticsData, setAnalyticsData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    studentService.fetchAttendanceData().then(res => {
+    const studentId = user?.id || user?.student_id || user?.user_id
+
+    Promise.all([
+      studentService.fetchAttendanceData(studentId),
+      studentService.fetchAttendanceAnalytics(studentId)
+    ]).then(([attRes, analyticsRes]) => {
       if (cancelled) return
-      if (res.success) {
-        setAttendanceData(res.data)
-      }
+      if (attRes.success) setAttendanceData(attRes.data)
+      if (analyticsRes?.success && analyticsRes?.data) setAnalyticsData(analyticsRes.data)
       setLoading(false)
     })
+
     return () => { cancelled = true }
-  }, [])
+  }, [user])
 
   const records = attendanceData?.records || []
   const summary = attendanceData?.summary || {}
@@ -72,17 +78,87 @@ export default function AttendancePage({ tokens, user }) {
     }
   }
 
-  // ── GRAPH DATA & COORDINATES COMPUTATION ──
-  const chartPoints = [
-    { month: 'Jul', total: 4, attended: 4, xPercent: 6, xSvg: 50, ySvg: 90 },
-    { month: 'Aug', total: 6, attended: 6, xPercent: 24.4, xSvg: 186, ySvg: 55 },
-    { month: 'Sep', total: 3, attended: 2, xPercent: 42.8, xSvg: 322, ySvg: 110 },
-    { month: 'Oct', total: 5, attended: 5, xPercent: 61.2, xSvg: 458, ySvg: 72.5 },
-    { month: 'Nov', total: 4, attended: 4, xPercent: 79.6, xSvg: 594, ySvg: 90 },
-    { month: 'Dec', total: 2, attended: 2, xPercent: 98, xSvg: 730, ySvg: 125 },
-  ]
+  // ── DYNAMIC GRAPH & COORDINATES COMPUTATION ──
+  const buildChartPoints = () => {
+    // 1. Backend analytics monthly array (already normalized in service)
+    const serverMonthly = analyticsData?.monthly
+    if (Array.isArray(serverMonthly) && serverMonthly.length > 0) {
+      // Find max value for Y scaling (min 8 to match Y axis ticks: 0, 2, 4, 6, 8)
+      const maxVal = Math.max(8, ...serverMonthly.map(item => Math.max(item.total || 0, item.attended || 0)))
+      
+      // Filter or display last 6 months or relevant range (or display all months if 6-12)
+      const listToDisplay = serverMonthly.length > 6 ? serverMonthly.slice(-6) : serverMonthly
+      
+      return listToDisplay.map((item, idx, arr) => {
+        const tot = item.total || 0
+        const att = item.attended || 0
+        const xSvg = Math.round(50 + (idx / Math.max(1, arr.length - 1)) * 680)
+        // 160 is base Y (0 value), 20 is top Y (max value)
+        const ySvg = Math.round(160 - ((att / maxVal) * 140))
+        const xPercent = Number((6 + (idx / Math.max(1, arr.length - 1)) * 88).toFixed(1))
+        return { month: item.month || `M${idx + 1}`, total: tot, attended: att, xPercent, xSvg, ySvg }
+      })
+    }
 
-  const activePoint = chartPoints[hoveredPointIndex !== null ? hoveredPointIndex : 2]
+    // 2. Fallback: compute month-by-month from raw attendance records
+    const monthOrder = ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const monthStats = {}
+    monthOrder.forEach(m => { monthStats[m] = { total: 0, attended: 0 } })
+
+    if (Array.isArray(records) && records.length > 0) {
+      records.forEach(r => {
+        const rawDate = r.event_date || r.date || r.created_at
+        if (rawDate) {
+          const d = new Date(rawDate)
+          if (!isNaN(d.getTime())) {
+            const mName = d.toLocaleDateString('en-US', { month: 'short' })
+            if (!monthStats[mName]) {
+              monthStats[mName] = { total: 0, attended: 0 }
+              if (!monthOrder.includes(mName)) monthOrder.push(mName)
+            }
+            monthStats[mName].total += 1
+            if ((r.status || '').toLowerCase() === 'present') monthStats[mName].attended += 1
+          }
+        }
+      })
+    }
+
+    const displayMonths = monthOrder.slice(-6)
+    const maxVal = Math.max(8, ...displayMonths.map(m => monthStats[m]?.total || 0))
+    return displayMonths.map((m, idx, arr) => {
+      const tot = monthStats[m]?.total || 0
+      const att = monthStats[m]?.attended || 0
+      const xSvg = Math.round(50 + (idx / Math.max(1, arr.length - 1)) * 680)
+      const ySvg = Math.round(160 - ((att / maxVal) * 140))
+      const xPercent = Number((6 + (idx / Math.max(1, arr.length - 1)) * 88).toFixed(1))
+      return { month: m, total: tot, attended: att, xPercent, xSvg, ySvg }
+    })
+  }
+
+  const chartPoints = buildChartPoints()
+  const activePoint = chartPoints[hoveredPointIndex !== null && hoveredPointIndex < chartPoints.length ? hoveredPointIndex : 0]
+
+  // Generate smooth SVG bezier curve
+  const generateSvgCurve = (pts) => {
+    if (!pts || pts.length === 0) return ''
+    if (pts.length === 1) return `M ${pts[0].xSvg} ${pts[0].ySvg}`
+    let d = `M ${pts[0].xSvg} ${pts[0].ySvg}`
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p1 = pts[i]
+      const p2 = pts[i + 1]
+      const cpx1 = p1.xSvg + (p2.xSvg - p1.xSvg) * 0.4
+      const cpy1 = p1.ySvg
+      const cpx2 = p1.xSvg + (p2.xSvg - p1.xSvg) * 0.6
+      const cpy2 = p2.ySvg
+      d += ` C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${p2.xSvg} ${p2.ySvg}`
+    }
+    return d
+  }
+
+  const waveStrokePath = generateSvgCurve(chartPoints)
+  const waveAreaPath = chartPoints.length > 0
+    ? `${waveStrokePath} L ${chartPoints[chartPoints.length - 1].xSvg} 160 L ${chartPoints[0].xSvg} 160 Z`
+    : ''
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 flex flex-col gap-6 max-w-7xl mx-auto w-full font-[Manrope,sans-serif]">
@@ -212,7 +288,7 @@ export default function AttendancePage({ tokens, user }) {
             Attendance Analytics
           </h3>
           <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-            <TrendingUp size={13} /> {summary.analyticsChange || '↑ 87.5%'}
+            <TrendingUp size={13} /> ↑ {analyticsData?.percentage ?? summary.overallRate ?? summary.analyticsChange ?? '—'}
           </span>
         </div>
 
@@ -250,19 +326,23 @@ export default function AttendancePage({ tokens, user }) {
             ))}
 
             {/* Smooth Filled Gradient Area */}
-            <path
-              d="M 50 90 C 110 50, 130 55, 186 55 C 240 55, 270 107.5, 322 107.5 C 370 107.5, 410 72.5, 458 72.5 C 500 72.5, 540 90, 594 90 C 640 90, 680 125, 730 125 L 730 160 L 50 160 Z"
-              fill="url(#analyticsAreaGrad)"
-            />
+            {waveAreaPath && (
+              <path
+                d={waveAreaPath}
+                fill="url(#analyticsAreaGrad)"
+              />
+            )}
 
             {/* Main Glowing Smooth Wave Stroke */}
-            <path
-              d="M 50 90 C 110 50, 130 55, 186 55 C 240 55, 270 107.5, 322 107.5 C 370 107.5, 410 72.5, 458 72.5 C 500 72.5, 540 90, 594 90 C 640 90, 680 125, 730 125"
-              fill="none"
-              stroke={BRAND}
-              strokeWidth="3"
-              strokeLinecap="round"
-            />
+            {waveStrokePath && (
+              <path
+                d={waveStrokePath}
+                fill="none"
+                stroke={BRAND}
+                strokeWidth="3"
+                strokeLinecap="round"
+              />
+            )}
 
             {/* Interactive Vertical Cursor Indicator Line */}
             {activePoint && (
