@@ -75,10 +75,7 @@ export default function PaymentsPage({ tokens }) {
   useEffect(() => {
     eventsService.fetchAll().then(res => {
       if (res.success) {
-        console.log("MY_DEBUG: USER:", user)
-        console.log("MY_DEBUG: RAW EVENTS:", res.events)
         const filtered = filterEventsByOrganizer(res.events)
-        console.log("MY_DEBUG: FILTERED EVENTS:", filtered)
         // Sort by created_at descending (latest first)
         const sorted = [...filtered].sort((a, b) => {
           const dateA = new Date(a.created_at || a.start_datetime || 0)

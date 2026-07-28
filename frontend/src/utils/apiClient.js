@@ -17,7 +17,29 @@ const SESSION_KEY = 'cc_session'
 
 // ── Token helpers ────────────────────────────────────────────────
 export function getAccessToken() {
-  return sessionStorage.getItem(TOKEN_KEY) || sessionStorage.getItem('token') || ''
+  let token = sessionStorage.getItem(TOKEN_KEY) ||
+              sessionStorage.getItem('token') ||
+              sessionStorage.getItem('cc_token') ||
+              localStorage.getItem(TOKEN_KEY) ||
+              localStorage.getItem('token') ||
+              localStorage.getItem('cc_token')
+  if (!token) {
+    const keys = [SESSION_KEY, 'cc_session', 'cc_user', 'user', 'cc_auth']
+    for (const key of keys) {
+      try {
+        const raw = sessionStorage.getItem(key) || localStorage.getItem(key)
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const found = parsed.token || parsed.access_token || parsed.accessToken || parsed.user?.token || parsed.user?.access_token
+          if (found) {
+            token = found
+            break
+          }
+        }
+      } catch (_e) {}
+    }
+  }
+  return (token || '').trim()
 }
 
 export function getRefreshToken() {

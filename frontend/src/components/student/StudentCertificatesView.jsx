@@ -82,19 +82,19 @@ export default function StudentCertificatesView({ tokens, user }) {
             </div>
 
             {/* Actions */}
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-[#1a3050] flex items-center gap-3">
+            <div className="mt-5 pt-4 border-t border-slate-100 dark:border-[#1a3050] flex items-center gap-2">
               <button
                 onClick={() => downloadCertificatePDF({ ...cert, userName: user?.name })}
-                className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90"
+                className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap transition-all hover:opacity-90 active:scale-95 shadow-sm"
                 style={{ background: BRAND }}
               >
-                <Download size={14} /> Download PDF
+                <Download size={14} className="shrink-0" /> Download PDF
               </button>
               <button
                 onClick={() => setSelectedCert(cert)}
-                className="px-3.5 py-2.5 rounded-xl font-bold text-xs border border-slate-200 dark:border-[#1e2d45] text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-[#162640] hover:bg-slate-100 dark:hover:bg-[#1e2d45] cursor-pointer transition-colors flex items-center gap-1.5"
+                className="px-3 py-2.5 rounded-xl font-bold text-xs border border-slate-200 dark:border-[#1e2d45] text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-[#162640] hover:bg-slate-100 dark:hover:bg-[#1e2d45] cursor-pointer transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 active:scale-95"
               >
-                <ExternalLink size={14} /> Preview
+                <ExternalLink size={14} className="shrink-0" /> Preview
               </button>
             </div>
           </div>

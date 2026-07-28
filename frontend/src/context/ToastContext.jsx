@@ -10,12 +10,15 @@ const ToastContext = createContext(null)
  *   type    : 'success' | 'error' | 'info' | 'warning'   (default: 'success')
  *   duration: milliseconds before auto-dismiss              (default: 4000)
  */
+import { formatUserFriendlyError } from '../utils/formatUserFriendlyError'
+
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
   const showToast = useCallback((message, type = 'success', duration = 4000) => {
+    const finalMessage = type === 'error' ? formatUserFriendlyError(message) : message
     const id = Date.now() + Math.random()
-    setToasts(prev => [...prev, { id, message, type }])
+    setToasts(prev => [...prev, { id, message: finalMessage, type }])
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
     }, duration)

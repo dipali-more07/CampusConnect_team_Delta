@@ -24,6 +24,7 @@ export default function EventFormModal({
   if (!open) return null
 
   const BRAND = tokens?.brand || DEFAULT_BRAND
+  const isOrganizerRole = window.location.pathname.includes('/organizer') || (sessionStorage.getItem('cc_role') || '').toLowerCase().includes('organizer')
 
   const inputStyle = {
     border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`,
@@ -194,19 +195,28 @@ export default function EventFormModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-                Assign Organizer
+                Assign Organizer {isOrganizerRole && <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500 ml-1">(Locked)</span>}
               </label>
               <input
                 type="text"
-                placeholder="Dr. Priya Sharma"
+                placeholder="Organizer Name"
                 value={formState.organizer}
-                onChange={e => setFormState(p => ({ ...p, organizer: e.target.value }))}
+                onChange={e => !isOrganizerRole && setFormState(p => ({ ...p, organizer: e.target.value }))}
+                readOnly={isOrganizerRole}
                 className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
                 style={{
                   ...inputStyle,
-                  borderColor: formErrors.organizer ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0'
+                  borderColor: formErrors.organizer ? '#ef4444' : dark ? '#1a3050' : '#e2e8f0',
+                  background: isOrganizerRole ? (dark ? '#0a1628' : '#f1f5f9') : inputStyle.background,
+                  cursor: isOrganizerRole ? 'not-allowed' : 'text',
+                  opacity: isOrganizerRole ? 0.85 : 1
                 }}
-                onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
+                onFocus={e => {
+                  if (!isOrganizerRole) {
+                    e.target.style.borderColor = BRAND
+                    e.target.style.boxShadow = `0 0 0 3px ${BRAND}20`
+                  }
+                }}
                 onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
               />
               {formErrors.organizer && <span className="text-[11px] text-red-500 mt-1.5 block">{formErrors.organizer}</span>}
@@ -358,110 +368,6 @@ export default function EventFormModal({
               onBlur={e => { e.target.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.target.style.boxShadow = 'none' }}
             />
           </div>
-
-          {/* Image Drag and Drop Upload */}
-          <div>
-            <input 
-              type="file"
-              accept="image/*"
-              id="banner-file-input"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files[0]
-                if (file) {
-                  const reader = new FileReader()
-                  reader.onloadend = () => {
-                    setRawBannerSrc(reader.result)
-                    setCropperOpen(true)
-                  }
-                  reader.readAsDataURL(file)
-                }
-              }}
-            />
-            <label
-              htmlFor="banner-file-input"
-              className="flex flex-col items-center justify-center border-2 border-dashed rounded-2xl p-8 transition-all duration-200 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-[#162640]/20"
-              style={{
-                borderColor: dark ? '#1a3050' : '#d8e3f0',
-                background: dark ? '#091526' : '#ffffff',
-              }}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault()
-                const file = e.dataTransfer.files[0]
-                if (file) {
-                  const reader = new FileReader()
-                  reader.onloadend = () => {
-                    setRawBannerSrc(reader.result)
-                    setCropperOpen(true)
-                  }
-                  reader.readAsDataURL(file)
-                }
-              }}
-            >
-              {formState.banner ? (
-                <div className="relative w-full flex flex-col items-center">
-                  <img 
-                    src={formState.banner} 
-                    alt="Banner preview" 
-                    className="max-h-[140px] rounded-lg object-cover mb-2 w-full"
-                  />
-                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setRawBannerSrc(formState.banner)
-                        setCropperOpen(true)
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white rounded-full p-1.5 border-none cursor-pointer flex items-center justify-center shadow-md transition-transform hover:scale-105"
-                      title="Crop Poster"
-                    >
-                      <Crop size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault()
-                        e.stopPropagation()
-                        setFormState(p => ({ ...p, banner: null }))
-                      }}
-                      className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 border-none cursor-pointer flex items-center justify-center shadow-md transition-transform hover:scale-105"
-                      title="Remove Image"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                  <span className="text-[12px] font-bold text-slate-500">Click to replace or tap crop icon to adjust poster</span>
-                </div>
-              ) : (
-                <>
-                  <Image size={32} className="mb-2" style={{ color: dark ? '#7a98bb' : '#94a3b8' }} />
-                  <div className="text-[13px] font-semibold text-center" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-                    Drop event banner here or <span className="text-blue-500 font-bold hover:underline">browse</span>
-                  </div>
-                  <div className="text-[11px] mt-1" style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>
-                    PNG, JPG up to 5MB (Supports Image Cropping)
-                  </div>
-                </>
-              )}
-            </label>
-          </div>
-
-          <ImageCropperModal
-            isOpen={cropperOpen}
-            onClose={() => setCropperOpen(false)}
-            imageSrc={rawBannerSrc}
-            cropShape="rect"
-            cropTitle="Crop Event Poster"
-            BRAND={BRAND}
-            onCropComplete={(croppedUrl) => {
-              setFormState(p => ({ ...p, banner: croppedUrl }))
-              setCropperOpen(false)
-            }}
-          />
-
         </div>
 
         {/* Modal Footer */}

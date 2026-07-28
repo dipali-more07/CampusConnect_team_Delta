@@ -100,8 +100,7 @@ export default function StudentDashboard() {
             setIsSuspended(true)
           }
         }
-      } catch (err) {
-        console.error('Suspension poll error:', err)
+      } catch (_err) {
       }
     }
 

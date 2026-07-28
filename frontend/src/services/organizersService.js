@@ -191,9 +191,9 @@ async function mockGetProfile() {
 
 async function apiGetProfile() {
   try {
-    let res = await fetchWithAuth(`${API_BASE}/organizers/me`)
+    let res = await fetchWithAuth(`${API_BASE}/organizers/me`, { method: 'GET' })
     if (!res.ok) {
-      res = await fetchWithAuth(`${API_BASE}/auth/me`)
+      res = await fetchWithAuth(`${API_BASE}/auth/me`, { method: 'GET' })
     }
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch organizer profile.' }
@@ -217,28 +217,30 @@ async function mockUpdateProfile(payload) {
 async function apiUpdateProfile(payload) {
   try {
     const backendPayload = {
-      full_name: payload.name,
+      full_name: payload.name || payload.full_name,
       email: payload.email,
       phone: payload.phone,
-      mobile: payload.phone,
-      gender: payload.gender ? payload.gender.toLowerCase() : null,
-      department: payload.department,
       bio: payload.bio || '',
-      profile_picture: payload.avatarUrl || payload.profile_image || null
+      department: payload.department,
+      course: payload.course || '',
+      college_id: payload.collegeId || payload.college_id || '',
+      college_name: payload.collegeName || payload.college_name || '',
+      designation: payload.designation || 'Head Organizer',
+      permissions: payload.permissions || ['create_event', 'manage_attendance'],
     }
     let res = await fetchWithAuth(`${API_BASE}/organizers/me`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: JSON.stringify(backendPayload)
     })
     if (!res.ok) {
-      res = await fetchWithAuth(`${API_BASE}/auth/me`, {
+      res = await fetchWithAuth(`${API_BASE}/organizers/me`, {
         method: 'PUT',
         body: JSON.stringify(backendPayload)
       })
     }
     if (!res.ok) {
       res = await fetchWithAuth(`${API_BASE}/auth/me`, {
-        method: 'PATCH',
+        method: 'PUT',
         body: JSON.stringify(backendPayload)
       })
     }

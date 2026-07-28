@@ -4,6 +4,7 @@ import { X, Check, QrCode, Camera, CheckCircle2, Loader2, AlertCircle, Calendar,
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import studentService from '../../services/studentService'
+import eventsService from '../../services/eventsService'
 import { Html5Qrcode } from 'html5-qrcode'
 
 export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed, user }) {
@@ -38,14 +39,23 @@ export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed,
 
     Promise.all([
       studentService.fetchEventsData(),
-      studentService.fetchMyRegistrations()
-    ]).then(([evRes, regRes]) => {
+      studentService.fetchMyRegistrations(),
+      eventsService.fetchAll()
+    ]).then(([evRes, regRes, allEvRes]) => {
       let allEvs = []
       let myRegs = []
 
       if (evRes.success && Array.isArray(evRes.data)) {
-        allEvs = evRes.data
-        eventsListRef.current = evRes.data
+        allEvs = [...evRes.data]
+      }
+      if (allEvRes?.success && Array.isArray(allEvRes.events)) {
+        const existingIds = new Set(allEvs.map(e => String(e.id || e.event_id)))
+        allEvRes.events.forEach(e => {
+          const eId = String(e.id || e.event_id)
+          if (eId && !existingIds.has(eId)) {
+            allEvs.push(e)
+          }
+        })
       }
 
       if (regRes.success && Array.isArray(regRes.data)) {
@@ -53,13 +63,39 @@ export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed,
         registrationsRef.current = regRes.data
       }
 
-      // Filter events that student registered for, or default to all events
+      // 1. Filter events that student has registered for
       const registeredIds = new Set(myRegs.map(r => String(r.event_id || r.eventId || r.event?.id)))
-      const userEvList = allEvs.filter(e => registeredIds.has(String(e.id || e.event_id)) || e.registered)
+      const registeredEvents = allEvs.filter(e => {
+        const eId = String(e.id || e.event_id)
+        return registeredIds.has(eId) || e.registered
+      })
 
-      setEventsList(userEvList.length > 0 ? userEvList : allEvs)
-      if (userEvList.length > 0) {
-        setSelectedEventId(String(userEvList[0].id || userEvList[0].event_id))
+      // 2. Exclude completed / past events
+      const now = Date.now()
+      const activeRegisteredEvents = registeredEvents.filter(e => {
+        const statusLower = (e.status || '').toLowerCase()
+        if (statusLower === 'completed' || statusLower === 'cancelled' || statusLower === 'finished') {
+          return false
+        }
+        const rawEnd = e.end_datetime || e.endDateTime || e.date
+        if (rawEnd) {
+          const endDate = new Date(rawEnd)
+          if (!isNaN(endDate.getTime())) {
+            if (!String(rawEnd).includes('T') && !String(rawEnd).includes(':')) {
+              endDate.setHours(23, 59, 59, 999)
+            }
+            if (now > endDate.getTime()) return false
+          }
+        }
+        return true
+      })
+
+      eventsListRef.current = activeRegisteredEvents
+      setEventsList(activeRegisteredEvents)
+      if (activeRegisteredEvents.length > 0) {
+        setSelectedEventId(String(activeRegisteredEvents[0].id || activeRegisteredEvents[0].event_id))
+      } else {
+        setSelectedEventId('')
       }
     }).catch(_err => {})
     .finally(() => {
@@ -346,21 +382,6 @@ export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed,
               >
                 <Camera size={16} /> Open Camera QR Scanner
               </button>
-
-              {selectedEventId && (
-                <button
-                  type="button"
-                  onClick={handleDirectCheckIn}
-                  disabled={submittingCheckIn}
-                  className="w-full py-2.5 rounded-2xl font-bold text-xs border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 cursor-pointer flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
-                >
-                  {submittingCheckIn ? (
-                    <><Loader2 size={14} className="animate-spin" /> Recording Check-In...</>
-                  ) : (
-                    <><Sparkles size={14} /> Quick Self Check-In for Selected Event</>
-                  )}
-                </button>
-              )}
             </div>
           </div>
         )}

@@ -16,8 +16,7 @@ export function encryptPayload(data) {
       String.fromCharCode('0x' + p1)
     ))
     return base64
-  } catch (err) {
-    console.error('btoa encryption error:', err)
+  } catch (_err) {
     return typeof data === 'string' ? data : JSON.stringify(data)
   }
 }

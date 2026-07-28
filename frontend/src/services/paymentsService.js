@@ -174,8 +174,7 @@ async function getEventsMap() {
           })
         }
       }
-    } catch (e) {
-      console.error('Failed to load events map for payments:', e)
+    } catch (_e) {
     }
     return map
   })()

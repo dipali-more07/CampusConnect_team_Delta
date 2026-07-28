@@ -107,11 +107,13 @@ export default function AttendancePage({ tokens }) {
     if (saved) {
       try {
         const parsed = JSON.parse(saved)
-        if (parsed.expiresAt > Date.now()) {
+        if (parsed.expiresAt > Date.now() && parsed.qrUrl && !parsed.qrUrl.startsWith('blob:')) {
           setQrImageUrl(parsed.qrUrl)
           setQrGenerated(true)
           startCountdown(parsed.expiresAt)
           return
+        } else if (parsed.qrUrl?.startsWith('blob:')) {
+          localStorage.removeItem(`cc_qr_${selectedEvent}`)
         }
       } catch (e) {}
     }
@@ -339,7 +341,7 @@ export default function AttendancePage({ tokens }) {
       }
 
       if (finalUrl) {
-        const expiresAt = Date.now() + (8 * 3600 + 32 * 60 + 14) * 1000
+        const expiresAt = Date.now() + 15 * 60 * 1000
         const dataToSave = { qrUrl: finalUrl, expiresAt }
         localStorage.setItem(`cc_qr_${selectedEvent}`, JSON.stringify(dataToSave))
 

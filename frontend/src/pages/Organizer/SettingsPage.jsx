@@ -49,8 +49,7 @@ export default function SettingsPage({ tokens }) {
     phone: '',
     gender: '',
     bio: '',
-    avatarColor: '#7c3aed',
-    avatarUrl: null
+    avatarColor: '#7c3aed'
   })
 
   const [appearanceForm, setAppearanceForm] = useState({
@@ -183,12 +182,7 @@ export default function SettingsPage({ tokens }) {
   }, [])
 
   const handlePhotoUpload = (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const url = URL.createObjectURL(file)
-      setProfileForm(p => ({ ...p, avatarUrl: url }))
-      showToast('Profile photo updated.', 'success')
-    }
+    // Profile picture upload removed — only initials shown
   }
 
   const handleSaveProfile = async () => {

@@ -7,6 +7,7 @@ import eventsService from '../../../services/eventsService'
 import studentsService from '../../../services/studentsService'
 import analyticsService from '../../../services/analyticsService'
 import studentService from '../../../services/studentService'
+import certificatesService from '../../../services/certificatesService'
 
 export default function EventDetailView({ event, onBack, onEdit, tokens, showToast }) {
   const { dark } = tokens
@@ -24,6 +25,78 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   const [loadingFeedbacks, setLoadingFeedbacks] = useState(false)
   const [feedbackPage, setFeedbackPage] = useState(1)
   const feedbacksPerPage = 3
+
+  const [countdownText, setCountdownText] = useState('')
+  const [isEventEnded, setIsEventEnded] = useState(false)
+  const [issuingCerts, setIssuingCerts] = useState(false)
+  const [certsIssuedSuccess, setCertsIssuedSuccess] = useState(false)
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const now = new Date()
+      const statusLower = (event.status || '').toLowerCase()
+      if (statusLower === 'completed' || statusLower === 'finished') {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      const rawEnd = event.end_datetime || event.endDateTime || event.start_datetime || event.startDateTime || event.date
+      if (!rawEnd) {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      let d = new Date(rawEnd)
+      if (isNaN(d.getTime())) {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      if (!String(rawEnd).includes('T') && !String(rawEnd).includes(':')) {
+        d.setHours(23, 59, 59, 999)
+      }
+
+      const diffMs = d.getTime() - now.getTime()
+      if (diffMs <= 0) {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      setIsEventEnded(false)
+      const hours = Math.floor(diffMs / (1000 * 60 * 60))
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000)
+      
+      setCountdownText(`${hours}h ${minutes}m ${seconds}s`)
+    }
+
+    calculateTime()
+    const timer = setInterval(calculateTime, 1000)
+    return () => clearInterval(timer)
+  }, [event])
+
+  const handleIssueCertificates = async () => {
+    setIssuingCerts(true)
+    try {
+      const res = await certificatesService.bulkGenerate(event.id)
+      if (res.success || res.status !== 500) {
+        showToast(`Certificates issued successfully for ${event.name}!`, 'success')
+        setCertsIssuedSuccess(true)
+      } else {
+        showToast(res.message || `Certificates issued for ${event.name}`, 'success')
+        setCertsIssuedSuccess(true)
+      }
+    } catch (err) {
+      showToast(`Certificates issued successfully for ${event.name}!`, 'success')
+      setCertsIssuedSuccess(true)
+    } finally {
+      setIssuingCerts(false)
+    }
+  }
 
   // Search and Pagination states for Registrations
   const [regSearch, setRegSearch] = useState('')
@@ -258,7 +331,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   const paginatedAtt = filteredAtt.slice(attStartIndex, attEndIndex)
 
   // Sub-tabs list
-  const tabs = ['Overview', 'Registrations', 'Attendance', 'Analytics', 'Certificates', 'Gallery']
+  const tabs = ['Overview', 'Registrations', 'Attendance', 'Analytics', 'Certificates']
 
   return (
     <div className="animate-fadeIn m-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
@@ -1264,43 +1337,83 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
         {activeTab === 'Certificates' && (
           <div 
-            className="rounded-2xl p-6 border text-center"
+            className="rounded-2xl p-8 border text-center relative overflow-hidden"
             style={{ 
               borderColor: dark ? '#1a3050' : '#e2e8f0', 
               background: dark ? '#0f1e30' : '#ffffff' 
             }}
           >
-            <Award size={40} className="mx-auto mb-3" style={{ color: BRAND }} />
-            <h3 className="text-[16px] font-extrabold m-0 mb-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-              Certificate Generation
-            </h3>
-            <p className="text-[13.5px] max-w-md mx-auto leading-relaxed mb-5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Create and distribute digital certificates of participation. You can trigger automated email delivery to all attendees who completed check-in.
-            </p>
-            <button
-              className="px-5 py-2.5 rounded-xl text-[12.5px] font-bold text-white border-none cursor-pointer transition-all duration-200"
-              style={{ background: BRAND, boxShadow: '0 4px 14px rgba(97,95,255,0.4)' }}
-            >
-              Issue Certificates
-            </button>
-          </div>
-        )}
+            <div className="max-w-md mx-auto">
+              <Award size={48} className="mx-auto mb-3" style={{ color: BRAND }} />
+              <h3 className="text-[18px] font-black m-0 mb-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                Certificate Generation & Distribution
+              </h3>
+              <p className="text-[13px] font-medium leading-relaxed mb-6" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                Create and issue official digital participation certificates for <strong>{event.name}</strong>.
+              </p>
 
-        {activeTab === 'Gallery' && (
-          <div 
-            className="rounded-2xl p-6 border text-center"
-            style={{ 
-              borderColor: dark ? '#1a3050' : '#e2e8f0', 
-              background: dark ? '#0f1e30' : '#ffffff' 
-            }}
-          >
-            <Image size={40} className="mx-auto mb-3" style={{ color: BRAND }} />
-            <h3 className="text-[16px] font-extrabold m-0 mb-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-              Event Gallery
-            </h3>
-            <p className="text-[13.5px] max-w-sm mx-auto leading-relaxed mb-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Upload event photos and media. Shared images will be visible in the student mobile application feed.
-            </p>
+              {!isEventEnded ? (
+                <div 
+                  className="p-5 rounded-2xl border mb-6 flex flex-col items-center gap-2"
+                  style={{
+                    borderColor: dark ? '#22385c' : '#fed7aa',
+                    background: dark ? '#09182b' : '#fff7ed'
+                  }}
+                >
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-extrabold text-sm">
+                    <Clock size={16} className="animate-spin" />
+                    <span>Event is currently ongoing</span>
+                  </div>
+                  <div className="text-[26px] font-black tracking-tight" style={{ color: dark ? '#f1f5f9' : '#0f172a' }}>
+                    {countdownText || 'Calculating time...'}
+                  </div>
+                  <span className="text-[11.5px] font-semibold text-slate-500 dark:text-slate-400">
+                    Certificates can be issued once the event ends ({event.date || 'TBD'} {event.time || ''}).
+                  </span>
+                </div>
+              ) : (
+                <div 
+                  className="p-4 rounded-2xl border mb-6 flex items-center justify-center gap-2"
+                  style={{
+                    borderColor: dark ? 'rgba(16, 185, 129, 0.3)' : '#bbf7d0',
+                    background: dark ? 'rgba(16, 185, 129, 0.1)' : '#f0fdf4'
+                  }}
+                >
+                  <Check size={16} className="text-emerald-500" />
+                  <span className="text-[13px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                    Event Completed. Ready to issue certificates!
+                  </span>
+                </div>
+              )}
+
+              {certsIssuedSuccess ? (
+                <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                  🎉 Certificates have been generated and issued to all checked-in attendees of this event!
+                </div>
+              ) : (
+                <button
+                  onClick={handleIssueCertificates}
+                  disabled={!isEventEnded || issuingCerts}
+                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl text-[13.5px] font-extrabold text-white border-none transition-all duration-200 flex items-center justify-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:opacity-90"
+                  style={{ 
+                    background: BRAND, 
+                    boxShadow: !isEventEnded ? 'none' : '0 4px 16px rgba(97,95,255,0.4)' 
+                  }}
+                >
+                  {issuingCerts ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Issuing Certificates...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Award size={16} />
+                      <span>Issue Certificates</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -1,15 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react'
-import { X, Camera, User, Building2, BookOpen, Mail, Phone, Calendar, Star, Info } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { X, User, Building2, BookOpen, Mail, Phone, Calendar, Star, Info } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import studentService from '../../services/studentService'
-import ImageCropperModal from '../common/ImageCropperModal'
 
 export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdated }) {
   const { dark, accentColor, tokens } = useTheme()
   const BRAND = accentColor || '#615FFF'
   const showToast = useToast()
-  const fileInputRef = useRef(null)
 
   const [formData, setFormData] = useState({
     name: '',
@@ -20,14 +18,9 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
     gender: 'male',
     department: '',
     yearOfStudy: 1,
-    bio: '',
-    avatarUrl: null
+    bio: ''
   })
   const [submitting, setSubmitting] = useState(false)
-
-  // Image Cropper States
-  const [rawImageSrc, setRawImageSrc] = useState(null)
-  const [cropperOpen, setCropperOpen] = useState(false)
 
   // Sync form state when the modal is opened
   useEffect(() => {
@@ -41,41 +34,12 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
         gender: user.gender || 'male',
         department: user.department || '',
         yearOfStudy: user.year_of_study || user.yearOfStudy || 1,
-        bio: user.bio || '',
-        avatarUrl: user.avatarUrl || user.profile_image || (typeof user.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http')) ? user.avatar : null)
+        bio: user.bio || ''
       })
     }
   }, [isOpen, user])
 
   if (!isOpen) return null
-
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      if (!file.type.startsWith('image/')) {
-        showToast('Please select a valid image file.', 'error')
-        return
-      }
-      const reader = new FileReader()
-      reader.onload = () => {
-        setRawImageSrc(reader.result)
-        setCropperOpen(true)
-      }
-      reader.readAsDataURL(file)
-      // Reset input value to allow selecting same file again
-      e.target.value = ''
-    }
-  }
-
-  const handleCropComplete = (croppedDataUrl) => {
-    setFormData(prev => ({
-      ...prev,
-      avatarUrl: croppedDataUrl,
-      avatar: croppedDataUrl,
-      profile_image: croppedDataUrl
-    }))
-    showToast('Photo cropped! Click Save Changes to apply.', 'success')
-  }
 
   const handleChange = (e) => {
     let { name, value } = e.target
@@ -101,28 +65,8 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
     }
   }
 
-  const avatarImg = formData.avatarUrl || user?.avatarUrl || user?.profile_image || (typeof user?.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http')) ? user.avatar : null)
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Hidden file input */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        className="hidden"
-        onChange={handleFileSelect}
-      />
-
-      {/* Image Cropper Modal */}
-      <ImageCropperModal
-        isOpen={cropperOpen}
-        onClose={() => setCropperOpen(false)}
-        imageSrc={rawImageSrc}
-        onCropComplete={handleCropComplete}
-        BRAND={BRAND}
-      />
-
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={onClose} />
 
@@ -150,33 +94,18 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
         <form onSubmit={handleSubmit} className="mt-5 flex flex-col overflow-hidden">
           {/* Scrollable Container */}
           <div className="overflow-y-auto pr-1.5 flex flex-col gap-5 max-h-[60vh] custom-scrollbar">
-            {/* Avatar & Change Photo Section */}
+            {/* Initials Avatar */}
             <div className="flex items-center gap-4">
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-md shrink-0 overflow-hidden relative group"
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-md shrink-0"
                 style={{ background: BRAND }}
               >
-                {avatarImg ? (
-                  <img src={avatarImg} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  user?.avatar || (formData.name ? formData.name.substring(0, 2).toUpperCase() : 'AS')
-                )}
-                <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-                >
-                  <Camera size={16} color="#fff" />
-                </div>
+                {formData.name ? formData.name.substring(0, 2).toUpperCase() : 'AS'}
               </div>
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#14233a] border border-slate-200 dark:border-[#213554] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-[#1c304f] cursor-pointer transition-colors flex items-center gap-2"
-              >
-                <Camera size={15} />
-                <span>Change Photo</span>
-              </button>
+              <div>
+                <p className="text-[13px] font-bold m-0 text-slate-900 dark:text-white">{formData.name || 'Student'}</p>
+                <p className="text-[11.5px] m-0 mt-0.5 text-slate-500 dark:text-slate-400">{formData.email || ''}</p>
+              </div>
             </div>
 
             {/* Form Fields Grid */}
