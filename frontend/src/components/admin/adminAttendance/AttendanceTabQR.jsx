@@ -46,6 +46,14 @@ export default function AttendanceTabQR({
   label,
   fmtCountdown
 }) {
+  const selectedEventObj = (eventsList || []).find(e => String(e.id) === String(selectedEvent))
+  const rawStart = selectedEventObj?.start_datetime || selectedEventObj?.startDateTime || selectedEventObj?.date
+  const startDateObj = rawStart ? new Date(rawStart) : null
+  const isBeforeStart = startDateObj && !isNaN(startDateObj.getTime()) && Date.now() < startDateObj.getTime()
+
+  // Use event's qrCodeImage if available and not before start
+  const displayQrUrl = qrImageUrl || (!isBeforeStart ? selectedEventObj?.qrCodeImage : null)
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* left: form */}
@@ -66,22 +74,29 @@ export default function AttendanceTabQR({
 
         <button
           onClick={handleGenerateQR}
-          className="w-full py-3 rounded-xl text-[14px] font-bold text-white border-none cursor-pointer transition-all flex items-center justify-center gap-2"
-          style={{ background: BRAND, boxShadow: '0 4px 16px rgba(97,95,255,0.35)' }}
+          disabled={isBeforeStart || qrLoading}
+          className="w-full py-3 rounded-xl text-[14px] font-bold text-white border-none transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          style={{ background: BRAND, boxShadow: isBeforeStart ? 'none' : '0 4px 16px rgba(97,95,255,0.35)' }}
         >
           {qrLoading ? <Loader2 size={16} className="animate-spin" /> : <QrCode size={16} />}
           {qrLoading ? 'Generating…' : 'Generate QR Code'}
         </button>
+
+        {isBeforeStart && (
+          <div className="mt-3 text-center text-xs font-extrabold text-amber-600 dark:text-amber-400 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+            QR code will be available once the event starts.
+          </div>
+        )}
       </div>
 
       {/* right: preview */}
       <div className="rounded-2xl p-6 border flex flex-col items-center justify-center min-h-[280px] gap-0" style={cardStyle}>
-        {qrGenerated ? (
+        {qrGenerated || displayQrUrl ? (
           <>
             {/* QR image */}
             <div className="mb-5 p-3 rounded-2xl flex items-center justify-center" style={{ background: dark ? '#060e1c' : '#f8fafc' }}>
-              {qrImageUrl ? (
-                <img src={qrImageUrl} alt="Event QR Code" className="w-[160px] h-[160px] rounded-lg object-contain" />
+              {displayQrUrl ? (
+                <img src={displayQrUrl} alt="Event QR Code" className="w-[160px] h-[160px] rounded-lg object-contain" />
               ) : (
                 <QrPlaceholder size={160} color={dark ? '#e8f0fe' : '#0f172a'} />
               )}
@@ -92,30 +107,30 @@ export default function AttendanceTabQR({
 
             {/* validity */}
             <p className="text-[12px] font-semibold mb-5 text-center" style={label}>
-              Valid for today
+              <span>15-Minute Validity Window</span>
               {countdown > 0 && (
                 <span> · Expires in <span style={{ color: BRAND, fontVariantNumeric: 'tabular-nums' }}>{fmtCountdown(countdown)}</span></span>
               )}
             </p>
 
             {/* action buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 w-full mt-2">
               {qrImageUrl ? (
                 <a
                   href={qrImageUrl}
                   download={`qrcode_${selectedEvent}.png`}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80"
+                  className="flex-1 min-w-[110px] sm:min-w-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80 active:scale-95 text-center"
                   style={{ ...inp, textDecoration: 'none' }}
                 >
-                  <Download size={13} style={label} /> Download
+                  <Download size={14} style={label} /> Download
                 </a>
               ) : (
                 <button
                   onClick={() => showToast('QR code downloaded!', 'success')}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80"
+                  className="flex-1 min-w-[110px] sm:min-w-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80 active:scale-95"
                   style={inp}
                 >
-                  <Download size={13} style={label} /> Download
+                  <Download size={14} style={label} /> Download
                 </button>
               )}
               <button
@@ -127,17 +142,17 @@ export default function AttendanceTabQR({
                     showToast('Link copied to clipboard!', 'success')
                   }
                 }}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80"
+                className="flex-1 min-w-[110px] sm:min-w-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80 active:scale-95"
                 style={inp}
               >
-                <Share2 size={13} style={label} /> Share Link
+                <Share2 size={14} style={label} /> Share
               </button>
               <button
                 onClick={() => window.print()}
-                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80"
+                className="flex-1 min-w-[110px] sm:min-w-0 flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl text-[12.5px] font-bold border cursor-pointer transition-all hover:opacity-80 active:scale-95"
                 style={inp}
               >
-                <Printer size={13} style={label} /> Print
+                <Printer size={14} style={label} /> Print
               </button>
             </div>
           </>

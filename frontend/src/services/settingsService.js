@@ -1,3 +1,5 @@
+import { fetchWithAuth } from '../utils/apiClient'
+
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 
@@ -66,57 +68,39 @@ async function mockUpdatePassword(passwordData) {
 /* ── REAL API HANDLERS ─────────────────────────────────────────── */
 async function apiFetch() {
   try {
-    const res = await fetch(`${API_BASE}/auth/me`, { headers: authHeaders() })
+    const res = await fetchWithAuth(`${API_BASE}/auth/me`)
     const data = await parseJSON(res)
-    if (!res.ok) {
-            return { success: false, message: 'Failed to fetch settings.' }
-    }
-    
-    const user = data.data || {}
-    const profile = user.profile || {}
+    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch settings.' }
 
-    // Fetch user appearance preferences from backend
-    let appearance = {
-      themeMode: 'Light',
-      accentColor: '#615FFF',
-      fontSize: 'medium'
-    }
+    const rawUser = data.data?.user || data.data || data.user || data
+    let fetchedApp = {}
     try {
-      const appRes = await fetch(`${API_BASE}/users/profile/appearance`, { headers: authHeaders() })
+      const appRes = await fetchWithAuth(`${API_BASE}/users/profile/appearance`)
       if (appRes.ok) {
         const appData = await parseJSON(appRes)
-        const appObj = appData.data || appData || {}
-        if (appObj.theme_mode || appObj.accent_color || appObj.font_size) {
-          appearance = {
-            themeMode: appObj.theme_mode || 'Light',
-            accentColor: appObj.accent_color || '#615FFF',
-            fontSize: appObj.font_size || 'medium'
-          }
-        }
+        fetchedApp = appData.data || appData.settings || {}
       }
-    } catch (appErr) {
-          }
+    } catch (_e) {}
 
     const settings = {
       profile: {
-        name: profile.full_name || '',
-        email: user.email || '',
-        phone: profile.phone || user.phone || '',
-        gender: user.gender || profile.gender || '',
-        bio: user.bio || profile.bio || '',
+        name: rawUser.full_name || rawUser.name || '',
+        email: rawUser.email || '',
+        phone: rawUser.phone || rawUser.mobile || '',
+        gender: rawUser.gender || '',
+        bio: rawUser.bio || '',
         avatarColor: '#7c3aed',
-        avatarUrl: user.profile_image || null
+        avatarUrl: rawUser.profile_image || rawUser.profile_picture || null
       },
-      appearance,
-      permissions: {
-        Admin: ['all'],
-        Organizer: ['events', 'attendance'],
-        Student: ['view_events']
+      appearance: {
+        themeMode: fetchedApp.theme_mode || fetchedApp.themeMode || 'Light',
+        accentColor: fetchedApp.accent_color || fetchedApp.accentColor || '#615FFF',
+        fontSize: fetchedApp.font_size || fetchedApp.fontSize || 'medium'
       }
     }
     return { success: true, settings }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -131,16 +115,15 @@ async function apiUpdateProfile(profileData) {
     if (profileData.bio) payload.bio = profileData.bio
     if (profileData.college_id) payload.college_id = profileData.college_id
 
-    const res = await fetch(`${API_BASE}/users/profile`, {
+    const res = await fetchWithAuth(`${API_BASE}/users/profile`, {
       method: 'PATCH',
-      headers: authHeaders(),
       body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-            return { success: false, message: data.message || 'Failed to update profile.' }
+      return { success: false, message: data.message || 'Failed to update profile.' }
     }
-    
+
     const updatedProfile = data.data || {}
     const settings = {
       profile: {
@@ -155,7 +138,7 @@ async function apiUpdateProfile(profileData) {
     }
     return { success: true, message: data.message || 'Profile updated successfully.', settings }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -166,14 +149,13 @@ async function apiUpdateAppearance(appearanceData) {
       accent_color: appearanceData.accentColor || appearanceData.accent_color,
       font_size: appearanceData.fontSize || appearanceData.font_size
     }
-    const res = await fetch(`${API_BASE}/users/profile/appearance`, {
+    const res = await fetchWithAuth(`${API_BASE}/users/profile/appearance`, {
       method: 'PUT',
-      headers: authHeaders(),
       body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update appearance.' }
-    
+
     const returnedApp = data.data || data.settings || data || {}
     const settings = {
       appearance: {
@@ -184,22 +166,21 @@ async function apiUpdateAppearance(appearanceData) {
     }
     return { success: true, message: data.message || 'Appearance updated successfully.', settings }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiUpdatePassword(passwordData) {
   try {
-    const res = await fetch(`${API_BASE}/auth/change-password`, {
+    const res = await fetchWithAuth(`${API_BASE}/auth/change-password`, {
       method: 'POST',
-      headers: authHeaders(),
       body: JSON.stringify(passwordData),
     })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update password.' }
     return { success: true, message: data.message || 'Password updated.' }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 

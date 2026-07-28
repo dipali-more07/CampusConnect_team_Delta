@@ -41,7 +41,7 @@ export default function SettingsSecurityTab({
               onClick={() => setShowCurrent(!showCurrent)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center"
             >
-              {showCurrent ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showCurrent ? <Eye size={16} /> : <EyeOff size={16} />}
             </button>
           </div>
         </div>
@@ -64,7 +64,7 @@ export default function SettingsSecurityTab({
               onClick={() => setShowNew(!showNew)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center"
             >
-              {showNew ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showNew ? <Eye size={16} /> : <EyeOff size={16} />}
             </button>
           </div>
         </div>
@@ -87,7 +87,7 @@ export default function SettingsSecurityTab({
               onClick={() => setShowConfirm(!showConfirm)}
               className="absolute right-3.5 top-1/2 -translate-y-1/2 bg-transparent border-none cursor-pointer p-0 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors flex items-center"
             >
-              {showConfirm ? <EyeOff size={16} /> : <Eye size={16} />}
+              {showConfirm ? <Eye size={16} /> : <EyeOff size={16} />}
             </button>
           </div>
         </div>

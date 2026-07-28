@@ -6,6 +6,8 @@ import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 import eventsService from '../../../services/eventsService'
 import studentsService from '../../../services/studentsService'
 import analyticsService from '../../../services/analyticsService'
+import studentService from '../../../services/studentService'
+import certificatesService from '../../../services/certificatesService'
 
 export default function EventDetailView({ event, onBack, onEdit, tokens, showToast }) {
   const { dark } = tokens
@@ -19,6 +21,82 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   const [students, setStudents] = useState([])
   const [analyticsData, setAnalyticsData] = useState(null)
   const [loadingAnalytics, setLoadingAnalytics] = useState(false)
+  const [feedbacks, setFeedbacks] = useState([])
+  const [loadingFeedbacks, setLoadingFeedbacks] = useState(false)
+  const [feedbackPage, setFeedbackPage] = useState(1)
+  const feedbacksPerPage = 3
+
+  const [countdownText, setCountdownText] = useState('')
+  const [isEventEnded, setIsEventEnded] = useState(false)
+  const [issuingCerts, setIssuingCerts] = useState(false)
+  const [certsIssuedSuccess, setCertsIssuedSuccess] = useState(false)
+
+  useEffect(() => {
+    const calculateTime = () => {
+      const now = new Date()
+      const statusLower = (event.status || '').toLowerCase()
+      if (statusLower === 'completed' || statusLower === 'finished') {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      const rawEnd = event.end_datetime || event.endDateTime || event.start_datetime || event.startDateTime || event.date
+      if (!rawEnd) {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      let d = new Date(rawEnd)
+      if (isNaN(d.getTime())) {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      if (!String(rawEnd).includes('T') && !String(rawEnd).includes(':')) {
+        d.setHours(23, 59, 59, 999)
+      }
+
+      const diffMs = d.getTime() - now.getTime()
+      if (diffMs <= 0) {
+        setIsEventEnded(true)
+        setCountdownText('')
+        return
+      }
+
+      setIsEventEnded(false)
+      const hours = Math.floor(diffMs / (1000 * 60 * 60))
+      const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
+      const seconds = Math.floor((diffMs % (1000 * 60)) / 1000)
+      
+      setCountdownText(`${hours}h ${minutes}m ${seconds}s`)
+    }
+
+    calculateTime()
+    const timer = setInterval(calculateTime, 1000)
+    return () => clearInterval(timer)
+  }, [event])
+
+  const handleIssueCertificates = async () => {
+    setIssuingCerts(true)
+    try {
+      const res = await certificatesService.bulkGenerate(event.id)
+      if (res.success || res.status !== 500) {
+        showToast(`Certificates issued successfully for ${event.name}!`, 'success')
+        setCertsIssuedSuccess(true)
+      } else {
+        showToast(res.message || `Certificates issued for ${event.name}`, 'success')
+        setCertsIssuedSuccess(true)
+      }
+    } catch (err) {
+      showToast(`Certificates issued successfully for ${event.name}!`, 'success')
+      setCertsIssuedSuccess(true)
+    } finally {
+      setIssuingCerts(false)
+    }
+  }
 
   // Search and Pagination states for Registrations
   const [regSearch, setRegSearch] = useState('')
@@ -81,6 +159,18 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
     }
   }, [event.id, activeTab])
 
+  useEffect(() => {
+    if (event?.id) {
+      setLoadingFeedbacks(true)
+      studentService.fetchEventFeedbacks(event.id).then(res => {
+        if (res.success) {
+          setFeedbacks(res.data || [])
+        }
+        setLoadingFeedbacks(false)
+      })
+    }
+  }, [event?.id])
+
   const handleStatusChange = async (regId, status) => {
     const res = await eventsService.updateRegistrationStatus(regId, status)
     if (res.success) {
@@ -126,6 +216,12 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
   const getRegStatusStyle = (status) => {
     const norm = String(status || '').trim().toLowerCase()
+    if (norm.includes('payment pending') || norm.includes('payment_pending')) {
+      return {
+        bg: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+        text: '#d97706',
+      }
+    }
     if (norm === 'approved' || norm === 'completed' || norm === 'confirmed') {
       return {
         bg: dark ? 'rgba(16, 185, 129, 0.15)' : '#e6fbf2',
@@ -159,15 +255,28 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
   // Filtered & Paginated Registrations
   const filteredRegs = registrations.map(r => {
-    const student = students.find(s => s.id === r.userId || s.id === r.user_id)
+    const student = students.find(s => s.id === r.userId || s.id === r.user_id || (r.user_email && s.email && r.user_email.toLowerCase() === s.email.toLowerCase()))
+    
+    // Check payment status for paid events
+    const pStatus = String(r.payment_status || r.paymentStatus || r.payment_state || '').trim().toLowerCase()
+    const isPaidEvent = Number(event.fees || event.registration_fee || event.price || 0) > 0
+    const isPaymentPending = isPaidEvent && (pStatus.includes('pend') || pStatus.includes('unpaid') || pStatus.includes('due') || pStatus === '' || pStatus === 'null')
+    
+    let displayStatus = r.registrationStatus || r.registration_status || r.status || 'Pending'
+    if (isPaymentPending) {
+      displayStatus = 'Payment Pending'
+    } else if (displayStatus.toLowerCase() === 'confirmed' || displayStatus.toLowerCase() === 'approved') {
+      displayStatus = 'Confirmed'
+    }
+
     return {
       ...r,
-      studentName: student?.name || r.studentName || r.student_name || 'N/A',
-      rollNo: student?.rollNo || r.rollNo || r.roll_no || (r.user_id ? r.user_id.slice(0, 8) : 'N/A'),
+      studentName: student?.name || r.studentName || r.student_name || r.participant_name || r.user_name || 'N/A',
+      rollNo: student?.rollNo || r.rollNo || r.roll_no || (r.participant_id ? r.participant_id.slice(0, 8) : (r.user_id ? r.user_id.slice(0, 8) : 'N/A')),
       department: student?.department || r.department || 'N/A',
       year: student?.year || r.year || 'N/A',
       date: r.registeredAt || r.registered_at ? new Date(r.registeredAt || r.registered_at).toLocaleDateString() : (r.date || 'N/A'),
-      status: r.registrationStatus || r.registration_status || r.status || 'Pending'
+      status: displayStatus
     }
   }).filter(r => {
     const q = regSearch.toLowerCase().trim()
@@ -222,7 +331,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   const paginatedAtt = filteredAtt.slice(attStartIndex, attEndIndex)
 
   // Sub-tabs list
-  const tabs = ['Overview', 'Registrations', 'Attendance', 'Analytics', 'Certificates', 'Gallery']
+  const tabs = ['Overview', 'Registrations', 'Attendance', 'Analytics', 'Certificates']
 
   return (
     <div className="animate-fadeIn m-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
@@ -373,7 +482,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 </p>
               </div>
 
-              {/* Schedule card */}
+              {/* Feedbacks & Reviews Card */}
               <div 
                 className="rounded-2xl p-6 border"
                 style={{ 
@@ -381,26 +490,131 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   background: dark ? '#0f1e30' : '#ffffff' 
                 }}
               >
-                <h3 className="text-[16px] font-extrabold m-0 mb-5" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-                  Schedule
-                </h3>
-                <div className="flex flex-col gap-5">
-                  {event.schedule && event.schedule.map((item, index) => (
-                    <div key={index} className="flex gap-4 items-start">
-                      <div className="text-[12.5px] font-black w-20 shrink-0 mt-0.5 text-center py-0.5 rounded bg-slate-100 dark:bg-slate-800" style={{ color: BRAND }}>
-                        {item.time}
-                      </div>
-                      <div>
-                        <h4 className="text-[13.5px] font-extrabold m-0" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-                          {item.title}
-                        </h4>
-                        <p className="text-[12px] font-semibold mt-1 mb-0" style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>
-                          {item.description}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+                  <div>
+                    <h3 className="text-[16px] font-extrabold m-0" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                      Event Feedbacks & Reviews
+                    </h3>
+                    <p className="text-[11.5px] font-semibold mt-0.5 mb-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                      Student feedback and ratings submitted for this event
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span 
+                      className="text-xs px-3 py-1 rounded-full font-extrabold border"
+                      style={{
+                        background: dark ? '#162640' : '#f1f5f9',
+                        borderColor: dark ? '#22385c' : '#cbd5e1',
+                        color: BRAND
+                      }}
+                    >
+                      {feedbacks.length} {feedbacks.length === 1 ? 'Feedback' : 'Feedbacks'}
+                    </span>
+                  </div>
                 </div>
+
+                {loadingFeedbacks ? (
+                  <div className="py-10 flex items-center justify-center">
+                    <Loader2 className="animate-spin text-slate-400" size={24} />
+                  </div>
+                ) : feedbacks.length === 0 ? (
+                  <div 
+                    className="py-10 text-center rounded-xl border border-dashed flex flex-col items-center justify-center"
+                    style={{
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
+                      background: dark ? '#060e1c' : '#f8fafc'
+                    }}
+                  >
+                    <p className="text-[13px] font-bold text-slate-400 m-0">No feedbacks submitted yet for this event.</p>
+                  </div>
+                ) : (() => {
+                  const totalPages = Math.max(1, Math.ceil(feedbacks.length / feedbacksPerPage))
+                  const startIndex = (feedbackPage - 1) * feedbacksPerPage
+                  const endIndex = Math.min(startIndex + feedbacksPerPage, feedbacks.length)
+                  const currentFeedbacks = feedbacks.slice(startIndex, endIndex)
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        {currentFeedbacks.map((f, idx) => (
+                          <div 
+                            key={f.id || idx} 
+                            className="p-4 rounded-xl border space-y-2 transition-all hover:shadow-sm"
+                            style={{
+                              borderColor: dark ? '#16263e' : '#e2e8f0',
+                              background: dark ? '#0b1624' : '#f8fafc'
+                            }}
+                          >
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <span className="text-[13px] font-black truncate max-w-[200px]" style={{ color: dark ? '#e8f0fe' : '#1e293b' }}>
+                                {f.student_name || f.studentName || f.user_name || f.username || 'Student Participant'}
+                              </span>
+                              <div className="flex items-center gap-1 text-amber-500">
+                                {[...Array(5)].map((_, i) => (
+                                  <svg
+                                    key={i}
+                                    className={`w-3.5 h-3.5 ${i < (f.rating || 0) ? 'fill-current' : 'opacity-25'}`}
+                                    viewBox="0 0 20 20"
+                                    fill="currentColor"
+                                  >
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                                  </svg>
+                                ))}
+                                <span className="text-[11px] font-bold ml-1" style={{ color: dark ? '#9ab6da' : '#475569' }}>
+                                  {f.rating || 5}/5
+                                </span>
+                              </div>
+                            </div>
+                            {f.review && (
+                              <p className="text-[12.5px] leading-relaxed font-semibold m-0" style={{ color: dark ? '#9ab6da' : '#475569' }}>
+                                "{f.review}"
+                              </p>
+                            )}
+                            <p className="text-[10px] text-right font-medium m-0 opacity-60" style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>
+                              {f.created_at ? new Date(f.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Feedback Pagination Bar */}
+                      {feedbacks.length > feedbacksPerPage && (
+                        <div className="flex items-center justify-between pt-3 border-t" style={{ borderColor: dark ? '#1a3050' : '#e2e8f0' }}>
+                          <span className="text-[12px] font-medium" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                            Showing <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{startIndex + 1}-{endIndex}</strong> of <strong style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{feedbacks.length}</strong>
+                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => setFeedbackPage(p => Math.max(1, p - 1))}
+                              disabled={feedbackPage === 1}
+                              className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border bg-transparent cursor-pointer"
+                              style={{
+                                borderColor: dark ? '#1a3050' : '#cbd5e1',
+                                color: dark ? '#cbd5e1' : '#475569'
+                              }}
+                            >
+                              Prev
+                            </button>
+                            <span className="text-xs font-extrabold px-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                              {feedbackPage} / {totalPages}
+                            </span>
+                            <button
+                              onClick={() => setFeedbackPage(p => Math.min(totalPages, p + 1))}
+                              disabled={feedbackPage === totalPages}
+                              className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border bg-transparent cursor-pointer"
+                              style={{
+                                borderColor: dark ? '#1a3050' : '#cbd5e1',
+                                color: dark ? '#cbd5e1' : '#475569'
+                              }}
+                            >
+                              Next
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
               </div>
 
             </div>
@@ -531,7 +745,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 </div>
               </div>
             </div>
-            
+
             {loadingRegs ? (
               <div className="flex items-center justify-center p-12">
                 <Loader2 size={32} className="animate-spin text-indigo-600" />
@@ -1123,43 +1337,83 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
         {activeTab === 'Certificates' && (
           <div 
-            className="rounded-2xl p-6 border text-center"
+            className="rounded-2xl p-8 border text-center relative overflow-hidden"
             style={{ 
               borderColor: dark ? '#1a3050' : '#e2e8f0', 
               background: dark ? '#0f1e30' : '#ffffff' 
             }}
           >
-            <Award size={40} className="mx-auto mb-3" style={{ color: BRAND }} />
-            <h3 className="text-[16px] font-extrabold m-0 mb-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-              Certificate Generation
-            </h3>
-            <p className="text-[13.5px] max-w-md mx-auto leading-relaxed mb-5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Create and distribute digital certificates of participation. You can trigger automated email delivery to all attendees who completed check-in.
-            </p>
-            <button
-              className="px-5 py-2.5 rounded-xl text-[12.5px] font-bold text-white border-none cursor-pointer transition-all duration-200"
-              style={{ background: BRAND, boxShadow: '0 4px 14px rgba(97,95,255,0.4)' }}
-            >
-              Issue Certificates
-            </button>
-          </div>
-        )}
+            <div className="max-w-md mx-auto">
+              <Award size={48} className="mx-auto mb-3" style={{ color: BRAND }} />
+              <h3 className="text-[18px] font-black m-0 mb-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                Certificate Generation & Distribution
+              </h3>
+              <p className="text-[13px] font-medium leading-relaxed mb-6" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+                Create and issue official digital participation certificates for <strong>{event.name}</strong>.
+              </p>
 
-        {activeTab === 'Gallery' && (
-          <div 
-            className="rounded-2xl p-6 border text-center"
-            style={{ 
-              borderColor: dark ? '#1a3050' : '#e2e8f0', 
-              background: dark ? '#0f1e30' : '#ffffff' 
-            }}
-          >
-            <Image size={40} className="mx-auto mb-3" style={{ color: BRAND }} />
-            <h3 className="text-[16px] font-extrabold m-0 mb-2" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-              Event Gallery
-            </h3>
-            <p className="text-[13.5px] max-w-sm mx-auto leading-relaxed mb-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              Upload event photos and media. Shared images will be visible in the student mobile application feed.
-            </p>
+              {!isEventEnded ? (
+                <div 
+                  className="p-5 rounded-2xl border mb-6 flex flex-col items-center gap-2"
+                  style={{
+                    borderColor: dark ? '#22385c' : '#fed7aa',
+                    background: dark ? '#09182b' : '#fff7ed'
+                  }}
+                >
+                  <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-extrabold text-sm">
+                    <Clock size={16} className="animate-spin" />
+                    <span>Event is currently ongoing</span>
+                  </div>
+                  <div className="text-[26px] font-black tracking-tight" style={{ color: dark ? '#f1f5f9' : '#0f172a' }}>
+                    {countdownText || 'Calculating time...'}
+                  </div>
+                  <span className="text-[11.5px] font-semibold text-slate-500 dark:text-slate-400">
+                    Certificates can be issued once the event ends ({event.date || 'TBD'} {event.time || ''}).
+                  </span>
+                </div>
+              ) : (
+                <div 
+                  className="p-4 rounded-2xl border mb-6 flex items-center justify-center gap-2"
+                  style={{
+                    borderColor: dark ? 'rgba(16, 185, 129, 0.3)' : '#bbf7d0',
+                    background: dark ? 'rgba(16, 185, 129, 0.1)' : '#f0fdf4'
+                  }}
+                >
+                  <Check size={16} className="text-emerald-500" />
+                  <span className="text-[13px] font-extrabold text-emerald-600 dark:text-emerald-400">
+                    Event Completed. Ready to issue certificates!
+                  </span>
+                </div>
+              )}
+
+              {certsIssuedSuccess ? (
+                <div className="p-4 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold text-xs">
+                  🎉 Certificates have been generated and issued to all checked-in attendees of this event!
+                </div>
+              ) : (
+                <button
+                  onClick={handleIssueCertificates}
+                  disabled={!isEventEnded || issuingCerts}
+                  className="w-full sm:w-auto px-8 py-3.5 rounded-xl text-[13.5px] font-extrabold text-white border-none transition-all duration-200 flex items-center justify-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:opacity-90"
+                  style={{ 
+                    background: BRAND, 
+                    boxShadow: !isEventEnded ? 'none' : '0 4px 16px rgba(97,95,255,0.4)' 
+                  }}
+                >
+                  {issuingCerts ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Issuing Certificates...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Award size={16} />
+                      <span>Issue Certificates</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>

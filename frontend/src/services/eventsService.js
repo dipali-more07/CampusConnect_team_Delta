@@ -1,6 +1,6 @@
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
-import { fetchWithAuth } from '../utils/apiClient'
+import { fetchWithAuth, getAccessToken } from '../utils/apiClient'
 import defaultRegistrations from '../data/registrations.json'
 import defaultEvents from '../data/events.json'
 import defaultAttendance from '../data/attendance.json'
@@ -219,6 +219,7 @@ function mapEvent(e) {
   return {
     id: e.event_id || e.id,
     name: e.event_name || e.name || e.title || '',
+    title: e.title || e.event_name || e.name || '',
     organizer: e.organizer_name || e.organized_by || (typeof e.organizer === 'object' ? e.organizer?.name || e.organizer?.full_name || '' : e.organizer) || '',
     category: e.category ? (e.category.charAt(0).toUpperCase() + e.category.slice(1)) : 'General',
     eventType: e.event_type || e.eventType || 'offline',
@@ -230,7 +231,7 @@ function mapEvent(e) {
     end_datetime: e.end_datetime,
     capacity: e.capacity || e.max_participants || 500,
     fees: e.fees ?? e.fee ?? e.registration_fee ?? e.event_fee ?? 0,
-    registrationsCount: e.registrationsCount || e.registrations_count || 0,
+    registrationsCount: e.registrationsCount || e.total_registrations || e.registration_count || e.registrations_count || 0,
     status: e.status || 'Upcoming',
     approvalStatus: (() => {
       const raw = e.approval_status || e.approvalStatus || 'Approved'
@@ -238,7 +239,16 @@ function mapEvent(e) {
     })(),
     description: e.description || '',
     registrationDeadline: e.registration_deadline || e.reg_deadline || e.registrationDeadline || '',
+    regDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
+    registrationStartDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
     banner: e.poster || e.banner || null,
+    qr_code: e.qr_code || e.qrcode || null,
+    qrCodeImage: (e.qr_code || e.qrcode) ? (
+      (e.qr_code || e.qrcode).startsWith('http') || (e.qr_code || e.qrcode).startsWith('data:')
+        ? (e.qr_code || e.qrcode)
+        : `${(API_BASE || '').replace(/\/api\/v1\/?$/, '')}${(e.qr_code || e.qrcode).startsWith('/') ? '' : '/'}${e.qr_code || e.qrcode}`
+    ) : null,
+    created_at: e.created_at || e.createdAt || null,
   }
 }
 
@@ -263,39 +273,29 @@ async function apiFetchEvents() {
 
 async function apiFetchUpcomingEvents(limit = 10) {
   try {
-    const res = await fetchWithAuth(`${API_BASE}/events/upcoming?limit=${limit}`, { method: 'GET' })
-    const data = await parseJSON(res)
-    if (!res.ok) {
-            return { success: false, events: [] }
+    let res = await fetchWithAuth(`${API_BASE}/events/upcoming?limit=${limit}`, { method: 'GET' })
+    if (res.ok) {
+      const data = await parseJSON(res)
+      const eventsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : (data.events || []))
+      if (eventsArray.length > 0) {
+        const mapped = eventsArray.map(e => mapEvent(e))
+        return { success: true, events: mapped }
+      }
     }
-    const eventsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : [])
-    const mapped = eventsArray.map(e => {
-      const mappedEv = mapEvent(e)
-      
-      let monthStr = 'AUG'
-      let dayStr = '15'
-      if (mappedEv.date) {
-        try {
-          const dObj = new Date(mappedEv.date)
-          if (!isNaN(dObj.getTime())) {
-            monthStr = dObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
-            dayStr = String(dObj.getDate())
-          }
-        } catch { }
-      }
-      return {
-        ...mappedEv,
-        title: mappedEv.name || mappedEv.title || 'Event',
-        month: monthStr,
-        day: dayStr,
-        registered: Number(mappedEv.registrationsCount || 0),
-        capacity: Number(mappedEv.capacity || 500),
-        color: '#615FFF'
-      }
-    })
-    return { success: true, events: mapped }
+
+    // Fallback: If /events/upcoming returns 500/404 on server, fetch main /events list
+    const allRes = await apiFetchEvents()
+    if (allRes.success && Array.isArray(allRes.events)) {
+      const now = new Date()
+      const upcoming = allRes.events
+        .filter(e => !e.date || new Date(e.date) >= now || (e.status || '').toLowerCase() === 'upcoming' || (e.status || '').toLowerCase() === 'published')
+        .slice(0, limit)
+      return { success: true, events: upcoming.length > 0 ? upcoming : allRes.events.slice(0, limit) }
+    }
+
+    return { success: false, events: [] }
   } catch (err) {
-        return { success: false, events: [], message: 'Server unreachable.' }
+    return { success: false, events: [], message: 'Server unreachable.' }
   }
 }
 
@@ -459,7 +459,11 @@ async function mockFetchAttendance(eventId) {
 /* ── REAL API REGISTRATIONS ──────────────────────────────────── */
 async function apiFetchRegistrations(eventId) {
   try {
-    // Correct endpoint: GET /registrations/event/{event_id}
+    const userRole = sessionStorage.getItem('cc_role') || sessionStorage.getItem('role') || ''
+    if (userRole.toLowerCase() === 'student') {
+      return { success: true, registrations: [] }
+    }
+
     const res = await fetchWithAuth(
       `${API_BASE}/registrations/event/${eventId}?page=1&size=500`,
       { method: 'GET' }
@@ -467,14 +471,13 @@ async function apiFetchRegistrations(eventId) {
     const data = await parseJSON(res)
 
     if (!res.ok) {
-      return { success: false, message: data.message || 'Failed to fetch registrations.' }
+      return { success: false, registrations: [], message: data.message || 'Failed to fetch registrations.' }
     }
 
-    // Backend may return registrations in various formats
     const regs = data.registrations || data.data || data.items || data || []
     return { success: true, registrations: Array.isArray(regs) ? regs : [] }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, registrations: [], message: 'Server unreachable.' }
   }
 }
 
@@ -514,7 +517,8 @@ function mapAttendanceRecord(r) {
     studentName: r.student_name || r.full_name || r.name || r.studentName || r.registration_id?.slice(0, 8) || 'Student',
     rollNo: r.roll_no || r.rollNo || r.college_id || r.student_id || 'N/A',
     eventId: r.event_id || r.eventId || '',
-    eventName: r.event_name || r.eventName || '',
+    eventName: r.event_name || r.eventName || r.event_title || '',
+    venue: r.venue || r.event_venue || r.location || '',
     checkIn: fmtTime(r.check_in_time || r.checkIn),
     checkOut: fmtTime(r.check_out_time || r.checkOut),
     status: fmtStatus(r.attendance_status || r.status),
@@ -593,17 +597,6 @@ const eventsService = {
 
   create: (payload) =>
     USE_MOCK ? mockCreateEvent(payload) : apiCreateEvent(payload),
-
-
-
-
-
-
-
-
-
-
-
     
   update: (id, payload) =>
     USE_MOCK ? mockUpdateEvent(id, payload) : apiUpdateEvent(id, payload),
@@ -629,57 +622,62 @@ const eventsService = {
   publish: (eventId) =>
     USE_MOCK ? Promise.resolve({ success: true, message: 'Event published (mock).' }) : apiPublishEvent(eventId),
 
-  getQRCodeBlob: (eventId) =>
-    USE_MOCK ? mockGetQRCodeBlob(eventId) : apiGetQRCodeBlob(eventId),
+  getQRCodeBlob: (eventId) => apiGetQRCodeBlob(eventId),
 }
 
-/* ── MOCK GET QR CODE BLOB ── */
-async function mockGetQRCodeBlob(eventId) {
-  try {
-    const res = await fetch(`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=cc-event-${eventId}`)
-    const blob = await res.blob()
-    return { success: true, blob }
-  } catch {
-    return { success: false }
-  }
-}
-
-/* ── API GET QR CODE BLOB ── */
+/* ── API GET QR CODE FROM BACKEND ONLY (POST /api/v1/events/{event_id}/qrcode) ── */
 async function apiGetQRCodeBlob(eventId) {
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-    const res = await fetch(`${API_BASE}/events/${eventId}/qrcode`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      }
+    // Perform POST /api/v1/events/{event_id}/qrcode using fetchWithAuth with JSON body payload
+    let res = await fetchWithAuth(`${API_BASE}/events/${eventId}/qrcode`, {
+      method: 'POST',
+      body: JSON.stringify({ event_id: eventId, eventId })
     })
+
+    // Fallback to GET if backend returns 405 Method Not Allowed
+    if (!res.ok && res.status === 405) {
+      res = await fetchWithAuth(`${API_BASE}/events/${eventId}/qrcode`, {
+        method: 'GET'
+      })
+    }
+
     if (!res.ok) {
-      return { success: false, message: 'Failed to fetch QR code.' }
+      const errorData = await res.json().catch(() => ({}))
+      let errMsg = errorData.message || errorData.detail || 'Event check-in QR code can only be generated after the event has started'
+      if (Array.isArray(errMsg)) errMsg = errMsg.map(e => e.msg || e.message).join(', ')
+      if (typeof errMsg === 'object') errMsg = JSON.stringify(errMsg)
+      return { success: false, message: errMsg }
     }
-    const contentType = res.headers.get('content-type') || ''
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase()
     if (contentType.includes('application/json')) {
-      const text = await res.json()
-      let qrUrl = text
-      if (typeof text === 'string') {
-        if (!text.startsWith('data:') && (text.startsWith('iVBORw0KG') || text.length > 100)) {
-          qrUrl = `data:image/png;base64,${text}`
-        }
-      } else if (text && typeof text === 'object') {
-        const val = text.qr_code || text.qrCode || text.data || text.url
-        if (typeof val === 'string') {
-          qrUrl = val
-          if (!val.startsWith('data:') && (val.startsWith('iVBORw0KG') || val.length > 100)) {
-            qrUrl = `data:image/png;base64,${val}`
-          }
-        }
+      const data = await res.json().catch(() => ({}))
+      let qrUrl = data.data || data.qr_code || data.qrCode || data.url || data
+      if (typeof qrUrl === 'object' && qrUrl !== null) {
+        qrUrl = qrUrl.qr_code || qrUrl.qrCode || qrUrl.url || qrUrl.data || ''
       }
-      return { success: true, qrUrl }
-    } else {
-      const blob = await res.blob()
-      return { success: true, blob }
+      if (typeof qrUrl === 'string' && qrUrl.length > 0) {
+        if (!qrUrl.startsWith('data:') && (qrUrl.startsWith('iVBORw0KG') || qrUrl.length > 100)) {
+          qrUrl = `data:image/png;base64,${qrUrl}`
+        }
+        return { success: true, qrUrl }
+      }
     }
+
+    const blob = await res.blob()
+    if (blob && blob.size > 0) {
+      const base64Url = await new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onloadend = () => resolve(reader.result)
+        reader.onerror = () => resolve(URL.createObjectURL(blob))
+        reader.readAsDataURL(blob)
+      })
+      return { success: true, qrUrl: base64Url, blob }
+    }
+
+    return { success: false, message: 'Empty QR code response received.' }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, message: err.message || 'Server unreachable.' }
   }
 }
 

@@ -93,23 +93,25 @@ async function mockDelete(id) {
 function mapStudent(s) {
   if (!s) return null
   const COLORS = ['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#7c3aed', '#e11d48', '#16a34a', '#d97706']
+  
+  const rawAtt = s.attendance_percentage ?? s.attendance_percent ?? s.attendancePercent ?? s.attendance_rate ?? 0
+  const attPct = typeof rawAtt === 'number' ? Math.round(rawAtt * 10) / 10 : (parseFloat(rawAtt) || 0)
+
   return {
     id: s.user_id || s.id || '',
     name: s.full_name || s.name || '',
-    rollNo: s.roll_no || s.rollNo || (s.user_id ? s.user_id.slice(0, 8) : ''),
+    rollNo: s.roll_no || s.rollNo || s.college_id || (s.user_id ? s.user_id.slice(0, 8) : ''),
     email: s.email || '',
     department: s.department || 'N/A',
-    year: s.year || s.course_year || '3rd',
+    year: s.year || s.course_year || s.course || '3rd',
     phone: s.mobile || s.phone || '',
-    eventsAttended: s.events_attended || s.eventsAttended || 0,
-    attendancePercent: s.attendance_percent || s.attendancePercent || 0,
-    certificatesCount: s.certificates_count || s.certificatesCount || 0,
-    status: s.is_active === false
+    eventsAttended: Number(s.events_attended ?? s.eventsAttended ?? s.events_count ?? 0),
+    attendancePercent: attPct,
+    certificatesCount: Number(s.certificates_count ?? s.certificatesCount ?? s.certificates ?? 0),
+    status: (s.is_suspended === true || s.is_active === false || (s.status && ['suspended', 'inactive', 'deactivated', 'banned'].includes(String(s.status).toLowerCase())))
       ? 'Suspended'
-      : (s.status && ['suspended', 'inactive', 'deactivated', 'banned'].includes(String(s.status).toLowerCase()))
-        ? 'Suspended'
-        : 'Active',
-    joinedDate: s.joined_date || s.joinedDate || new Date().toISOString().split('T')[0],
+      : 'Active',
+    joinedDate: s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : (s.joined_date || s.joinedDate || new Date().toISOString().split('T')[0]),
     avatarColor: s.avatarColor || COLORS[Math.floor(Math.random() * COLORS.length)]
   }
 }

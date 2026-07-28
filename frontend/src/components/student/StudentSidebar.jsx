@@ -16,11 +16,11 @@ import { useTheme } from '../../context/ThemeContext'
 
 export const STUDENT_NAV = [
   { icon: LayoutDashboard, label: 'Dashboard' },
-  { icon: SquareCheckBig,  label: 'Attendance' },
-  { icon: CalendarDays,    label: 'Events' },
-  { icon: Trophy,          label: 'Results' },
-  { icon: Award,           label: 'Certificates' },
-  { icon: CreditCard,      label: 'Payments' },
+  { icon: SquareCheckBig, label: 'Attendance' },
+  { icon: CalendarDays, label: 'Events' },
+  { icon: Trophy, label: 'Results' },
+  { icon: Award, label: 'Certificates' },
+  { icon: CreditCard, label: 'Payments' },
 ]
 
 export default function StudentSidebar({

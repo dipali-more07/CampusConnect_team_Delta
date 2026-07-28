@@ -46,7 +46,7 @@ export default function AnalyticsTrendChart({
       </div>
 
       {trendLoading ? (
-        <div className="h-[240px] flex items-center justify-center">
+        <div className="h-60 flex items-center justify-center">
           <Loader2 className="animate-spin text-slate-400" size={24} />
         </div>
       ) : (() => {

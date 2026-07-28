@@ -218,15 +218,15 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const result = await authService.login(email, password)
-            if (result.success && result.user) {
+      if (result.success && result.user) {
         login(result.user, result.token, result.refreshToken)
         const userName = result.user?.name || result.user?.fullName || result.user?.email || 'User'
         showToast(`Logged in successfully! User: ${userName}, Role: ${result.user.role}`, 'success')
       } else {
-                showToast(result.message || 'Login failed. Please try again.', 'error')
+        showToast(result.message || 'Login failed. Please try again.', 'error')
       }
     } catch (err) {
-            showToast('Something went wrong. Please try again.', 'error')
+      showToast('Something went wrong. Please try again.', 'error')
     } finally {
       setLoading(false)
     }
@@ -385,7 +385,7 @@ export default function LoginPage() {
 
           {/* Form Card Container */}
           <div className="w-full max-w-[430px] relative z-10 bg-white rounded-3xl border border-slate-200/80 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 hover:shadow-[0_25px_70px_-15px_rgba(99,102,241,0.1)]">
-            
+
             {/* Top Gradient Decorative Accent Bar */}
             <div className="h-1.5 w-full bg-linear-to-r from-indigo-600 via-purple-600 to-pink-500" />
 
@@ -451,7 +451,7 @@ export default function LoginPage() {
                             onClick={() => setShowPass(!showPass)}
                             className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                           >
-                            {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                            {showPass ? <Eye size={16} /> : <EyeOff size={16} />}
                           </button>
                         </div>
                       </div>

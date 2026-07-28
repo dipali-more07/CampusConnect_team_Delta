@@ -1,15 +1,23 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { X, ZoomIn, ZoomOut, Check, RotateCcw } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import { X, Check } from 'lucide-react'
 
-export default function ImageCropperModal({ isOpen, onClose, imageSrc, onCropComplete, BRAND = '#615FFF' }) {
-  const [zoom, setZoom] = useState(1)
+export default function ImageCropperModal({ 
+  isOpen, 
+  onClose, 
+  imageSrc, 
+  onCropComplete, 
+  BRAND = '#615FFF',
+  cropShape = 'rect', // 'round' | 'rect'
+  cropTitle = 'Crop Poster'
+}) {
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
   const [imgElement, setImgElement] = useState(null)
-  const canvasRef = useRef(null)
 
-  const CROP_SIZE = 260 // Circular crop viewport diameter
+  const isRect = cropShape === 'rect'
+  const CROP_WIDTH = isRect ? 340 : 260
+  const CROP_HEIGHT = isRect ? 200 : 260
 
   // Reset state when image changes
   useEffect(() => {
@@ -19,7 +27,6 @@ export default function ImageCropperModal({ isOpen, onClose, imageSrc, onCropCom
       img.src = imageSrc
       img.onload = () => {
         setImgElement(img)
-        setZoom(1)
         setPan({ x: 0, y: 0 })
       }
     } else {
@@ -27,7 +34,7 @@ export default function ImageCropperModal({ isOpen, onClose, imageSrc, onCropCom
     }
   }, [imageSrc])
 
-  // Mouse / Touch handlers for panning image inside crop circle
+  // Mouse / Touch handlers for panning image inside crop area
   const handleMouseDown = (e) => {
     setIsDragging(true)
     const clientX = e.clientX || e.touches?.[0]?.clientX || 0
@@ -64,53 +71,51 @@ export default function ImageCropperModal({ isOpen, onClose, imageSrc, onCropCom
     }
   }, [isDragging, handleMouseMove])
 
-  // Crop & Export to base64 DataURL
+  // Lightweight Crop & Export to base64 DataURL
   const handleCropSave = () => {
     if (!imgElement) return
 
     const canvas = document.createElement('canvas')
-    const OUTPUT_SIZE = 300 // Output dimensions 300x300 for crisp high-res avatar
-    canvas.width = OUTPUT_SIZE
-    canvas.height = OUTPUT_SIZE
+    const OUTPUT_WIDTH = isRect ? 800 : 300
+    const OUTPUT_HEIGHT = isRect ? 450 : 300
+    canvas.width = OUTPUT_WIDTH
+    canvas.height = OUTPUT_HEIGHT
     const ctx = canvas.getContext('2d')
 
     if (!ctx) return
 
-    // Draw circular clip
-    ctx.beginPath()
-    ctx.arc(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, OUTPUT_SIZE / 2, 0, Math.PI * 2)
-    ctx.closePath()
-    ctx.clip()
+    if (!isRect) {
+      ctx.beginPath()
+      ctx.arc(OUTPUT_WIDTH / 2, OUTPUT_HEIGHT / 2, OUTPUT_WIDTH / 2, 0, Math.PI * 2)
+      ctx.closePath()
+      ctx.clip()
+    }
 
-    // Calculate aspect ratio scale between viewport CROP_SIZE and output size
-    const scaleFactor = OUTPUT_SIZE / CROP_SIZE
+    const scaleFactorX = OUTPUT_WIDTH / CROP_WIDTH
+    const scaleFactorY = OUTPUT_HEIGHT / CROP_HEIGHT
 
-    // Base dimensions of the image
-    const minDim = Math.min(imgElement.naturalWidth, imgElement.naturalHeight) || 1
-    const baseScale = CROP_SIZE / minDim
+    const baseScale = Math.max(CROP_WIDTH / imgElement.naturalWidth, CROP_HEIGHT / imgElement.naturalHeight)
 
-    const drawWidth = imgElement.naturalWidth * baseScale * zoom * scaleFactor
-    const drawHeight = imgElement.naturalHeight * baseScale * zoom * scaleFactor
+    const drawWidth = imgElement.naturalWidth * baseScale * scaleFactorX
+    const drawHeight = imgElement.naturalHeight * baseScale * scaleFactorY
 
-    const drawX = (OUTPUT_SIZE - drawWidth) / 2 + (pan.x * scaleFactor)
-    const drawY = (OUTPUT_SIZE - drawHeight) / 2 + (pan.y * scaleFactor)
+    const drawX = (OUTPUT_WIDTH - drawWidth) / 2 + (pan.x * scaleFactorX)
+    const drawY = (OUTPUT_HEIGHT - drawHeight) / 2 + (pan.y * scaleFactorY)
 
     ctx.drawImage(imgElement, drawX, drawY, drawWidth, drawHeight)
 
-    const croppedDataUrl = canvas.toDataURL('image/png', 0.95)
+    const croppedDataUrl = canvas.toDataURL('image/png', 0.92)
     onCropComplete(croppedDataUrl)
     onClose()
   }
 
   if (!isOpen || !imageSrc) return null
 
-  // Calculate style for viewport image preview
   let imgStyle = { display: 'none' }
   if (imgElement) {
-    const minDim = Math.min(imgElement.naturalWidth, imgElement.naturalHeight) || 1
-    const baseScale = CROP_SIZE / minDim
-    const width = imgElement.naturalWidth * baseScale * zoom
-    const height = imgElement.naturalHeight * baseScale * zoom
+    const baseScale = Math.max(CROP_WIDTH / imgElement.naturalWidth, CROP_HEIGHT / imgElement.naturalHeight)
+    const width = imgElement.naturalWidth * baseScale
+    const height = imgElement.naturalHeight * baseScale
 
     imgStyle = {
       width: `${width}px`,
@@ -132,7 +137,7 @@ export default function ImageCropperModal({ isOpen, onClose, imageSrc, onCropCom
         
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-[#1b2b48]">
-          <h3 className="text-base font-extrabold m-0 text-white">Crop Profile Photo</h3>
+          <h3 className="text-base font-extrabold m-0 text-white">{cropTitle}</h3>
           <button
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-[#1a2d48] border-none bg-transparent cursor-pointer transition-colors"
@@ -146,8 +151,8 @@ export default function ImageCropperModal({ isOpen, onClose, imageSrc, onCropCom
           <div
             onMouseDown={handleMouseDown}
             onTouchStart={handleMouseDown}
-            className="relative overflow-hidden rounded-full border-2 border-white/80 shadow-2xl flex items-center justify-center bg-black/40 touch-none cursor-grab active:cursor-grabbing"
-            style={{ width: `${CROP_SIZE}px`, height: `${CROP_SIZE}px` }}
+            className={`relative overflow-hidden ${isRect ? 'rounded-2xl' : 'rounded-full'} border-2 border-white/80 shadow-2xl flex items-center justify-center bg-black/40 touch-none cursor-grab active:cursor-grabbing`}
+            style={{ width: `${CROP_WIDTH}px`, height: `${CROP_HEIGHT}px` }}
           >
             {imgElement && (
               <img
@@ -157,53 +162,16 @@ export default function ImageCropperModal({ isOpen, onClose, imageSrc, onCropCom
                 draggable={false}
               />
             )}
-            <div className="absolute inset-0 border border-white/30 rounded-full pointer-events-none" />
+            <div className={`absolute inset-0 border border-white/30 ${isRect ? 'rounded-2xl' : 'rounded-full'} pointer-events-none`} />
           </div>
 
           <p className="text-[11.5px] text-slate-400 mt-3 font-semibold">
-            Drag photo to adjust position
+            Drag image to adjust crop position
           </p>
         </div>
 
-        {/* Zoom & Reset Controls */}
-        <div className="flex items-center gap-3 bg-[#132238] p-3 rounded-2xl mb-6 border border-[#1e3252]">
-          <button
-            onClick={() => setZoom(z => Math.max(1, z - 0.15))}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-[#1c3050] bg-transparent border-none cursor-pointer"
-            title="Zoom Out"
-          >
-            <ZoomOut size={16} />
-          </button>
-
-          <input
-            type="range"
-            min="1"
-            max="3"
-            step="0.05"
-            value={zoom}
-            onChange={e => setZoom(parseFloat(e.target.value))}
-            className="flex-1 accent-indigo-500 cursor-pointer h-1.5 rounded-lg bg-[#22385c]"
-          />
-
-          <button
-            onClick={() => setZoom(z => Math.min(3, z + 0.15))}
-            className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-[#1c3050] bg-transparent border-none cursor-pointer"
-            title="Zoom In"
-          >
-            <ZoomIn size={16} />
-          </button>
-
-          <button
-            onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1c3050] bg-transparent border-none cursor-pointer ml-1"
-            title="Reset Position"
-          >
-            <RotateCcw size={15} />
-          </button>
-        </div>
-
         {/* Action Buttons */}
-        <div className="flex items-center justify-end gap-3 pt-2">
+        <div className="flex items-center justify-end gap-3 pt-2 border-t border-[#1b2b48]">
           <button
             onClick={onClose}
             className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[#14233a] border border-[#213554] text-slate-300 hover:bg-[#1a2d48] cursor-pointer transition-colors"

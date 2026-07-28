@@ -308,7 +308,8 @@ export default function ResultsPage({ tokens }) {
 
           <button
             onClick={handleOpenAddModal}
-            disabled={!selectedEventId}
+            disabled={!selectedEventId || (!selectedEventObj || ((selectedEventObj.status || '').toLowerCase() !== 'completed' && selectedEventObj.end_datetime && new Date(selectedEventObj.end_datetime).getTime() > Date.now()))}
+            title={selectedEventObj && (selectedEventObj.status || '').toLowerCase() !== 'completed' && selectedEventObj.end_datetime && new Date(selectedEventObj.end_datetime).getTime() > Date.now() ? "Results can only be declared after the event has completed" : ""}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-150 hover:-translate-y-px disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ background: BRAND, boxShadow: '0 4px 12px rgba(97,95,255,0.25)' }}
           >

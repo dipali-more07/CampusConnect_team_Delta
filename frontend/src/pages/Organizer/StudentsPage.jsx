@@ -13,7 +13,7 @@ import StudentViewModal from '../../components/admin/adminStudent/StudentViewMod
 import StudentDeleteModal from '../../components/admin/adminStudent/StudentDeleteModal'
 
 const DEPTS = ['All', 'CSE', 'ECE', 'ME', 'MBA', 'EEE', 'Civil']
-const YEARS = ['All', '1st', '2nd', '3rd', '4th']
+const YEARS = ['All', '1st', '2nd', '3rd', '4th', '5th', '6th']
 const STATUSES = ['All', 'Active', 'Suspended']
 
 export default function StudentsPage({ tokens }) {
@@ -32,7 +32,10 @@ export default function StudentsPage({ tokens }) {
   const [viewStudent, setViewStudent] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', rollNo: '', email: '', department: 'CSE', year: '1st', phone: '' })
+  const [form, setForm] = useState({ 
+    name: '', rollNo: '', email: '', password: '', confirmPassword: '', 
+    department: 'CSE', year: '1st', phone: '', collegeName: '', courseName: '', gender: 'Select Gender' 
+  })
   const [errors, setErrors] = useState({})
 
   const card = { background: tokens.card, border: `1px solid ${tokens.border}`, boxShadow: tokens.shadow }

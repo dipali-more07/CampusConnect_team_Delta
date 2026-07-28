@@ -55,7 +55,7 @@ export default function StudentViewModal({
               ['Phone', viewStudent.phone || '—'],
               ['Events', viewStudent.eventsAttended],
               ['Certificates', viewStudent.certificatesCount],
-              ['Attendance', `${viewStudent.attendancePercent}%`],
+              ['Attendance', `${Number(viewStudent.attendancePercent || 0).toFixed(1)}%`],
               ['Joined', viewStudent.joinedDate],
             ].map(([k, v]) => (
               <div key={k} className="rounded-xl p-3" style={{ background: tokens.hoverBg }}>

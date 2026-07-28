@@ -149,12 +149,16 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
     }
 
     const { payment_id, transaction_id, amount } = paymentRes.data || {}
-    const isMockPayment = !transaction_id || transaction_id.startsWith('order_mock')
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID || ''
+    const hasValidKey = razorpayKey && razorpayKey !== 'rzp_test_placeholder' && razorpayKey.startsWith('rzp_')
+    const isMockPayment = !transaction_id || transaction_id.startsWith('order_mock') || !hasValidKey
 
     if (isMockPayment) {
+      const mockOrder = transaction_id || `order_mock_${Math.random().toString(36).substr(2, 9)}`
       const confirmRes = await studentService.confirmPayment(payment_id || regId, {
+        transaction_id: mockOrder,
         razorpay_payment_id: `pay_mock_${Math.random().toString(36).substr(2, 9)}`,
-        razorpay_order_id: transaction_id || `order_mock_${Math.random().toString(36).substr(2, 9)}`,
+        razorpay_order_id: mockOrder,
         razorpay_signature: `sig_mock_${Math.random().toString(36).substr(2, 9)}`
       })
       setPaymentLoading(false)
@@ -190,7 +194,7 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
 
       try {
         const options = {
-          key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+          key: razorpayKey,
           amount: Math.round((amount || event.fees) * 100),
           currency: 'INR',
           name: 'CampusConnect',
@@ -199,6 +203,7 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
           handler: async function (response) {
             setPaymentLoading(true)
             const confirmRes = await studentService.confirmPayment(payment_id, {
+              transaction_id: transaction_id || response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
               razorpay_signature: response.razorpay_signature

@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useToast } from '../../context/ToastContext'
 import { useTheme } from '../../context/ThemeContext'
-import { BRAND } from '../../data/dashboardData'
+import { fetchWithAuth } from '../../utils/apiClient'
 import studentService from '../../services/studentService'
 
 import StudentSidebar from '../../components/student/StudentSidebar'
@@ -19,6 +19,7 @@ import ResultsPage from './ResultsPage'
 import CertificatesPage from './CertificatesPage'
 import PaymentsPage from './PaymentsPage'
 import PageTransition from '../../components/common/PageTransition'
+import SuspendedAccountModal from '../../components/common/SuspendedAccountModal'
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth()
@@ -54,9 +55,75 @@ export default function StudentDashboard() {
   }
   
   const [showLogoutModal, setShowLogoutModal] = useState(false)
+  const [isSuspended, setIsSuspended] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+
+  // Monitor account suspension state in real-time
+  useEffect(() => {
+    if (!user) return
+
+    const checkSuspension = () => {
+      try {
+        const localStudents = localStorage.getItem('cc_students_v1')
+        if (localStudents) {
+          const list = JSON.parse(localStudents)
+          const currentStudent = list.find(s => 
+            String(s.id) === String(user.id) || 
+            (s.email && user.email && s.email.toLowerCase() === user.email.toLowerCase())
+          )
+          if (currentStudent && currentStudent.status === 'Suspended') {
+            setIsSuspended(true)
+            return
+          }
+        }
+        if (user.status === 'Suspended' || user.is_active === false) {
+          setIsSuspended(true)
+        }
+      } catch (_e) {}
+    }
+
+    const checkRealtimeSuspension = async () => {
+      try {
+        const res = await fetchWithAuth(`${import.meta.env.VITE_API_BASE_URL}/auth/me`)
+        
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}))
+          const profile = data.data?.user || data.user || data.data || data
+          if (profile && (
+            profile.status === 'Suspended' || 
+            profile.status === 'suspended' || 
+            profile.is_active === false || 
+            profile.is_active === 'false'
+          )) {
+            setIsSuspended(true)
+          }
+        }
+      } catch (_err) {
+      }
+    }
+
+    checkSuspension()
+    checkRealtimeSuspension()
+    window.addEventListener('storage', checkSuspension)
+    window.addEventListener('cc_user_suspended', checkSuspension)
+    const interval = setInterval(checkSuspension, 30000)          // check localStorage every 30s
+    const intervalReal = setInterval(checkRealtimeSuspension, 60000) // check real backend every 60 seconds
+
+    return () => {
+      window.removeEventListener('storage', checkSuspension)
+      window.removeEventListener('cc_user_suspended', checkSuspension)
+      clearInterval(interval)
+      clearInterval(intervalReal)
+    }
+  }, [user])
+
+  const handleSuspendedLogout = () => {
+    setIsSuspended(false)
+    localStorage.removeItem('cc_student_active_nav')
+    logout()
+  }
 
   // Service data states
   const [dashboardData, setDashboardData] = useState(null)
@@ -289,6 +356,9 @@ export default function StudentDashboard() {
           `}</style>
         </div>
       )}
+
+      {/* Suspended Account Modal */}
+      <SuspendedAccountModal isOpen={isSuspended} onLogout={handleSuspendedLogout} />
     </div>
   )
 }

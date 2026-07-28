@@ -62,7 +62,7 @@ export default function AnalyticsCategoriesChart({
         ))}
 
         {/* Bars group container */}
-        <div className="absolute left-8 right-2 top-0 bottom-[30px] flex justify-around items-end">
+        <div className="absolute left-8 right-2 top-0 bottom-7.5 flex justify-around items-end">
           {categories.map((item, idx) => {
             const v1 = item.events !== undefined ? item.events : (item.workshops || 0)
             const v2 = item.registrations !== undefined ? item.registrations : (item.seminars || 0)
@@ -76,18 +76,18 @@ export default function AnalyticsCategoriesChart({
                 {/* Double bars */}
                 <div className="flex items-end gap-1.5">
                   <div
-                    className="w-[8px] rounded-t-[3px] transition-all duration-700 hover:opacity-85 cursor-pointer"
+                    className="w-2 rounded-t-[3px] transition-all duration-700 hover:opacity-85 cursor-pointer"
                     style={{ height: wHeight, background: '#615FFF' }}
                     title={`${legendLabel1}: ${v1}`}
                   />
                   <div
-                    className="w-[24px] rounded-t-[6px] transition-all duration-700 hover:opacity-85 cursor-pointer"
+                    className="w-6 rounded-t-md transition-all duration-700 hover:opacity-85 cursor-pointer"
                     style={{ height: sHeight, background: '#00BC7D' }}
                     title={`${legendLabel2}: ${v2}`}
                   />
                 </div>
                 {/* X-axis label */}
-                <span className="absolute bottom-[-24px] text-[11px] font-semibold truncate max-w-[80px]" style={label} title={xLabel}>
+                <span className="absolute bottom-6 text-[11px] font-semibold truncate max-w-20" style={label} title={xLabel}>
                   {xLabel}
                 </span>
               </div>

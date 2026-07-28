@@ -129,45 +129,45 @@ export default function DashboardSidebar({
             const displayBadge = label === 'Notifications' ? unreadCount : badge
             const isCollapsedView = collapsed && !isMobile
             return (
-            <button
-              key={label}
-              onClick={() => {
-                setActiveNav(label)
-                if (isMobile) setSidebarOpen(false)
-              }}
-              title={isCollapsedView ? label : ''}
-              className="flex items-center rounded-[10px] text-[13px] font-semibold border-none cursor-pointer w-full relative transition-all duration-150"
-              style={{
-                justifyContent: isCollapsedView ? 'center' : 'flex-start',
-                gap: isCollapsedView ? 0 : 12,
-                padding: isCollapsedView ? '11px' : '10px 14px',
-                background: active ? `${BRAND}18` : 'transparent',
-                color: active ? BRAND : undefined,
-              }}
-              onMouseEnter={e => { if (!active) {e.currentTarget.style.background = dark ? '#162640' : '#f1f5f9'} }}
-              onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
-            >
-              <Icon size={18} className="shrink-0" style={{ color: active ? BRAND : '#7a98bb' }} />
-              {!isCollapsedView && (
-                <span
-                  className="whitespace-nowrap overflow-hidden text-ellipsis text-slate-500 dark:text-[#7a98bb]"
-                  style={{ color: active ? BRAND : undefined }}
-                >
-                  {label}
-                </span>
-              )}
-              {displayBadge > 0 && !isCollapsedView && (
-                <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: BRAND }}>
-                  {displayBadge}
-                </span>
-              )}
-              {displayBadge > 0 && isCollapsedView && (
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full" style={{ background: BRAND }} />
-              )}
-            </button>
-          )
-        })
-      })()}
+              <button
+                key={label}
+                onClick={() => {
+                  setActiveNav(label)
+                  if (isMobile) setSidebarOpen(false)
+                }}
+                title={isCollapsedView ? label : ''}
+                className="flex items-center rounded-[10px] text-[13px] font-semibold border-none cursor-pointer w-full relative transition-all duration-150"
+                style={{
+                  justifyContent: isCollapsedView ? 'center' : 'flex-start',
+                  gap: isCollapsedView ? 0 : 12,
+                  padding: isCollapsedView ? '11px' : '10px 14px',
+                  background: active ? `${BRAND}18` : 'transparent',
+                  color: active ? BRAND : undefined,
+                }}
+                onMouseEnter={e => { if (!active) { e.currentTarget.style.background = dark ? '#162640' : '#f1f5f9' } }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}
+              >
+                <Icon size={18} className="shrink-0" style={{ color: active ? BRAND : '#7a98bb' }} />
+                {!isCollapsedView && (
+                  <span
+                    className="whitespace-nowrap overflow-hidden text-ellipsis text-slate-500 dark:text-[#7a98bb]"
+                    style={{ color: active ? BRAND : undefined }}
+                  >
+                    {label}
+                  </span>
+                )}
+                {displayBadge > 0 && !isCollapsedView && (
+                  <span className="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full text-white" style={{ background: BRAND }}>
+                    {displayBadge}
+                  </span>
+                )}
+                {displayBadge > 0 && isCollapsedView && (
+                  <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full" style={{ background: BRAND }} />
+                )}
+              </button>
+            )
+          })
+        })()}
       </nav>
 
       {/* Profile / Logout Footer */}

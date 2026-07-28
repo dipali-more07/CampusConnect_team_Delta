@@ -14,7 +14,7 @@ import StudentDeleteModal from '../../components/admin/adminStudent/StudentDelet
 import StudentStatusModal from '../../components/admin/adminStudent/StudentStatusModal'
 
 const DEPTS = ['All', 'CSE', 'ECE', 'ME', 'MBA', 'EEE', 'Civil']
-const YEARS = ['All', '1st', '2nd', '3rd', '4th']
+const YEARS = ['All', '1st', '2nd', '3rd', '4th', '5th', '6th']
 const STATUSES = ['All', 'Active', 'Suspended']
 
 export default function StudentsPage({ tokens }) {
@@ -35,7 +35,10 @@ export default function StudentsPage({ tokens }) {
   const [statusTarget, setStatusTarget] = useState(null)
   const [saving, setSaving] = useState(false)
   const [statusSaving, setStatusSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', rollNo: '', email: '', password: '', department: 'CSE', year: '1st', phone: '' })
+  const [form, setForm] = useState({ 
+    name: '', rollNo: '', email: '', password: '', confirmPassword: '', 
+    department: 'CSE', year: '1st', phone: '', collegeName: '', courseName: '', gender: 'Select Gender' 
+  })
   const [errors, setErrors] = useState({})
 
   const card = { background: tokens.card, border: `1px solid ${tokens.border}`, boxShadow: tokens.shadow }
@@ -57,15 +60,36 @@ export default function StudentsPage({ tokens }) {
     return matchQ && (dept === 'All' || s.department === dept) && (year === 'All' || s.year === year) && (status === 'All' || s.status === status)
   })
 
-  const openCreate = () => { setEditing(null); setForm({ name: '', rollNo: '', email: '', password: '', department: 'CSE', year: '1st', phone: '' }); setErrors({}); setModalOpen(true) }
-  const openEdit = (s) => { setEditing(s); setForm({ name: s.name, rollNo: s.rollNo, email: s.email, password: '', department: s.department, year: s.year, phone: s.phone || '' }); setErrors({}); setModalOpen(true) }
+  const openCreate = () => { 
+    setEditing(null)
+    setForm({ 
+      name: '', rollNo: '', email: '', password: '', confirmPassword: '', 
+      department: 'CSE', year: '1st', phone: '', collegeName: '', courseName: '', gender: 'Select Gender' 
+    })
+    setErrors({})
+    setModalOpen(true) 
+  }
+  
+  const openEdit = (s) => { 
+    setEditing(s)
+    setForm({ 
+      name: s.name || '', rollNo: s.rollNo || '', email: s.email || '', password: '', confirmPassword: '', 
+      department: s.department || 'CSE', year: s.year || '1st', phone: s.phone || '', 
+      collegeName: s.collegeName || '', courseName: s.courseName || '', gender: s.gender || 'Select Gender' 
+    })
+    setErrors({})
+    setModalOpen(true) 
+  }
 
   const validate = () => {
     const e = {}
     if (!form.name.trim()) e.name = 'Required'
     if (!form.rollNo.trim()) e.rollNo = 'Required'
     if (!form.email.trim()) e.email = 'Required'
-    if (!editing && !form.password.trim()) e.password = 'Required'
+    if (!editing) {
+      if (!form.password.trim()) e.password = 'Required'
+      if (form.password !== form.confirmPassword) e.confirmPassword = 'Passwords do not match'
+    }
     setErrors(e)
     return !Object.keys(e).length
   }
@@ -99,8 +123,11 @@ export default function StudentsPage({ tokens }) {
       showToast(`Student ${next === 'Active' ? 'activated' : 'suspended'} successfully.`, 'success')
       setStatusTarget(null)
 
-      // ✅ Local state update — backend /users/students sirf active users return karta hai
-      // isliye load() mat karo, warna suspended student gayab ho jaata hai
+      // Notify any active session or dashboard if student is suspended
+      if (next === 'Suspended') {
+        window.dispatchEvent(new CustomEvent('cc_user_suspended', { detail: { id: statusTarget.id, email: statusTarget.email } }))
+      }
+
       setStudents(prev =>
         prev.map(s => s.id === statusTarget.id ? { ...s, status: next } : s)
       )

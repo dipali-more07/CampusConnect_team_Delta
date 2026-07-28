@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { saveTokens, clearTokens, getRefreshToken } from '../utils/apiClient'
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react'
+import { saveTokens, clearTokens, getRefreshToken, fetchWithAuth } from '../utils/apiClient'
 import authService from '../services/authService'
 
 const AuthContext = createContext(null)
@@ -33,50 +33,96 @@ function loadSession() {
  */
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(loadSession)
+  // Track which token we've already fetched /auth/me for, to prevent infinite loop
+  const lastFetchedToken = useRef(null)
 
-  // Fetch and sync complete user info from /auth/me on mount/token load
+  // Fetch and sync complete user info from /auth/me on mount/token change
   useEffect(() => {
     const token = session?.token
-    if (token) {
-      fetch(`${import.meta.env.VITE_API_BASE_URL}/auth/me`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        }
-      })
+    // Only call /auth/me if we have a token AND it's a different token than last time
+    if (!token || token === lastFetchedToken.current) return
+    lastFetchedToken.current = token
+
+    fetchWithAuth(`${import.meta.env.VITE_API_BASE_URL}/auth/me`)  
       .then(res => {
         if (res.ok) return res.json()
         throw new Error('Failed to fetch /auth/me')
       })
       .then(data => {
-        const profile = data.data || data
-        let role = (profile.role || profile.userType || profile.roleName || 'student').toString().toLowerCase()
-        if (role === 'participant') {
-          role = 'student'
+        const profile = data.data?.user || data.user || data.data || data
+        const rawRole = (
+          profile.role || profile.role_name || profile.roleName || 
+          profile.userType || profile.user_type || data.data?.role || data.role || ''
+        ).toString().toLowerCase()
+
+        const existingRole = session?.user?.role || 'student'
+        let role = existingRole
+        if (['admin', 'superadmin', 'super_admin'].includes(rawRole)) role = 'admin'
+        else if (['organizer', 'event_organizer'].includes(rawRole)) role = 'organizer'
+        else if (['student', 'participant'].includes(rawRole)) {
+          role = (existingRole === 'admin' || existingRole === 'organizer') ? existingRole : 'student'
         }
+        else if (session?.user?.email?.toLowerCase().includes('admin') || profile.email?.toLowerCase().includes('admin')) role = 'admin'
+        else if (session?.user?.email?.toLowerCase().includes('organizer') || profile.email?.toLowerCase().includes('organizer')) role = 'organizer'
+
+        const rawName = profile.full_name || profile.name || profile.fullName || profile.username || session?.user?.name || 'User'
+        const formattedName = rawName.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+
+        const getInitials = (nm) => {
+          const parts = nm.trim().split(/\s+/)
+          if (parts.length > 0 && parts[0]) {
+            if (parts.length > 1 && parts[parts.length - 1]) {
+              return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+            }
+            return parts[0][0].toUpperCase()
+          }
+          return 'CC'
+        }
+
         const avatarImg = profile.profile_image || profile.avatar_url || profile.avatarUrl || null
         const updatedUser = {
+          ...session?.user,
           ...profile,
-          name: profile.full_name || profile.name || profile.fullName || profile.username || profile.email?.split('@')[0] || 'User',
+          name: formattedName,
           role,
           avatarUrl: avatarImg,
           profile_image: avatarImg,
-          avatar: avatarImg || profile.avatar || (profile.full_name ? profile.full_name.substring(0, 2).toUpperCase() : 'CC')
+          avatar: avatarImg || profile.avatar || getInitials(formattedName)
         }
         setSession(prev => {
           if (!prev) return null
-          const s = { ...prev, user: updatedUser }
+          const latestToken = sessionStorage.getItem('token') || prev.token
+          const s = { ...prev, token: latestToken, user: updatedUser }
           sessionStorage.setItem(SESSION_KEY, JSON.stringify(s))
           return s
         })
       })
       .catch(err => {
-              })
-    }
+      })
   }, [session?.token])
 
   const login = useCallback((user, token, refreshToken) => {
-    const s = { user, token }
+    const rawName = user?.full_name || user?.name || user?.fullName || user?.username || 'User'
+    const formattedName = rawName.trim().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+
+    const getInitials = (nm) => {
+      const parts = nm.trim().split(/\s+/)
+      if (parts.length > 0 && parts[0]) {
+        if (parts.length > 1 && parts[parts.length - 1]) {
+          return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        }
+        return parts[0][0].toUpperCase()
+      }
+      return 'CC'
+    }
+
+    const formattedUser = {
+      ...user,
+      name: formattedName,
+      avatar: user?.avatar || getInitials(formattedName)
+    }
+
+    const s = { user: formattedUser, token }
     sessionStorage.setItem(SESSION_KEY, JSON.stringify(s))
     // Save both tokens via apiClient helper
     saveTokens(token, refreshToken)

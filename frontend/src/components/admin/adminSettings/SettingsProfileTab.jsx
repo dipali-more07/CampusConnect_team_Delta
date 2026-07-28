@@ -1,88 +1,34 @@
-import React, { useState } from 'react'
-import { Camera, Loader2 } from 'lucide-react'
-import ImageCropperModal from '../../common/ImageCropperModal'
+import React from 'react'
+import { Loader2 } from 'lucide-react'
 
 export default function SettingsProfileTab({
   profileForm,
   setProfileForm,
   saving,
   handleSaveProfile,
-  fileInputRef,
-  handlePhotoUpload,
   tokens,
   BRAND,
   inputStyle
 }) {
-  const [rawImageSrc, setRawImageSrc] = useState(null)
-  const [cropperOpen, setCropperOpen] = useState(false)
-
-  const onFileSelect = (e) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = () => {
-        setRawImageSrc(reader.result)
-        setCropperOpen(true)
-      }
-      reader.readAsDataURL(file)
-      e.target.value = ''
-    }
-  }
-
-  const handleCropComplete = (croppedUrl) => {
-    setProfileForm(p => ({ ...p, avatarUrl: croppedUrl, profile_image: croppedUrl }))
-  }
 
   return (
     <div className="space-y-6">
-      {/* Image Cropper Modal */}
-      <ImageCropperModal
-        isOpen={cropperOpen}
-        onClose={() => setCropperOpen(false)}
-        imageSrc={rawImageSrc}
-        onCropComplete={handleCropComplete}
-        BRAND={BRAND}
-      />
-
       <div>
         <h3 className="text-[17px] font-extrabold m-0" style={{ color: tokens.txtPri }}>Profile Settings</h3>
       </div>
 
-      {/* Profile Picture Upload Section */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept="image/*"
-        className="hidden"
-        onChange={onFileSelect}
-      />
+      {/* Initials Avatar */}
       <div className="flex items-center gap-4">
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center font-extrabold text-white text-[18px] relative group overflow-hidden shrink-0"
+          className="w-14 h-14 rounded-full flex items-center justify-center font-extrabold text-white text-[18px] shrink-0"
           style={{ background: profileForm.avatarColor || BRAND }}
         >
-          {profileForm.avatarUrl ? (
-            <img src={profileForm.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
-          ) : (
-            profileForm.name ? profileForm.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'CC'
-          )}
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer"
-          >
-            <Camera size={14} color="#fff" />
-          </div>
+          {profileForm.name ? profileForm.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'CC'}
         </div>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="px-3.5 py-2 rounded-xl text-[12.5px] font-bold border cursor-pointer bg-transparent transition-all"
-          style={{ borderColor: tokens.border, color: tokens.txtPri }}
-          onMouseEnter={e => e.currentTarget.style.background = tokens.hoverBg}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-        >
-          Change Photo
-        </button>
+        <div>
+          <p className="text-[13px] font-bold m-0" style={{ color: tokens.txtPri }}>{profileForm.name || 'User'}</p>
+          <p className="text-[11.5px] m-0 mt-0.5" style={{ color: tokens.txtSec }}>{profileForm.email || ''}</p>
+        </div>
       </div>
 
       {/* Profile Form fields */}

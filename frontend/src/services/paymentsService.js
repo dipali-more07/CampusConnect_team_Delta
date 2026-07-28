@@ -34,37 +34,154 @@ const MOCK_PAYMENTS = [
 ]
 
 /* ── Shared mapper ──────────────────────────────────────────────── */
-function mapPayment(p, index) {
-  const student = p.student || p.user || {}
-  const event = p.event || {}
-  const amt = Number(p.amount ?? p.fee ?? event.fees ?? 0)
-  const rawStatus = p.payment_status || p.status || p.paymentStatus
-  let normStatus = 'Success'
+/* ── Shared mapper ──────────────────────────────────────────────── */
+function mapPayment(p, index, eventsMap = {}) {
+  // Student can be nested under student/user/registration object
+  const student = p.student || p.user || p.registration?.student || p.registration?.user || {}
+  const event = p.event || p.event_details || p.eventDetails || p.registration?.event || p.registration?.event_details || p.registration?.eventDetails || {}
+  const reg = p.registration || {}
+
+  // Amount — try all common field names
+  const amt = Number(
+    p.amount ?? p.fee ?? p.total_amount ?? p.paid_amount ??
+    event.fees ?? event.fee ?? reg.amount ?? 0
+  )
+
+  // Status normalisation
+  const rawStatus = p.payment_status || p.status || p.paymentStatus || reg.payment_status
+  let normStatus = 'Pending'
   if (rawStatus) {
     const s = String(rawStatus).toLowerCase()
-    if (s.includes('pend')) normStatus = 'Pending'
-    else if (s.includes('fail')) normStatus = 'Failed'
-    else if (s.includes('succ') || s.includes('comp')) normStatus = 'Success'
+    if (s.includes('succ') || s.includes('comp') || s.includes('paid')) normStatus = 'Success'
+    else if (s.includes('fail') || s.includes('cancel')) normStatus = 'Failed'
+    else if (s.includes('pend')) normStatus = 'Pending'
     else normStatus = s.charAt(0).toUpperCase() + s.slice(1)
-  } else if (amt > 0) {
-    normStatus = 'Pending'
+  } else if (amt === 0) {
+    normStatus = 'Success'
   }
+
+  // Use registration_id as fallback identifier when no student info
+  const regShort = (p.registration_id || reg.id || '').toString().slice(-8)
+
+  // Student name — try every known field variation
+  const rawStudentName =
+    p.student_name ||
+    p.user_name ||
+    student.full_name ||
+    student.fullName ||
+    student.name ||
+    student.username ||
+    (student.first_name ? `${student.first_name || ''} ${student.last_name || ''}`.trim() : null) ||
+    reg.student_name ||
+    null
+
+  const studentName = rawStudentName || (regShort ? `Reg#${regShort}` : 'Student')
+
+  // Roll / college ID
+  const rawRollNo =
+    p.roll_no ||
+    p.roll_number ||
+    p.college_id ||
+    student.roll_no ||
+    student.roll_number ||
+    student.college_id ||
+    student.registration_number ||
+    student.student_id ||
+    reg.roll_no ||
+    null
+
+  const rollNo = rawRollNo || (regShort ? `...${regShort}` : 'N/A')
+
+  // Email
+  const email =
+    p.email ||
+    student.email ||
+    p.user_email ||
+    ''
+
+  // Event ID
+  const eventId = p._injected_event_id || p.event_id || event.id || event.event_id || reg.event_id || ''
+
+  const mappedEventName = eventsMap[String(eventId)] || ''
+
+  // Event name — injected from calling context OR nested event object
+  const eventName =
+    mappedEventName ||
+    p._injected_event_name ||
+    p.event_name   ||
+    p.event_title  ||
+    p.eventTitle   ||
+    p.eventName    ||
+    event.title    ||
+    event.name     ||
+    event.event_name ||
+    event.event_title ||
+    event.eventTitle ||
+    event.eventName ||
+    reg.event_name  ||
+    reg.eventTitle  ||
+    reg.eventName   ||
+    'Unknown Event'
+
+  // Payment / Transaction ID
+  const txnId =
+    p.razorpay_payment_id ||
+    p.transaction_id ||
+    p.transactionId ||
+    p.payment_id ||
+    `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
   return {
     id: p.payment_id || p.id || `PAY${String(index + 1).padStart(3, '0')}`,
-    registrationId: p.registration_id || p.registrationId || p.id,
-    transactionId: p.transaction_id || p.transactionId || `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
-    studentName: p.student_name || student.full_name || student.name || 'Student',
-    rollNo: p.roll_no || student.college_id || 'N/A',
-    email: p.email || student.email || '',
-    eventId: p.event_id || event.id || '',
-    eventName: p.event_name || event.event_name || event.name || 'Event',
+    registrationId: p.registration_id || p.registrationId || reg.id || p.id,
+    transactionId: txnId,
+    studentName,
+    rollNo,
+    email,
+    eventId,
+    eventName,
     amount: amt,
-    method: p.payment_method || p.method || (amt === 0 ? 'Free' : 'Pending'),
+    method: p.payment_method || p.method || p.gateway || p.payment_gateway || (amt === 0 ? 'Free' : 'UPI'),
     status: normStatus,
-    date: p.created_at ? new Date(p.created_at).toLocaleString('en-IN') : (p.date || '')
+    date: p.payment_date
+      ? new Date(p.payment_date).toLocaleString('en-IN')
+      : p.created_at
+        ? new Date(p.created_at).toLocaleString('en-IN')
+        : (p.paid_at ? new Date(p.paid_at).toLocaleString('en-IN') : (p.date || ''))
   }
 }
+
+
+let _eventsMapPromise = null
+
+async function getEventsMap() {
+  if (_eventsMapPromise) return _eventsMapPromise
+
+  _eventsMapPromise = (async () => {
+    const map = {}
+    try {
+      const res = await fetchWithAuth(`${API_BASE}/events`, { method: 'GET' })
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        const rawEvents = data.data || data.events || data || []
+        if (Array.isArray(rawEvents)) {
+          rawEvents.forEach(e => {
+            const id = e.event_id || e.id
+            const name = e.event_name || e.name || e.title || ''
+            if (id) {
+              map[String(id)] = name
+            }
+          })
+        }
+      }
+    } catch (_e) {
+    }
+    return map
+  })()
+
+  return _eventsMapPromise
+}
+
 
 function getStoredPendingPayments() {
   try {
@@ -83,19 +200,16 @@ async function mockFetchPayments() {
 
 async function apiFetchPayments() {
   try {
-    let res = await fetch(`${API_BASE}/payments`, {
-      method: 'GET',
-      headers: authHeaders()
-    })
+    const [res, eventsMap] = await Promise.all([
+      fetch(`${API_BASE}/payments`, { method: 'GET', headers: authHeaders() }).then(async r => {
+        if (!r.ok) {
+          return fetch(`${API_BASE}/payments/all`, { method: 'GET', headers: authHeaders() })
+        }
+        return r
+      }),
+      getEventsMap()
+    ])
 
-    if (!res.ok) {
-      res = await fetch(`${API_BASE}/payments/all`, {
-        method: 'GET',
-        headers: authHeaders()
-      })
-    }
-
-    
     if (!res.ok) {
       return { success: false, payments: [], message: 'Failed to load payments.' }
     }
@@ -107,7 +221,7 @@ async function apiFetchPayments() {
       return { success: true, payments: [] }
     }
 
-    return { success: true, payments: rawList.map(mapPayment) }
+    return { success: true, payments: rawList.map((p, idx) => mapPayment(p, idx, eventsMap)) }
   } catch (err) {
     return { success: false, payments: [], message: 'Server unreachable.' }
   }
@@ -120,17 +234,20 @@ async function apiFetchPayments() {
  */
 async function apiFetchMyPayments({ page = 1, size = 100 } = {}) {
   try {
-    const res = await fetch(`${API_BASE}/payments/my?page=${page}&size=${size}`, {
-      method: 'GET',
-      headers: authHeaders(),
-    })
+    const [res, eventsMap] = await Promise.all([
+      fetch(`${API_BASE}/payments/my?page=${page}&size=${size}`, {
+        method: 'GET',
+        headers: authHeaders(),
+      }),
+      getEventsMap()
+    ])
 
     const storedPending = getStoredPendingPayments()
 
     if (!res.ok) {
       // If API error, still return stored pending payments if available
       if (storedPending.length > 0) {
-        return { success: true, payments: storedPending.map(mapPayment), total: storedPending.length }
+        return { success: true, payments: storedPending.map((p, idx) => mapPayment(p, idx, eventsMap)), total: storedPending.length }
       }
       return { success: false, payments: [], message: 'Failed to load payments.' }
     }
@@ -139,23 +256,35 @@ async function apiFetchMyPayments({ page = 1, size = 100 } = {}) {
     const rawList = data.data?.payments ?? data.data ?? data.payments ?? data.items ?? []
 
     const serverList = Array.isArray(rawList) ? rawList : []
-    // Combine server payments + local pending payments without duplicates
-    const combined = [...storedPending]
-    serverList.forEach(item => {
-      if (!combined.some(c => c.id === item.id || (c.event_id && c.event_id === item.event_id))) {
-        combined.push(item)
+
+    // Server payments take priority over local pending payments
+    const combined = [...serverList]
+    storedPending.forEach(localItem => {
+      const existsOnServer = serverList.some(s =>
+        s.id === localItem.id ||
+        s.payment_id === localItem.id ||
+        (s.event_id && (s.event_id === localItem.event_id || s.event_id === localItem.eventId)) ||
+        (s.registration_id && s.registration_id === localItem.registrationId)
+      )
+      if (!existsOnServer) {
+        combined.push(localItem)
       }
     })
 
     return {
       success: true,
-      payments: combined.map(mapPayment),
+      payments: combined.map((p, idx) => mapPayment(p, idx, eventsMap)),
       total: combined.length,
     }
   } catch (err) {
     const storedPending = getStoredPendingPayments()
     if (storedPending.length > 0) {
-      return { success: true, payments: storedPending.map(mapPayment), total: storedPending.length }
+      try {
+        const eventsMap = await getEventsMap()
+        return { success: true, payments: storedPending.map((p, idx) => mapPayment(p, idx, eventsMap)), total: storedPending.length }
+      } catch (_) {
+        return { success: true, payments: storedPending.map(mapPayment), total: storedPending.length }
+      }
     }
     return { success: false, payments: [], message: 'Server unreachable.' }
   }
@@ -172,28 +301,39 @@ async function mockFetchMyPayments() {
  * GET /payments/event/{event_id}
  * Retrieve all payments for a specific event. Organizer/Admin only.
  */
-async function apiFetchEventPayments(eventId, { page = 1, size = 500 } = {}) {
+async function apiFetchEventPayments(eventId, { page = 1, size = 500 } = {}, eventName = '') {
   try {
-    const res = await fetch(`${API_BASE}/payments/event/${eventId}?page=${page}&size=${size}`, {
-      method: 'GET',
-      headers: authHeaders(),
-    })
+    const [res, eventsMap] = await Promise.all([
+      fetch(`${API_BASE}/payments/event/${eventId}?page=${page}&size=${size}`, {
+        method: 'GET',
+        headers: authHeaders(),
+      }),
+      getEventsMap()
+    ])
 
     if (!res.ok) {
       return { success: false, payments: [], message: 'Failed to load event payments.' }
     }
 
     const data = await parseJSON(res)
-    const rawList = data.data?.payments ?? data.data ?? data.payments ?? data.items ?? []
+    // Backend returns { data: [...], pagination: {...} }
+    const rawList = Array.isArray(data.data) ? data.data
+      : Array.isArray(data.data?.payments) ? data.data.payments
+        : Array.isArray(data.payments) ? data.payments
+          : Array.isArray(data.items) ? data.items
+            : []
 
-    if (!Array.isArray(rawList)) {
-      return { success: true, payments: [], total: 0 }
-    }
+    // Inject event_id & event_name into each record so mapPayment can display it
+    const enriched = rawList.map(item => ({
+      ...item,
+      _injected_event_id: item.event_id || eventId,
+      _injected_event_name: item.event_name || item.event_title || eventName,
+    }))
 
     return {
       success: true,
-      payments: rawList.map(mapPayment),
-      total: data.data?.total ?? data.total ?? rawList.length,
+      payments: enriched.map((p, idx) => mapPayment(p, idx, eventsMap)),
+      total: data.pagination?.total ?? data.total ?? rawList.length,
     }
   } catch (err) {
     return { success: false, payments: [], message: 'Server unreachable.' }
@@ -213,8 +353,8 @@ const paymentsService = {
   fetchMy: (opts) => (USE_MOCK ? mockFetchMyPayments() : apiFetchMyPayments(opts)),
 
   /** Fetch payments for a specific event (Organizer/Admin only) */
-  fetchByEvent: (eventId, opts) =>
-    USE_MOCK ? mockFetchEventPayments(eventId) : apiFetchEventPayments(eventId, opts),
+  fetchByEvent: (eventId, opts, eventName) =>
+    USE_MOCK ? mockFetchEventPayments(eventId) : apiFetchEventPayments(eventId, opts, eventName),
 }
 
 export default paymentsService

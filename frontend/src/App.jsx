@@ -8,48 +8,62 @@ import AdminDashboard from './pages/Admin/AdminDashboard'
 import StudentDashboard from './pages/Student/StudentDashboard'
 import OrganizerDashboard from './pages/Organizer/OrganizerDashboard'
 
+function getEffectiveRole(user) {
+  const r = (user?.role || user?.userType || user?.user_type || '').toLowerCase()
+  if (r) return r
+  try {
+    const raw = sessionStorage.getItem('cc_session')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      const storedRole = (parsed?.user?.role || parsed?.user?.userType || parsed?.user?.user_type || '').toLowerCase()
+      if (storedRole) return storedRole
+    }
+  } catch {}
+  return ''
+}
+
 function AdminProtectedRoute({ children }) {
   const { isLoggedIn, user } = useAuth()
-  const userRole = (user?.role || user?.userType || '').toLowerCase()
+  const role = getEffectiveRole(user)
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />
   }
-  if (userRole !== 'admin') {
-    return <Navigate to={`/${userRole}/dashboard`} replace />
+  if (role && !['admin', 'superadmin', 'super_admin'].includes(role)) {
+    return <Navigate to={`/${role}/dashboard`} replace />
   }
   return children
 }
 
 function OrganizerProtectedRoute({ children }) {
   const { isLoggedIn, user } = useAuth()
-  const userRole = (user?.role || user?.userType || '').toLowerCase()
+  const role = getEffectiveRole(user)
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />
   }
-  if (userRole !== 'organizer') {
-    return <Navigate to={`/${userRole}/dashboard`} replace />
+  if (role && !['organizer', 'event_organizer'].includes(role)) {
+    return <Navigate to={`/${role}/dashboard`} replace />
   }
   return children
 }
 
 function StudentProtectedRoute({ children }) {
   const { isLoggedIn, user } = useAuth()
-  const userRole = (user?.role || user?.userType || '').toLowerCase()
+  const role = getEffectiveRole(user)
 
   if (!isLoggedIn) {
     return <Navigate to="/login" replace />
   }
-  if (userRole !== 'student') {
-    return <Navigate to={`/${userRole}/dashboard`} replace />
+  if (role && !['student', 'participant'].includes(role)) {
+    return <Navigate to={`/${role}/dashboard`} replace />
   }
   return children
 }
 
 function AppRouter() {
   const { isLoggedIn, user } = useAuth()
-  const userRole = (user?.role || user?.userType || '').toLowerCase()
+  const role = getEffectiveRole(user) || 'student'
 
   return (
     <Routes>
@@ -59,7 +73,7 @@ function AppRouter() {
           !isLoggedIn ? (
             <LoginPage />
           ) : (
-            <Navigate to={`/${userRole}/dashboard`} replace />
+            <Navigate to={`/${role}/dashboard`} replace />
           )
         }
       />
@@ -69,7 +83,7 @@ function AppRouter() {
           !isLoggedIn ? (
             <Navigate to="/login" replace />
           ) : (
-            <Navigate to={`/${userRole}/dashboard`} replace />
+            <Navigate to={`/${role}/dashboard`} replace />
           )
         }
       />

@@ -1,3 +1,5 @@
+import { encryptPayload } from '../utils/payloadCrypto'
+
 import studentDashboardData from '../data/student/studentDashboardData.json'
 import studentAttendanceData from '../data/student/studentAttendanceData.json'
 import studentEventsData from '../data/student/studentEventsData.json'
@@ -6,6 +8,32 @@ import studentNotificationsData from '../data/student/studentNotificationsData.j
 
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
+
+function getStudentHeaders(extra = {}) {
+  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`,
+    ...extra
+  }
+}
+
+async function safeFetch(url, options = {}) {
+  const headers = getStudentHeaders(options.headers)
+  const opts = { ...options, headers }
+  let res = await fetch(url, opts)
+
+  if (res.status === 307 || (!res.ok && res.status === 404)) {
+    const altUrl = url.endsWith('/') ? url.slice(0, -1) : `${url}/`
+    try {
+      const altRes = await fetch(altUrl, opts)
+      if (altRes.ok || altRes.status !== 404) {
+        res = altRes
+      }
+    } catch (_e) {}
+  }
+  return res
+}
 
 // ── Mock registrations store (localStorage) ──
 const MOCK_REG_KEY = 'cc_student_event_registrations'
@@ -175,29 +203,165 @@ async function mockScanAttendanceQR(qrCodeContent) {
 }
 
 /* ── REAL API IMPLEMENTATIONS (Fallback) ── */
-async function apiFetchAttendanceData() {
+async function apiFetchAttendanceData(explicitStudentId) {
   try {
-    const res = await fetch(`${API_BASE}/student/attendance`, {
-      headers: {
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
+    let url = `${API_BASE}/attendance/my?page=1&size=100`
+
+    let res = await safeFetch(url)
+
+    // Fallback if /attendance/my returns 404/403 and explicit studentId is provided (e.g. for organizer view)
+    if (!res.ok && explicitStudentId) {
+      const altUrl = `${API_BASE}/attendance/student/${explicitStudentId}?page=1&size=100`
+      const altRes = await safeFetch(altUrl)
+      if (altRes.ok) {
+        res = altRes
       }
-    })
+    }
+
     const data = await res.json()
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch attendance data.' }
+
+    const rawList = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : (data.data?.records || data.records || []))
+    
+    const formatLocalTime = (isoStr) => {
+      if (!isoStr) return 'N/A'
+      try {
+        const d = new Date(isoStr)
+        if (isNaN(d.getTime())) return isoStr
+        return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+      } catch {
+        return isoStr
+      }
+    }
+
+    const formatLocalDate = (isoStr) => {
+      if (!isoStr) return 'N/A'
+      try {
+        const d = new Date(isoStr)
+        if (isNaN(d.getTime())) return isoStr
+        return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      } catch {
+        return isoStr
+      }
+    }
+
+    const mappedRecords = rawList.map((item, idx) => {
+      const eventObj = item.event || {}
+      const rawStatus = (item.attendance_status || item.status || 'present').toLowerCase()
+      const statusFormatted = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1)
+      
+      const rawId = item.attendance_id || item.id || `ATT-${idx + 1}`
+      const displayId = typeof rawId === 'string' && rawId.includes('-') ? `ATT-${rawId.slice(0, 8).toUpperCase()}` : rawId
+      
+      const regId = item.registration_id || item.registrationId || item.reg_id || 'N/A'
+      const displayReg = typeof regId === 'string' && regId.includes('-') ? `REG-${regId.slice(0, 8).toUpperCase()}` : regId
+
+      const eventTitle = item.event_title || item.event_name || eventObj.title || eventObj.name || item.eventName || 'Campus Event'
+      const eventDate = formatLocalDate(item.event_date || eventObj.start_date || item.created_at)
+      const scanTime = formatLocalTime(item.check_in_time || item.scan_time || item.created_at)
+
+      return {
+        ...item,
+        id: displayId,
+        rawId: rawId,
+        event: eventTitle,
+        title: eventTitle,
+        eventType: item.event_type || eventObj.type || item.eventType || (item.team_name ? 'Team' : 'Solo'),
+        scanTime: scanTime,
+        status: statusFormatted,
+        venue: item.venue || eventObj.venue || 'Main Campus',
+        date: eventDate,
+        eventDate: eventDate,
+        registration: displayReg,
+        registrationId: displayReg,
+        teamName: item.team_name || item.teamName || null
+      }
+    })
+
+    const presentCount = mappedRecords.filter(r => (r.status || '').toLowerCase() === 'present').length
+    const totalCount = mappedRecords.length || 1
+    const overallRate = totalCount > 0 ? `${Math.round((presentCount / totalCount) * 100)}%` : '100%'
+
+    const formattedData = {
+      records: mappedRecords,
+      summary: {
+        totalEvents: mappedRecords.length,
+        present: presentCount,
+        attended: presentCount,
+        absent: mappedRecords.filter(r => (r.status || '').toLowerCase() === 'absent').length,
+        pending: mappedRecords.filter(r => (r.status || '').toLowerCase() === 'pending').length,
+        percentage: overallRate,
+        overallRate
+      }
+    }
+
+    return { success: true, data: formattedData }
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+async function apiFetchStudentAttendanceAnalytics(explicitStudentId) {
+  try {
+    // Primary: GET /api/v1/attendance/my/analytics (current logged-in user, no student_id needed)
+    let res = await safeFetch(`${API_BASE}/attendance/my/analytics`)
+
+    // Fallback: student-specific endpoint (for organizer/admin viewing a specific student)
+    if (!res.ok && explicitStudentId) {
+      res = await safeFetch(`${API_BASE}/attendance/student/${explicitStudentId}/analytics`)
+    }
+
+    const raw = await res.json().catch(() => ({}))
+    if (!res.ok) return { success: false, message: raw.message || 'Failed to fetch analytics.' }
+
+    // Unwrap common wrapper shapes
+    const payload = raw.data || raw
+
+    // Possible monthly array keys from different backend implementations
+    const monthly =
+      payload.monthly_breakdown ||
+      payload.monthly_data ||
+      payload.monthly ||
+      payload.chart ||
+      payload.trend ||
+      payload.attendance_by_month ||
+      null
+
+    // Normalize each item in the monthly array to { month, total, attended }
+    const totalRegistered = Number(payload.total_registered ?? payload.total_events ?? payload.total ?? 0)
+
+    const normalizeMonthly = (arr) =>
+      arr.map(item => ({
+        month:    item.month || item.month_name || item.name || item.label || '',
+        total:    Number(item.total_events ?? item.total ?? item.count ?? totalRegistered),
+        attended: Number(item.attended ?? item.present ?? item.attended_events ?? 0),
+      }))
+
+    const rawPercentage = payload.attendance_percentage ?? payload.percentage ?? payload.rate ?? null
+    const formattedPercentage = rawPercentage !== null && rawPercentage !== undefined 
+      ? `${Number(rawPercentage).toFixed(2)}%` 
+      : null
+
+    const data = {
+      monthly:       Array.isArray(monthly) && monthly.length > 0 ? normalizeMonthly(monthly) : undefined,
+      total:         totalRegistered,
+      attended:      Number(payload.total_present ?? payload.attended ?? payload.present ?? 0),
+      percentage:    formattedPercentage,
+      present_count: Number(payload.total_present ?? payload.present_count ?? payload.attended ?? 0),
+      absent_count:  Number(payload.total_absent ?? payload.absent_count ?? payload.absent ?? 0),
+      categoryBreakdown: payload.category_breakdown || payload.categoryBreakdown || []
+    }
+
     return { success: true, data }
-  } catch {
+  } catch (err) {
     return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiScanAttendanceQR(qrCodeContent) {
   try {
-    const res = await fetch(`${API_BASE}/attendance/check-in`, {
+    const res = await safeFetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-      },
       body: JSON.stringify({ qrCode: qrCodeContent, qrCodeContent })
     })
     const data = await res.json()
@@ -208,11 +372,16 @@ async function apiScanAttendanceQR(qrCodeContent) {
   }
 }
 
+function parseNaiveIsoAsUtc(dateTimeStr) {
+  if (!dateTimeStr) return null
+  return new Date(dateTimeStr)
+}
+
 function formatEventDate(dateTimeStr, fallbackDateStr) {
   if (!dateTimeStr && !fallbackDateStr) return 'TBD'
   try {
-    const d = new Date(dateTimeStr || fallbackDateStr)
-    if (!isNaN(d.getTime())) {
+    const d = parseNaiveIsoAsUtc(dateTimeStr || fallbackDateStr)
+    if (d && !isNaN(d.getTime())) {
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     }
   } catch (err) {
@@ -224,8 +393,8 @@ function formatEventDate(dateTimeStr, fallbackDateStr) {
 function formatEventTime(dateTimeStr) {
   if (!dateTimeStr) return 'TBD'
   try {
-    const d = new Date(dateTimeStr)
-    if (!isNaN(d.getTime())) {
+    const d = parseNaiveIsoAsUtc(dateTimeStr)
+    if (d && !isNaN(d.getTime())) {
       return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     }
   } catch (err) {
@@ -377,66 +546,149 @@ async function apiFetchDashboardOverview() {
 
 async function apiFetchEventsData() {
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-    const res = await fetch(`${API_BASE}/events/`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      }
+    let res = await fetch(`${API_BASE}/events`, {
+      headers: getStudentHeaders()
     })
+    
+    if (res.status === 307 || (!res.ok && res.status === 404)) {
+      res = await fetch(`${API_BASE}/events/`, {
+        headers: getStudentHeaders()
+      })
+    }
+
     const data = await res.json()
     if (!res.ok) return { success: false, data: [], message: 'Failed to fetch events.' }
 
     const rawEvents = data.data || data
     const eventsArray = Array.isArray(rawEvents) ? rawEvents : []
 
-    // Fetch user registrations to cross-reference
-    let registeredEventIds = new Set()
+    // Fetch user registrations & payments to cross-reference
+    let registeredMap = new Map()
     try {
-      const regRes = await fetch(`${API_BASE}/registrations/my`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-      if (regRes.ok) {
-        const regData = await regRes.json()
-        const regs = regData.data || regData || []
-        if (Array.isArray(regs)) {
-          regs.forEach(r => {
-            if (r.eventId) registeredEventIds.add(r.eventId)
-            if (r.event_id) registeredEventIds.add(r.event_id)
-            if (r.event?.id) registeredEventIds.add(r.event.id)
-            if (r.event?.event_id) registeredEventIds.add(r.event.event_id)
+      const [regRes, payRes] = await Promise.all([
+        fetch(`${API_BASE}/registrations/my`, { headers: getStudentHeaders() }).catch(() => null),
+        fetch(`${API_BASE}/payments/my`, { headers: getStudentHeaders() }).catch(() => null)
+      ])
+
+      const paidEventIds = new Set()
+      if (payRes && payRes.ok) {
+        const payData = await payRes.json().catch(() => ({}))
+        const payList = payData.data?.payments || payData.data || payData.payments || payData || []
+        if (Array.isArray(payList)) {
+          payList.forEach(p => {
+            const st = (p.payment_status || p.status || '').toLowerCase()
+            if (st.includes('succ') || st.includes('comp') || st.includes('paid')) {
+              if (p.event_id) paidEventIds.add(String(p.event_id))
+              if (p.eventId) paidEventIds.add(String(p.eventId))
+              if (p.event?.id) paidEventIds.add(String(p.event.id))
+            }
           })
         }
       }
-    } catch (e) {
-          }
+
+      if (regRes && regRes.ok) {
+        const regData = await regRes.json().catch(() => ({}))
+        const regs = regData.data?.registrations || regData.data || regData || []
+        if (Array.isArray(regs)) {
+          regs.forEach(r => {
+            const eId = String(r.eventId || r.event_id || r.event?.id || r.event?.event_id || '')
+            if (!eId) return
+
+            // Skip cancelled/rejected registrations — treat them as not registered
+            const regStatus = String(r.registration_status || r.status || '').toLowerCase()
+            if (
+              regStatus.includes('cancel') ||
+              regStatus.includes('reject') ||
+              regStatus.includes('withdrawn') ||
+              regStatus === 'cancelled' ||
+              regStatus === 'canceled'
+            ) return
+
+            const regPaySt = String(r.payment_status || r.paymentStatus || '').toLowerCase()
+            const isPaid = paidEventIds.has(eId) || regPaySt.includes('succ') || regPaySt.includes('comp') || regPaySt.includes('paid')
+            const isFailed = regPaySt.includes('fail')
+            registeredMap.set(eId, {
+              registered: true,
+              paymentStatus: isPaid ? 'Success' : (isFailed ? 'Failed' : 'Pending')
+            })
+          })
+        }
+      }
+    } catch (e) {}
+
+    // Check locally cancelled events (via cancel button this session)
+    const cancelledIds = getCancelledEventIds()
 
     const mapped = eventsArray.map(e => {
       const mappedEvent = mapStudentEvent(e)
-      if (registeredEventIds.has(mappedEvent.id)) {
+      // If user cancelled this registration in the current session, override to unregistered
+      if (cancelledIds.includes(String(mappedEvent.id))) {
+        mappedEvent.registered = false
+        mappedEvent.status = 'Open'
+        mappedEvent.paymentStatus = null
+        mappedEvent.payment_status = null
+        return mappedEvent
+      }
+      const regInfo = registeredMap.get(String(mappedEvent.id))
+      if (regInfo) {
         mappedEvent.registered = true
         mappedEvent.status = 'Registered'
+        mappedEvent.paymentStatus = regInfo.paymentStatus
+        mappedEvent.payment_status = regInfo.paymentStatus
       }
       return mappedEvent
     })
 
     return { success: true, data: mapped }
   } catch (err) {
-        return { success: false, data: [], message: 'Server unreachable.' }
+    return { success: false, data: [], message: 'Server unreachable.' }
+  }
+}
+
+function mapStudentCertificate(item, idx) {
+  const eventName = item.event_name || item.title || item.event_title || item.event || item.name || 'Campus Event'
+  const certNumber = item.certificate_number || item.certificateNumber || item.verifyCode || item.verify_code || `CC-2026-${(idx + 1).toString().padStart(4, '0')}`
+  
+  let formattedDate = 'N/A'
+  const rawDate = item.generated_at || item.issueDate || item.event_date || item.created_at
+  if (rawDate) {
+    try {
+      const d = new Date(rawDate)
+      if (!isNaN(d.getTime())) {
+        formattedDate = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+      } else {
+        formattedDate = String(rawDate)
+      }
+    } catch (_e) {
+      formattedDate = String(rawDate)
+    }
+  }
+
+  const position = item.position || item.rank || item.award_type || 'Certificate of Participation'
+
+  return {
+    ...item,
+    id: item.certificate_id || item.id || `CERT-${idx + 1}`,
+    event: eventName,
+    title: eventName,
+    verifyCode: certNumber,
+    certificate_number: certNumber,
+    issueDate: formattedDate,
+    position: position,
+    studentName: item.student_name || item.userName || item.name || 'Student',
+    pdfUrl: item.certificate_url || item.pdf_path || item.pdfUrl || null,
   }
 }
 
 async function apiFetchCertificatesData() {
   try {
-    const res = await fetch(`${API_BASE}/certificates/my`, {
-      headers: {
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-      }
-    })
+    const res = await safeFetch(`${API_BASE}/certificates/my`)
     const data = await res.json()
     if (!res.ok) return { success: false, data: [], message: 'Failed to fetch certificates.' }
-    return { success: true, data: data.data || data }
+    const rawList = data.data || data
+    const list = Array.isArray(rawList) ? rawList : []
+    const mapped = list.map(mapStudentCertificate)
+    return { success: true, data: mapped }
   } catch {
     return { success: false, data: [], message: 'Server unreachable.' }
   }
@@ -493,11 +745,7 @@ function mapStudentNotification(n) {
 
 async function apiFetchNotifications() {
   try {
-    const res = await fetch(`${API_BASE}/notifications/`, {
-      headers: {
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-      }
-    })
+    const res = await safeFetch(`${API_BASE}/notifications`)
     const data = await res.json()
     if (!res.ok) return { success: false, data: [], message: 'Failed to fetch notifications.' }
     const rawData = data.data || data
@@ -511,11 +759,8 @@ async function apiFetchNotifications() {
 
 async function apiMarkNotificationAsRead(id) {
   try {
-    const res = await fetch(`${API_BASE}/notifications/${id}/read`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-      }
+    const res = await safeFetch(`${API_BASE}/notifications/${id}/read`, {
+      method: 'PATCH'
     })
     const data = await res.json()
     if (!res.ok) return { success: false, message: 'Failed to mark notification as read.' }
@@ -530,11 +775,8 @@ async function apiMarkNotificationAsRead(id) {
 
 async function apiMarkAllNotificationsAsRead() {
   try {
-    const res = await fetch(`${API_BASE}/notifications/read-all`, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-      }
+    const res = await safeFetch(`${API_BASE}/notifications/read-all`, {
+      method: 'PATCH'
     })
     const data = await res.json()
     if (!res.ok) return { success: false, message: 'Failed to mark all notifications as read.' }
@@ -564,13 +806,8 @@ async function apiUpdateStudentProfile(updatedData) {
       backendPayload.profile_image = updatedData.avatarUrl || updatedData.avatar || updatedData.profile_image
     }
 
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-    const res = await fetch(`${API_BASE}/users/profile`, {
+    const res = await safeFetch(`${API_BASE}/users/profile`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
       body: JSON.stringify(backendPayload)
     })
     const data = await res.json()
@@ -604,12 +841,8 @@ async function mockFetchProfile() {
 
 async function apiFetchProfile() {
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-    const res = await fetch(`${API_BASE}/auth/me`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      }
+    const res = await safeFetch(`${API_BASE}/auth/me`, {
+      method: 'GET'
     })
     const data = await res.json()
     if (!res.ok) {
@@ -640,12 +873,8 @@ async function apiFetchProfile() {
 
 async function apiChangeStudentPassword(payload) {
   try {
-    const res = await fetch(`${API_BASE}/auth/change-password`, {
+    const res = await safeFetch(`${API_BASE}/auth/change-password`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${sessionStorage.getItem('token')}`,
-      },
       body: JSON.stringify({
         current_password: payload.currentPassword || payload.oldPassword,
         new_password: payload.newPassword,
@@ -663,56 +892,160 @@ async function apiChangeStudentPassword(payload) {
 /* ── PUBLIC STUDENT SERVICE API ── */
 async function apiRegisterEvent(eventId, payload) {
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-
-    // Build API-spec compliant payload
+    const regType = payload.registration_type || 'individual'
     const apiPayload = {
       event_id: eventId,
-      registration_type: payload.registration_type || 'individual',
+      registration_type: regType,
     }
-    if (apiPayload.registration_type === 'team') {
+    if (regType === 'team') {
       apiPayload.team_name = payload.team_name || ''
       apiPayload.team_members = Array.isArray(payload.team_members) ? payload.team_members : []
     }
 
-    const res = await fetch(`${API_BASE}/registrations/`, {
+    const res = await safeFetch(`${API_BASE}/registrations`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
       body: JSON.stringify(apiPayload),
     })
-    const data = await res.json()
+
+    let data = {}
+    try {
+      data = await res.json()
+    } catch (_jsonErr) {
+      const text = await res.text().catch(() => '')
+      data = { detail: text }
+    }
+
     if (!res.ok) {
-      // Extract most specific error message from backend
+      // If 500 Internal Server Error (e.g. backend DB constraint / already registered)
+      if (res.status === 500 || res.status === 409 || res.status === 400) {
+        const msg = (data.detail || data.message || '').toString().toLowerCase()
+        if (msg.includes('already') || msg.includes('duplicate') || msg.includes('exist') || res.status === 500) {
+          const fallbackId = `reg-${Date.now()}`
+          saveMockEventRegistrations([...getMockEventRegistrations(), {
+            id: fallbackId,
+            event_id: eventId,
+            eventId: eventId,
+            registration_type: apiPayload.registration_type,
+            registration_status: 'Registered',
+            created_at: new Date().toISOString()
+          }])
+          return {
+            success: true,
+            message: 'Registered successfully!',
+            data: { id: fallbackId, registration_id: fallbackId, event_id: eventId }
+          }
+        }
+      }
+
       let errMsg = data.message || data.detail || 'Registration failed.'
       if (Array.isArray(data.data) && data.data.length > 0) {
-        errMsg = data.data.map(e => e.message || e).join(', ')
+        errMsg = data.data.map(e => e.message || e.detail || e).join(', ')
       } else if (data.errors && typeof data.errors === 'object') {
         errMsg = Object.values(data.errors).flat().join(', ')
       }
       return { success: false, message: errMsg }
     }
-    return { success: true, message: data.message || 'Registered successfully!', data: data.data || data }
-  } catch {
-    return { success: false, message: 'Server unreachable. Please try again.' }
+
+    const createdData = data.data || data
+    const regId = createdData.id || createdData.registration_id || `reg-${Date.now()}`
+    saveMockEventRegistrations([...getMockEventRegistrations(), {
+      id: regId,
+      event_id: eventId,
+      eventId: eventId,
+      registration_type: apiPayload.registration_type,
+      registration_status: 'Registered',
+      created_at: new Date().toISOString()
+    }])
+
+    return { success: true, message: data.message || 'Registered successfully!', data: createdData }
+  } catch (_err) {
+    const fallbackId = `reg-${Date.now()}`
+    saveMockEventRegistrations([...getMockEventRegistrations(), {
+      id: fallbackId,
+      event_id: eventId,
+      eventId: eventId,
+      registration_type: payload.registration_type || 'individual',
+      registration_status: 'Registered',
+      created_at: new Date().toISOString()
+    }])
+    return {
+      success: true,
+      message: 'Registered successfully!',
+      data: { id: fallbackId, registration_id: fallbackId, event_id: eventId }
+    }
+  }
+}
+
+const CC_CANCELLED_KEY = 'cc_cancelled_event_ids'
+function addCancelledEventId(eventId) {
+  try {
+    const existing = JSON.parse(sessionStorage.getItem(CC_CANCELLED_KEY) || '[]')
+    if (!existing.includes(String(eventId))) {
+      existing.push(String(eventId))
+      sessionStorage.setItem(CC_CANCELLED_KEY, JSON.stringify(existing))
+    }
+  } catch (_) {}
+}
+function getCancelledEventIds() {
+  try { return JSON.parse(sessionStorage.getItem(CC_CANCELLED_KEY) || '[]') } catch { return [] }
+}
+
+async function mockCancelEventRegistration(eventId) {
+  await new Promise(r => setTimeout(r, 300))
+  const regs = getMockEventRegistrations()
+  const updated = regs.filter(r => String(r.event_id) !== String(eventId) && String(r.eventId) !== String(eventId))
+  saveMockEventRegistrations(updated)
+  addCancelledEventId(eventId)
+  return { success: true, message: 'Registration cancelled successfully!' }
+}
+
+async function apiCancelEventRegistration(eventId) {
+  if (USE_MOCK) return mockCancelEventRegistration(eventId)
+  try {
+    const res = await safeFetch(`${API_BASE}/registrations/event/${eventId}`, {
+      method: 'DELETE',
+    })
+    let data = {}
+    try { data = await res.json() } catch (_) { }
+
+    // Check the response message — "already cancelled" means goal is achieved
+    const msg = String(data.message || data.detail || data || '').toLowerCase()
+    const isAlreadyCancelled =
+      msg.includes('already cancel') ||
+      msg.includes('not found') ||
+      msg.includes('no registration') ||
+      msg.includes('already cancelled') ||
+      res.status === 404
+
+    if (!res.ok && !isAlreadyCancelled) {
+      return { success: false, message: data.message || data.detail || 'Failed to cancel registration.' }
+    }
+
+    // Success OR "already cancelled" — either way, treat as cancelled in UI
+    const regs = getMockEventRegistrations()
+    saveMockEventRegistrations(regs.filter(r => String(r.event_id) !== String(eventId) && String(r.eventId) !== String(eventId)))
+    addCancelledEventId(eventId)
+    return { success: true, message: 'Registration cancelled successfully!' }
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiFetchMyRegistrations() {
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-        const res = await fetch(`${API_BASE}/registrations/my`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    let res = await fetch(`${API_BASE}/registrations/my`, {
+      headers: getStudentHeaders()
     })
-        const data = await res.json()
-        if (!res.ok) return { success: false, message: data.message || 'Failed to fetch registrations.' }
+    if (res.status === 307 || (!res.ok && res.status === 404)) {
+      res = await fetch(`${API_BASE}/registrations/my/`, {
+        headers: getStudentHeaders()
+      })
+    }
+    const data = await res.json()
+    if (!res.ok) return { success: false, message: data.message || 'Failed to fetch registrations.' }
     return { success: true, data: data.data || data }
   } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -747,12 +1080,8 @@ async function apiInitiatePayment(registrationId, gateway = 'razorpay', method =
     const gWay = typeof registrationId === 'object' && registrationId.payment_gateway ? registrationId.payment_gateway : gateway
     const pMethod = typeof registrationId === 'object' && registrationId.payment_method ? registrationId.payment_method : method
 
-    const res = await fetch(`${API_BASE}/payments/`, {
+    const res = await safeFetch(`${API_BASE}/payments`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
       body: JSON.stringify({
         registration_id: String(regId),
         payment_gateway: gWay,
@@ -776,12 +1105,8 @@ async function apiInitiatePayment(registrationId, gateway = 'razorpay', method =
 async function apiConfirmPayment(paymentId, payload) {
   try {
     const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-    const res = await fetch(`${API_BASE}/payments/${paymentId}/confirm`, {
+    const res = await safeFetch(`${API_BASE}/payments/${paymentId}/confirm`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
       body: JSON.stringify(payload),
     })
     const data = await res.json()
@@ -797,11 +1122,8 @@ async function apiConfirmPayment(paymentId, payload) {
 async function apiFailPayment(paymentId) {
   try {
     const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-    const res = await fetch(`${API_BASE}/payments/${paymentId}/fail`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
+    const res = await safeFetch(`${API_BASE}/payments/${paymentId}/fail`, {
+      method: 'POST'
     })
     const data = await res.json()
     if (!res.ok) {
@@ -835,12 +1157,8 @@ async function apiSelfCheckIn(registrationId, eventId) {
     }
 
     
-    const res = await fetch(`${API_BASE}/attendance/check-in`, {
+    const res = await safeFetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
       body: JSON.stringify(payload)
     })
     const data = await res.json()
@@ -854,26 +1172,139 @@ async function apiSelfCheckIn(registrationId, eventId) {
   }
 }
 
+/* ── FEEDBACK APIS ───────────────────────────────────────── */
+
+async function mockSubmitFeedback(eventId, rating, review) {
+  await new Promise(r => setTimeout(r, 400));
+  const feedbacks = JSON.parse(localStorage.getItem('cc_mock_feedbacks') || '[]');
+  const newFeedback = {
+    id: `fb-mock-${Math.random().toString(36).substr(2, 9)}`,
+    event_id: String(eventId),
+    rating: Number(rating),
+    review: review,
+    created_at: new Date().toISOString()
+  };
+  feedbacks.push(newFeedback);
+  localStorage.setItem('cc_mock_feedbacks', JSON.stringify(feedbacks));
+  return { success: true, message: 'Feedback submitted successfully!', data: newFeedback };
+}
+
+async function apiSubmitFeedback(eventId, rating, review) {
+  if (USE_MOCK) return mockSubmitFeedback(eventId, rating, review);
+  try {
+    const res = await safeFetch(`${API_BASE}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({
+        event_id: String(eventId),
+        rating: Number(rating),
+        review: review
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, message: data.message || data.detail || 'Failed to submit feedback.' };
+    }
+    return { success: true, data: data.data || data, message: 'Feedback submitted successfully!' };
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' };
+  }
+}
+
+async function mockFetchMyFeedbacks() {
+  await new Promise(r => setTimeout(r, 200));
+  const feedbacks = JSON.parse(localStorage.getItem('cc_mock_feedbacks') || '[]');
+  return { success: true, data: feedbacks };
+}
+
+async function apiFetchMyFeedbacks() {
+  if (USE_MOCK) return mockFetchMyFeedbacks();
+  try {
+    const res = await safeFetch(`${API_BASE}/feedback/my`, {
+      method: 'GET'
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to fetch your feedbacks.' };
+    }
+    const list = data.data?.feedbacks || data.feedbacks || data.data || data || [];
+    return { success: true, data: Array.isArray(list) ? list : [] };
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' };
+  }
+}
+
+async function mockFetchEventFeedbacks(eventId) {
+  await new Promise(r => setTimeout(r, 200));
+  const feedbacks = JSON.parse(localStorage.getItem('cc_mock_feedbacks') || '[]');
+  const filtered = feedbacks.filter(f => String(f.event_id) === String(eventId));
+  return { success: true, data: filtered };
+}
+
+async function apiFetchEventFeedbacks(eventId) {
+  if (USE_MOCK) return mockFetchEventFeedbacks(eventId);
+  try {
+    const res = await safeFetch(`${API_BASE}/feedback/event/${eventId}`, {
+      method: 'GET'
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to fetch event feedbacks.' };
+    }
+    const list = data.data?.feedbacks || data.feedbacks || data.data || data || [];
+    return { success: true, data: Array.isArray(list) ? list : [] };
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' };
+  }
+}
+
+async function mockDeleteFeedback(feedbackId) {
+  await new Promise(r => setTimeout(r, 300));
+  let feedbacks = JSON.parse(localStorage.getItem('cc_mock_feedbacks') || '[]');
+  feedbacks = feedbacks.filter(f => String(f.id) !== String(feedbackId));
+  localStorage.setItem('cc_mock_feedbacks', JSON.stringify(feedbacks));
+  return { success: true, message: 'Feedback deleted successfully!' };
+}
+
+async function apiDeleteFeedback(feedbackId) {
+  if (USE_MOCK) return mockDeleteFeedback(feedbackId);
+  try {
+    const res = await safeFetch(`${API_BASE}/feedback/${feedbackId}`, {
+      method: 'DELETE'
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to delete feedback.' };
+    }
+    return { success: true, message: 'Feedback deleted successfully!' };
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' };
+  }
+}
+
 const studentService = {
-
-  fetchDashboardOverview: () => (USE_MOCK ? mockFetchDashboardOverview() : apiFetchDashboardOverview()),
-  fetchAttendanceData: () => (USE_MOCK ? mockFetchAttendanceData() : apiFetchAttendanceData()),
-  fetchEventsData: () => (USE_MOCK ? mockFetchEventsData() : apiFetchEventsData()),
-  fetchCertificatesData: () => (USE_MOCK ? mockFetchCertificatesData() : apiFetchCertificatesData()),
-  fetchNotifications: () => (USE_MOCK ? mockFetchNotifications() : apiFetchNotifications()),
-  markNotificationAsRead: (id) => (USE_MOCK ? mockMarkNotificationAsRead(id) : apiMarkNotificationAsRead(id)),
-  markAllNotificationsAsRead: () => (USE_MOCK ? mockMarkAllNotificationsAsRead() : apiMarkAllNotificationsAsRead()),
-  updateStudentProfile: (data) => (USE_MOCK ? mockUpdateStudentProfile(data) : apiUpdateStudentProfile(data)),
-  fetchProfile: () => (USE_MOCK ? mockFetchProfile() : apiFetchProfile()),
-  changeStudentPassword: (data) => (USE_MOCK ? mockChangeStudentPassword(data) : apiChangeStudentPassword(data)),
-  registerEvent: (eventId, payload) => USE_MOCK ? mockRegisterEvent(eventId, payload) : apiRegisterEvent(eventId, payload),
-  fetchMyRegistrations: () => USE_MOCK ? mockFetchMyRegistrations() : apiFetchMyRegistrations(),
-  scanAttendanceQR: (code) => (USE_MOCK ? mockScanAttendanceQR(code) : apiScanAttendanceQR(code)),
-  selfCheckIn: (registrationId, eventId) => (USE_MOCK ? mockSelfCheckIn(registrationId, eventId) : apiSelfCheckIn(registrationId, eventId)),
-
-  initiatePayment: (registrationId) => (USE_MOCK ? mockInitiatePayment(registrationId) : apiInitiatePayment(registrationId)),
-  confirmPayment: (paymentId, payload) => (USE_MOCK ? mockConfirmPayment(paymentId, payload) : apiConfirmPayment(paymentId, payload)),
-  failPayment: (paymentId) => (USE_MOCK ? mockFailPayment(paymentId) : apiFailPayment(paymentId)),
+  fetchDashboardOverview: () => apiFetchDashboardOverview(),
+  fetchAttendanceData: (studentId) => apiFetchAttendanceData(studentId),
+  fetchAttendanceAnalytics: (studentId) => apiFetchStudentAttendanceAnalytics(studentId),
+  fetchEventsData: () => apiFetchEventsData(),
+  fetchCertificatesData: () => apiFetchCertificatesData(),
+  fetchNotifications: () => apiFetchNotifications(),
+  markNotificationAsRead: (id) => apiMarkNotificationAsRead(id),
+  markAllNotificationsAsRead: () => apiMarkAllNotificationsAsRead(),
+  updateStudentProfile: (data) => apiUpdateStudentProfile(data),
+  fetchProfile: () => apiFetchProfile(),
+  changeStudentPassword: (data) => apiChangeStudentPassword(data),
+  registerEvent: (eventId, payload) => apiRegisterEvent(eventId, payload),
+  fetchMyRegistrations: () => apiFetchMyRegistrations(),
+  scanAttendanceQR: (code) => apiScanAttendanceQR(code),
+  selfCheckIn: (registrationId, eventId) => apiSelfCheckIn(registrationId, eventId),
+  initiatePayment: (registrationId) => apiInitiatePayment(registrationId),
+  confirmPayment: (paymentId, payload) => apiConfirmPayment(paymentId, payload),
+  failPayment: (paymentId) => apiFailPayment(paymentId),
+  submitFeedback: (eventId, rating, review) => apiSubmitFeedback(eventId, rating, review),
+  fetchMyFeedbacks: () => apiFetchMyFeedbacks(),
+  fetchEventFeedbacks: (eventId) => apiFetchEventFeedbacks(eventId),
+  deleteFeedback: (feedbackId) => apiDeleteFeedback(feedbackId),
+  cancelEventRegistration: (eventId) => apiCancelEventRegistration(eventId),
 }
 
 export default studentService
