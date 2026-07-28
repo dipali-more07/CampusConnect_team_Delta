@@ -235,6 +235,11 @@ class CertificateService:
         if not event:
             raise NotFoundException(f"Event {event_id} not found")
 
+        # Check event has completed
+        from app.core.constants import EventStatus
+        if event.end_datetime and event.end_datetime > datetime.utcnow() and event.status != EventStatus.COMPLETED:
+            raise BadRequestException("Certificates cannot be issued before the event has completed")
+
         # Check user attended
         registration = self.reg_repo.get_by_event_and_user(event_id, user_id)
         if not registration:
@@ -367,3 +372,69 @@ class CertificateService:
         certs = self.cert_repo.get_by_user(user_id, skip=skip, limit=size)
         total = self.cert_repo.count_by_user(user_id)
         return certs, total
+
+    def get_user_performance(self, user_id: str) -> dict:
+        """
+        Calculate user performance metrics and gamified rank/score based on certificates earned,
+        event attendances, and achievements.
+        """
+        certs = self.cert_repo.get_by_user(user_id, skip=0, limit=1000)
+        total_certs = len(certs)
+
+        # Count certificates by type (Participation, Merit/Winner, Excellence, etc.)
+        participation_certs = sum(1 for c in certs if getattr(c, 'certificate_type', 'participation') == 'participation')
+        merit_certs = sum(1 for c in certs if getattr(c, 'certificate_type', 'participation') in ['merit', 'winner', 'first_place', 'second_place', 'third_place'])
+        excellence_certs = sum(1 for c in certs if getattr(c, 'certificate_type', 'participation') == 'excellence')
+
+        # Total attendance count
+        total_attendance = self.attendance_repo.count_by_user(user_id)
+
+        # Gamified Score Calculation:
+        # - Participation Certificate: 50 pts
+        # - Merit/Winner Certificate: 100 pts
+        # - Excellence Certificate: 150 pts
+        # - Attended Event: 20 pts
+        performance_score = (participation_certs * 50) + (merit_certs * 100) + (excellence_certs * 150) + (total_attendance * 20)
+
+        # Determine Performance Tier / Level
+        if performance_score >= 1000:
+            badge = "Platinum Legend"
+            level = "Level 5"
+        elif performance_score >= 500:
+            badge = "Gold Champion"
+            level = "Level 4"
+        elif performance_score >= 250:
+            badge = "Silver Performer"
+            level = "Level 3"
+        elif performance_score >= 100:
+            badge = "Bronze Achiever"
+            level = "Level 2"
+        else:
+            badge = "Beginner Explorer"
+            level = "Level 1"
+
+        return {
+            "user_id": user_id,
+            "performance_score": performance_score,
+            "performance_level": level,
+            "badge": badge,
+            "total_certificates": total_certs,
+            "total_attended_events": total_attendance,
+            "certificate_breakdown": {
+                "participation": participation_certs,
+                "merit_or_winner": merit_certs,
+                "excellence": excellence_certs,
+            },
+            "recent_certificates": [
+                {
+                    "certificate_id": c.certificate_id,
+                    "event_id": c.event_id,
+                    "event_name": c.event.title if c.event else None,
+                    "certificate_number": c.certificate_number,
+                    "certificate_type": getattr(c, 'certificate_type', 'participation'),
+                    "issued_at": c.generated_at.isoformat() if c.generated_at else None,
+                    "download_url": f"/api/v1/certificates/download/{c.certificate_number}",
+                }
+                for c in certs[:5]
+            ]
+        }

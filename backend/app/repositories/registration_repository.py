@@ -3,7 +3,7 @@ app/repositories/registration_repository.py
 Event Registration database operations.
 """
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func, and_
 
 from app.repositories.base import BaseRepository
@@ -17,9 +17,12 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
 
     def get_by_id(self, registration_id: str) -> Optional[EventRegistration]:
         return self.db.execute(
-            select(EventRegistration).where(
-                EventRegistration.registration_id == registration_id
+            select(EventRegistration)
+            .options(
+                joinedload(EventRegistration.event),
+                joinedload(EventRegistration.user)
             )
+            .where(EventRegistration.registration_id == registration_id)
         ).scalar_one_or_none()
 
     def get_by_event_and_user(
@@ -27,7 +30,12 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
     ) -> Optional[EventRegistration]:
         """Check if a user is already registered for an event."""
         return self.db.execute(
-            select(EventRegistration).where(
+            select(EventRegistration)
+            .options(
+                joinedload(EventRegistration.event),
+                joinedload(EventRegistration.user)
+            )
+            .where(
                 and_(
                     EventRegistration.event_id == event_id,
                     EventRegistration.participant_id == user_id,
@@ -41,6 +49,10 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
         """Get all registrations for an event."""
         query = (
             select(EventRegistration)
+            .options(
+                joinedload(EventRegistration.event),
+                joinedload(EventRegistration.user)
+            )
             .where(EventRegistration.event_id == event_id)
             .offset(skip)
             .limit(limit)
@@ -53,6 +65,10 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
         """Get all events a user has registered for."""
         query = (
             select(EventRegistration)
+            .options(
+                joinedload(EventRegistration.event),
+                joinedload(EventRegistration.user)
+            )
             .where(EventRegistration.participant_id == user_id)
             .order_by(EventRegistration.registered_at.desc())
             .offset(skip)

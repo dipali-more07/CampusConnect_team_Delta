@@ -13,10 +13,12 @@ router = APIRouter()
 
 
 def _attendance_to_dict(att) -> dict:
-
     return {
         "attendance_id": att.attendance_id,
         "registration_id": att.registration_id,
+        "event_id": att.event_id,
+        "event_title": att.event.title if (hasattr(att, "event") and att.event) else None,
+        "venue": att.event.venue if (hasattr(att, "event") and att.event) else None,
         "check_in_time": att.check_in_time.isoformat() if att.check_in_time else None,
         "check_out_time": att.check_out_time.isoformat() if att.check_out_time else None,
         "attendance_status": att.attendance_status,
@@ -63,8 +65,9 @@ def _detailed_attendance_to_dict(att) -> dict:
         "attendance_id": att.attendance_id,
         "registration_id": att.registration_id,
         "event_id": att.event_id,
-        "event_title": att.event.title if att.event else None,
-        "event_date": att.event.start_datetime.isoformat() if att.event else None,
+        "event_title": att.event.title if (hasattr(att, "event") and att.event) else None,
+        "event_date": att.event.start_datetime.isoformat() if (hasattr(att, "event") and att.event and att.event.start_datetime) else None,
+        "venue": att.event.venue if (hasattr(att, "event") and att.event) else None,
         "check_in_time": att.check_in_time.isoformat() if att.check_in_time else None,
         "check_out_time": att.check_out_time.isoformat() if att.check_out_time else None,
         "attendance_status": att.attendance_status,

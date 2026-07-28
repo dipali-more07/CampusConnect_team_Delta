@@ -31,6 +31,12 @@ class ResultService:
         if not event:
             raise NotFoundException(f"Event with ID '{data.event_id}' not found")
 
+        # Check event has completed
+        from datetime import datetime
+        from app.core.constants import EventStatus
+        if event.end_datetime and event.end_datetime > datetime.utcnow() and event.status != EventStatus.COMPLETED:
+            raise BadRequestException("Results can only be declared after the event has completed")
+
         # 2. Check if user is organizer of the event or admin
         if current_user.role != UserRole.ADMIN and event.organizer_id != current_user.user_id:
             raise ForbiddenException("Only the event organizer or an admin can declare results")

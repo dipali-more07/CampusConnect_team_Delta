@@ -60,7 +60,7 @@ class TestAnalyticsAndExtras:
             organizer_id=organizer_user.user_id,
             title="Test Event for QR",
             description="Details",
-            start_datetime=datetime.utcnow() + timedelta(days=5),
+            start_datetime=datetime.utcnow() - timedelta(minutes=5),
             end_datetime=datetime.utcnow() + timedelta(days=6),
             max_participants=50,
             status="published",
@@ -78,6 +78,33 @@ class TestAnalyticsAndExtras:
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
 
+    def test_event_qrcode_generation_before_start_fails(self, client, organizer_token, db, organizer_user):
+        from app.models.event import Event
+        from app.core.constants import ParticipationType
+        from datetime import datetime, timedelta
+        
+        future_event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Future Event for QR Test",
+            description="Details",
+            start_datetime=datetime.utcnow() + timedelta(days=5),
+            end_datetime=datetime.utcnow() + timedelta(days=6),
+            max_participants=50,
+            status="published",
+            approval_status="approved",
+            participation_type=ParticipationType.INDIVIDUAL,
+        )
+        db.add(future_event)
+        db.commit()
+        db.refresh(future_event)
+
+        response = client.get(
+            f"/api/v1/events/{future_event.event_id}/qrcode",
+            headers=auth_headers(organizer_token)
+        )
+        assert response.status_code == 400
+        assert "after the event has started" in response.json()["message"]
+
     def test_student_self_check_in_success(self, client, participant_token, participant_user, db, organizer_user):
         from app.models.event import Event
         from app.models.registration import EventRegistration
@@ -88,8 +115,8 @@ class TestAnalyticsAndExtras:
             organizer_id=organizer_user.user_id,
             title="Test Self CheckIn Event",
             description="Details",
-            start_datetime=datetime.utcnow() + timedelta(days=5),
-            end_datetime=datetime.utcnow() + timedelta(days=6),
+            start_datetime=datetime.utcnow() - timedelta(minutes=2),
+            end_datetime=datetime.utcnow() + timedelta(days=1),
             max_participants=50,
             status="published",
             approval_status="approved",

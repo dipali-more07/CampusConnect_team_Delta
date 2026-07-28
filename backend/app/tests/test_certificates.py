@@ -19,8 +19,8 @@ def published_event(db, organizer_user):
         organizer_id=organizer_user.user_id,
         title="Python Deep Dive Masterclass",
         description="Learn Python from scratch",
-        start_datetime=datetime.utcnow() + timedelta(days=1),
-        end_datetime=datetime.utcnow() + timedelta(days=2),
+        start_datetime=datetime.utcnow() - timedelta(days=2),
+        end_datetime=datetime.utcnow() - timedelta(days=1),
         max_participants=10,
         status="published",
         approval_status="approved",
@@ -89,3 +89,25 @@ class TestCertificateWorkflow:
         assert cert["event_date"] is not None
         assert cert["certificate_number"] is not None
         assert cert["pdf_path"] is not None
+
+        # 5. Get 'my' performance metrics with participant token
+        resp_perf = client.get(
+            "/api/v1/certificates/performance",
+            headers=auth_headers(participant_token),
+        )
+        assert resp_perf.status_code == 200
+        data_perf = resp_perf.json()
+        assert data_perf["success"] is True
+        perf_data = data_perf["data"]
+        assert perf_data["total_certificates"] == 1
+        assert perf_data["performance_score"] >= 50
+        assert "badge" in perf_data
+        assert "performance_level" in perf_data
+
+        # 6. Public/Organizer performance endpoint for user
+        resp_user_perf = client.get(
+            f"/api/v1/certificates/user/{participant_user.user_id}/performance",
+        )
+        assert resp_user_perf.status_code == 200
+        assert resp_user_perf.json()["data"]["total_certificates"] == 1
+

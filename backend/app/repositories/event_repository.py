@@ -80,7 +80,7 @@ class EventRepository(BaseRepository[Event]):
 
     def get_upcoming_events(self, limit: int = 10) -> List[Event]:
         """Get published events that haven't started yet."""
-        now = datetime.utcnow() + timedelta(hours=5, minutes=30)
+        now = datetime.utcnow()
         query = (
             select(Event)
             .where(

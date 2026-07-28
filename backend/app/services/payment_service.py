@@ -15,6 +15,7 @@ from app.models.user import User
 from app.models.notification import Notification
 from app.schemas.payment import PaymentCreate, PaymentConfirm
 from app.core.config import settings
+# pyrefly: ignore [missing-import]
 import razorpay
 import logging
 
@@ -83,15 +84,19 @@ class PaymentService:
                     if client:
                         try:
                             order_amount = int(float(event.fees) * 100)
+                            clean_id = str(existing_payment.payment_id).replace("-", "")[:30]
                             order_data = {
                                 "amount": order_amount,
                                 "currency": "INR",
-                                "receipt": f"receipt_{existing_payment.payment_id}",
+                                "receipt": f"rcpt_{clean_id}",
                             }
                             razorpay_order = client.order.create(data=order_data)
                             existing_payment.transaction_id = razorpay_order["id"]
                         except Exception as e:
                             logger.error(f"Razorpay Order creation failed: {e}")
+                            raise BadRequestException(f"Razorpay Order creation failed: {str(e)}")
+                    else:
+                        raise BadRequestException("Razorpay client is not properly configured. Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.")
 
             reg.payment_status = PaymentStatus.PENDING
             self.db.commit()
@@ -120,15 +125,19 @@ class PaymentService:
                 if client:
                     try:
                         order_amount = int(float(event.fees) * 100)
+                        clean_id = str(payment.payment_id).replace("-", "")[:30]
                         order_data = {
                             "amount": order_amount,
                             "currency": "INR",
-                            "receipt": f"receipt_{payment.payment_id}",
+                            "receipt": f"rcpt_{clean_id}",
                         }
                         razorpay_order = client.order.create(data=order_data)
                         payment.transaction_id = razorpay_order["id"]
                     except Exception as e:
                         logger.error(f"Razorpay Order creation failed: {e}")
+                        raise BadRequestException(f"Razorpay Order creation failed: {str(e)}")
+                else:
+                    raise BadRequestException("Razorpay client is not properly configured. Check RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.")
         
         # 6. Update registration payment status
         reg.payment_status = PaymentStatus.PENDING
@@ -169,6 +178,7 @@ class PaymentService:
                 # Use razorpay_order_id if provided; fallback to payment's saved transaction_id (which holds order_id)
                 order_id = data.razorpay_order_id or payment.transaction_id
                 
+                logger.info(f"Verifying signature for order_id: {order_id}, payment_id: {data.razorpay_payment_id}")
                 client.utility.verify_payment_signature({
                     'razorpay_order_id': order_id,
                     'razorpay_payment_id': data.razorpay_payment_id,
@@ -177,7 +187,11 @@ class PaymentService:
                 # If signature verification passes, use razorpay_payment_id as final transaction ID
                 final_tx_id = data.razorpay_payment_id
             except Exception as e:
-                logger.error(f"Razorpay payment verification failed: {e}")
+                order_id_used = data.razorpay_order_id or payment.transaction_id
+                logger.error(
+                    f"Razorpay payment verification failed: {e}. "
+                    f"order_id={order_id_used}, payment_id={data.razorpay_payment_id}, signature={data.razorpay_signature}"
+                )
                 raise BadRequestException(f"Payment verification failed: {e}")
         elif not final_tx_id:
             # Fallback to razorpay_payment_id if transaction_id is empty but we're in mock mode
@@ -190,6 +204,7 @@ class PaymentService:
 
         # Update registration
         reg.payment_status = PaymentStatus.COMPLETED
+        reg.registration_status = RegistrationStatus.CONFIRMED
 
         # Create notification
         event = self.event_repo.get_by_id(payment.event_id)

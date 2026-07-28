@@ -180,9 +180,6 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 app.add_middleware(LoggingMiddleware)
 
 # 2. CORS - Allow frontend to call our API
-# CORS = Cross-Origin Resource Sharing
-# Without this, browsers block requests from localhost:3000 to localhost:8000
-# Added after LoggingMiddleware so it is the outermost middleware.
 cors_args = {
     "allow_credentials": True,        # Allow cookies/auth headers
     "allow_methods": ["*"],           # Allow all HTTP methods (GET, POST, etc.)
@@ -201,9 +198,8 @@ app.add_middleware(CORSMiddleware, **cors_args)
 # ---------------------------------------------------------------
 # STATIC FILES (for serving uploaded files)
 # ---------------------------------------------------------------
-# This serves uploaded files at /static/uploads/...
-# In production, use nginx or S3 instead
 Path(settings.UPLOAD_DIR).mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=settings.UPLOAD_DIR), name="uploads")
 app.mount("/static", StaticFiles(directory="."), name="static")
 
 # ---------------------------------------------------------------
@@ -214,14 +210,15 @@ app.mount("/static", StaticFiles(directory="."), name="static")
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     """
     Handle HTTP exceptions (404, 403, etc.) with our standard format.
-    Without this, FastAPI returns: {"detail": "Not Found"}
-    With this, we return: {"success": false, "message": "Not Found", "data": null}
     """
+    msg = str(exc.detail)
+    if exc.status_code == 404 and msg in ["Not Found", "Resource not found"]:
+        msg = "No data found"
     return JSONResponse(
         status_code=exc.status_code,
         content={
             "success": False,
-            "message": str(exc.detail),
+            "message": msg,
             "data": None,
         },
     )
@@ -229,16 +226,6 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """
-    Handle Pydantic validation errors (422 Unprocessable Entity).
-
-    When request data fails validation (e.g., invalid email format),
-    Pydantic raises RequestValidationError.
-    We format this nicely for the frontend.
-
-    Example: POST /auth/register with invalid email
-    Returns: {"success": false, "message": "Validation error", "data": [{"field": "email", "message": "..."}]}
-    """
     errors = []
     for error in exc.errors():
         field = " -> ".join(str(loc) for loc in error["loc"])
@@ -262,19 +249,18 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 async def general_exception_handler(request: Request, exc: Exception):
     """
     Catch-all for unexpected errors.
-    Logs the error and returns a safe error message.
-
-    In production: log to Sentry/Datadog, never expose internal details.
+    Logs the error and returns a safe 400 error response without crashing or raising 500.
     """
     logger.error(
         f"Unhandled exception on {request.method} {request.url}: {exc}",
         exc_info=True,
     )
+    error_msg = str(exc) if str(exc) else "An unexpected error occurred. Please check your request data."
     return JSONResponse(
-        status_code=500,
+        status_code=400,
         content={
             "success": False,
-            "message": "An unexpected error occurred. Please try again later.",
+            "message": error_msg,
             "data": None,
         },
     )

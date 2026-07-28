@@ -114,3 +114,88 @@ class TestStudentAttendanceHistory:
         assert response_analytics.status_code == 200
         analytics = response_analytics.json()["data"]
         assert analytics["total_present"] == 1
+
+    def test_attendance_window_before_start_time_fails(self, client, db, participant_token, participant_user, organizer_user):
+        event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Future Event",
+            start_datetime=datetime.utcnow() + timedelta(hours=2),
+            end_datetime=datetime.utcnow() + timedelta(hours=4),
+            status="published",
+            approval_status="approved",
+        )
+        db.add(event)
+        db.commit()
+        reg = EventRegistration(
+            event_id=event.event_id,
+            participant_id=participant_user.user_id,
+            registration_status=RegistrationStatus.CONFIRMED,
+            registration_type="individual",
+        )
+        db.add(reg)
+        db.commit()
+
+        response = client.post(
+            "/api/v1/attendance/check-in",
+            json={"event_id": event.event_id},
+            headers=auth_headers(participant_token)
+        )
+        assert response.status_code == 400
+        assert "Attendance has not started yet" in response.json()["message"]
+
+    def test_attendance_window_after_15_minutes_fails(self, client, db, participant_token, participant_user, organizer_user):
+        event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Expired Window Event",
+            start_datetime=datetime.utcnow() - timedelta(minutes=20),
+            end_datetime=datetime.utcnow() + timedelta(hours=2),
+            status="published",
+            approval_status="approved",
+        )
+        db.add(event)
+        db.commit()
+        reg = EventRegistration(
+            event_id=event.event_id,
+            participant_id=participant_user.user_id,
+            registration_status=RegistrationStatus.CONFIRMED,
+            registration_type="individual",
+        )
+        db.add(reg)
+        db.commit()
+
+        response = client.post(
+            "/api/v1/attendance/check-in",
+            json={"event_id": event.event_id},
+            headers=auth_headers(participant_token)
+        )
+        assert response.status_code == 400
+        assert "Attendance window has closed" in response.json()["message"]
+
+    def test_attendance_window_within_15_minutes_success(self, client, db, participant_token, participant_user, organizer_user):
+        event = Event(
+            organizer_id=organizer_user.user_id,
+            title="Active Window Event",
+            start_datetime=datetime.utcnow() - timedelta(minutes=5),
+            end_datetime=datetime.utcnow() + timedelta(hours=2),
+            status="published",
+            approval_status="approved",
+        )
+        db.add(event)
+        db.commit()
+        reg = EventRegistration(
+            event_id=event.event_id,
+            participant_id=participant_user.user_id,
+            registration_status=RegistrationStatus.CONFIRMED,
+            registration_type="individual",
+        )
+        db.add(reg)
+        db.commit()
+
+        response = client.post(
+            "/api/v1/attendance/check-in",
+            json={"event_id": event.event_id},
+            headers=auth_headers(participant_token)
+        )
+        assert response.status_code == 200
+        assert response.json()["data"]["attendance_status"] == "present"
+

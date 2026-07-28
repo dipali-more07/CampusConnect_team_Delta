@@ -173,11 +173,15 @@ class EventService:
         if event.status != EventStatus.DRAFT:
             raise BadRequestException(f"Cannot publish event with status '{event.status}'")
 
-        # Generate a unique QR code image for this event (used for attendance check-in)
-        qr_path = qr_service.generate_event_qr(event_id)
+        # Generate a unique QR code image for this event if event has started
+        from datetime import datetime
+        qr_path = None
+        if event.start_datetime and datetime.utcnow() >= event.start_datetime:
+            qr_path = qr_service.generate_event_qr(event_id)
 
         event.status = EventStatus.PUBLISHED
-        event.qr_code = qr_path
+        if qr_path:
+            event.qr_code = qr_path
         self.db.commit()
         self.db.refresh(event)
         return event

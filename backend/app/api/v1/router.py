@@ -1,7 +1,7 @@
  
 from fastapi import APIRouter
 
-from app.api.v1 import auth, users, colleges, organizers, events, registrations, attendance, certificates, notifications, analytics, search, results, payments
+from app.api.v1 import auth, users, colleges, organizers, events, registrations, attendance, certificates, notifications, analytics, search, results, payments, feedback
 
 # Create the main v1 router
 api_router = APIRouter()
@@ -22,3 +22,4 @@ api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytic
 api_router.include_router(search.router, prefix="/search", tags=["Search"])
 api_router.include_router(results.router, prefix="/results", tags=["Results"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Payments"])
+api_router.include_router(feedback.router, prefix="/feedback", tags=["Feedback"])

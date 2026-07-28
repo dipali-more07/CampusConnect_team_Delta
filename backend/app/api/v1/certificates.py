@@ -72,6 +72,41 @@ def my_certificates(
     )
 
 
+@router.get("/performance", summary="Get my performance based on certificates earned")
+def my_performance(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns user performance metrics based on earned certificates and attendance:
+    - Performance score & points
+    - Badge & level (e.g. Bronze, Silver, Gold Champion)
+    - Certificate category breakdown (participation vs merit)
+    """
+    service = CertificateService(db)
+    perf = service.get_user_performance(current_user.user_id)
+    return success_response(
+        message="Your certificate performance metrics fetched successfully",
+        data=perf
+    )
+
+
+@router.get("/user/{user_id}/performance", summary="Get a user's performance metrics (Organizer/Admin/Public)")
+def user_performance(
+    user_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Public/Organizer endpoint to view any user's performance metrics and badge profile based on certificates.
+    """
+    service = CertificateService(db)
+    perf = service.get_user_performance(user_id)
+    return success_response(
+        message="User certificate performance metrics fetched successfully",
+        data=perf
+    )
+
+
 @router.get("/verify/{certificate_number}", summary="Verify a certificate (public)")
 def verify_certificate(
     certificate_number: str,
@@ -171,7 +206,7 @@ def _write_templates(templates: list) -> None:
         json.dump(templates, f, indent=4)
 
 
-@router.get("/", summary="List all certificates (Admin/Organizer only)")
+@router.get("", summary="List all certificates (Admin/Organizer only)")
 def list_all_certificates(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),

@@ -116,6 +116,17 @@ class AuthService:
         password_hash = hash_password(data.password)
 
         # Step 3: Create the User object (not yet in DB)
+        from app.core.constants import Gender
+        gender_enum = None
+        if data.gender:
+            if isinstance(data.gender, Gender):
+                gender_enum = data.gender
+            else:
+                try:
+                    gender_enum = Gender(str(data.gender).lower())
+                except ValueError:
+                    gender_enum = None
+
         new_user = User(
             email=data.email,
             password_hash=password_hash,
@@ -127,7 +138,7 @@ class AuthService:
             course=data.course,
             department=data.department,
             college_name=college.college_name,
-            gender=data.gender.value if data.gender else None,
+            gender=gender_enum.value if gender_enum else (str(data.gender) if data.gender else None),
         )
 
         # Step 4: Save User to DB (flush sends SQL but doesn't commit yet)
@@ -141,7 +152,7 @@ class AuthService:
             phone=data.phone,
             course=data.course,
             department=data.department,
-            gender=data.gender,
+            gender=gender_enum,
             year_of_study=data.year_of_study,
         )
         self.profile_repo.create(new_profile)

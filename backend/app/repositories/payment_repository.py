@@ -3,7 +3,7 @@ app/repositories/payment_repository.py
 Payment database operations.
 """
 from typing import Optional, List
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, func, and_
 
 from app.repositories.base import BaseRepository
@@ -15,16 +15,26 @@ class PaymentRepository(BaseRepository[Payment]):
     def __init__(self, db: Session):
         super().__init__(Payment, db)
 
+    def _default_options(self):
+        return [
+            joinedload(Payment.event),
+            joinedload(Payment.registration).joinedload(EventRegistration.user),
+        ]
+
     def get_by_id(self, payment_id: str) -> Optional[Payment]:
         """Fetch payment details by payment ID."""
         return self.db.execute(
-            select(Payment).where(Payment.payment_id == payment_id)
+            select(Payment)
+            .options(*self._default_options())
+            .where(Payment.payment_id == payment_id)
         ).scalar_one_or_none()
 
     def get_by_registration_id(self, registration_id: str) -> Optional[Payment]:
         """Fetch a payment by the associated registration ID."""
         return self.db.execute(
-            select(Payment).where(Payment.registration_id == registration_id)
+            select(Payment)
+            .options(*self._default_options())
+            .where(Payment.registration_id == registration_id)
         ).scalar_one_or_none()
 
     def get_by_event(
@@ -33,6 +43,7 @@ class PaymentRepository(BaseRepository[Payment]):
         """Get all payments for a specific event."""
         query = (
             select(Payment)
+            .options(*self._default_options())
             .where(Payment.event_id == event_id)
             .order_by(Payment.payment_date.desc())
             .offset(skip)
@@ -52,6 +63,7 @@ class PaymentRepository(BaseRepository[Payment]):
         """Get all payments made by a user."""
         query = (
             select(Payment)
+            .options(*self._default_options())
             .join(EventRegistration, Payment.registration_id == EventRegistration.registration_id)
             .where(EventRegistration.participant_id == user_id)
             .order_by(Payment.payment_date.desc())

@@ -145,6 +145,28 @@ class EmailService:
         )
         return await self._send(email, subject, body)
 
+    async def send_account_suspension_email(self, email: str, user_name: Optional[str] = None) -> bool:
+        """Send email notification when an account is suspended/deactivated."""
+        name_str = f"Dear {user_name},\n\n" if user_name else "Hello,\n\n"
+        subject = "Account Suspended - CampusConnect"
+        body = (
+            f"{name_str}"
+            f"Your CampusConnect account ({email}) has been suspended/deactivated by an administrator.\n\n"
+            f"If you believe this was done in error or need further clarification, please contact platform support."
+        )
+        return await self._send(email, subject, body)
+
+    async def send_account_activation_email(self, email: str, user_name: Optional[str] = None) -> bool:
+        """Send email notification when an account is reactivated."""
+        name_str = f"Dear {user_name},\n\n" if user_name else "Hello,\n\n"
+        subject = "Account Reactivated - CampusConnect"
+        body = (
+            f"{name_str}"
+            f"Good news! Your CampusConnect account ({email}) has been reactivated.\n\n"
+            f"You can now log in and access all platform features again."
+        )
+        return await self._send(email, subject, body)
+
 
 # Single instance used across the app (singleton)
 email_service = EmailService()

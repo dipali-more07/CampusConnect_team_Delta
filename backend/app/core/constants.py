@@ -83,6 +83,7 @@ class EventCategory(str, Enum):
 class RegistrationStatus(str, Enum):
     """Status of a student's event registration."""
     CONFIRMED = "confirmed"   # Registration confirmed
+    PENDING = "pending"       # Registration pending (awaiting payment)
     CANCELLED = "cancelled"   # Student cancelled
     WAITLISTED = "waitlisted" # Event full, student on waiting list
     ATTENDED = "attended"     # Student actually showed up

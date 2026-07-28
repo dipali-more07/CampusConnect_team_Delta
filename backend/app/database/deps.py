@@ -97,6 +97,12 @@ def get_current_user(
     if not user.is_active:
         raise UnauthorizedException("Your account has been deactivated. Contact admin.")
 
+    # Verify session role in token matches database user role
+    token_role = payload.get("role")
+    user_role_str = user.role.value if hasattr(user.role, "value") else str(user.role)
+    if token_role and token_role != user_role_str:
+        raise UnauthorizedException("Session role mismatch. Please login again.")
+
     return user
 
 
