@@ -12,6 +12,7 @@
   PATCH  /users/{id}/activate         → Activate a user (Admin only)
   POST   /users/organizer             → Create an organizer account (Admin only)
 """
+from app.utils.helpers import get_user_performance_stats
 from fastapi import APIRouter, Depends, Query, UploadFile, File
 from sqlalchemy.orm import Session
 
@@ -73,37 +74,7 @@ def update_profile(
     )
 
 
-@router.post(
-    "/profile/picture",
-    summary="Upload profile picture",
-)
-async def upload_profile_picture(
-    file: UploadFile = File(...),                       # The image file to upload
-    current_user: User = Depends(get_current_user),    # Must be logged in
-    db: Session = Depends(get_db),
-):
-    """
-    Upload or replace the user's profile picture.
 
-    HOW IT WORKS:
-      1. File is saved to disk (handled by file_service)
-      2. The file path is saved in the user's profile
-      3. Response includes the new file path/URL
-
-    ACCEPTED FORMATS: image files (jpg, png, etc.) — validated by file_service
-    """
-    # Step 1: Save the uploaded file to disk and get the file path
-    file_path = file_service.save_profile_picture(file)
-
-    # Step 2: Update the profile_picture field in the database
-    service = UserService(db)
-    from app.schemas.user import UpdateProfileRequest
-    profile = service.update_profile(current_user.user_id, UpdateProfileRequest(profile_picture=file_path))
-
-    return success_response(
-        message="Profile picture uploaded successfully",
-        data={"profile_picture": file_path},  # Frontend uses this URL to display the image
-    )
 
 
 @router.get(
@@ -142,28 +113,31 @@ def update_appearance(
     summary="List all organizers",
 )
 def list_organizers(
+    include_inactive: bool = Query(default=True),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),  # Must be logged in
 ):
     """
-    Get a list of all active organizer users.
-
-    USE CASE:
-      Admins or participants might want to see who organizes events on the platform.
+    Get a list of all organizer users (both active and suspended).
 
     RESPONSE FIELDS per organizer:
-      user_id, email, full_name, mobile, college_name, department, profile_image
+      user_id, email, full_name, mobile, college_name, department, profile_image, is_active, is_suspended, status
     """
     from app.models.user import User
     from app.core.constants import UserRole
     from sqlalchemy import select
 
-    # Query only users with ORGANIZER role who are still active
-    query = select(User).where(User.role == UserRole.ORGANIZER, User.is_active == True)
+    query = select(User).where(User.role == UserRole.ORGANIZER)
+    if not include_inactive:
+        query = query.where(User.is_active == True)
     organizers = db.execute(query).scalars().all()
 
-    data = [
-        {
+    from app.utils.helpers import get_user_performance_stats
+
+    data = []
+    for u in organizers:
+        stats = get_user_performance_stats(db, u.user_id)
+        data.append({
             "user_id": u.user_id,
             "email": u.email,
             # Use fallback chain: user table → profile table → email prefix
@@ -172,9 +146,14 @@ def list_organizers(
             "college_name": u.college_name or (u.profile.college.college_name if u.profile and u.profile.college else None),
             "department": u.department or (u.profile.department if u.profile else None),
             "profile_image": u.profile_image or (u.profile.profile_picture if u.profile else None),
-        }
-        for u in organizers
-    ]
+            "is_active": u.is_active,
+            "is_suspended": not u.is_active,
+            "status": "active" if u.is_active else "suspended",
+            "events_attended": stats["events_attended"],
+            "certificates_count": stats["certificates_count"],
+            "certificates": stats["certificates"],
+            "attendance_percentage": stats["attendance_percentage"],
+        })
     return success_response(message="Organizers fetched successfully", data=data)
 
 
@@ -183,25 +162,30 @@ def list_organizers(
     summary="List all participants",
 )
 def list_participants(
+    include_inactive: bool = Query(default=True),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),  # Must be logged in
 ):
     """
-    Get a list of all active participant (student) users.
+    Get a list of all participant (student) users (both active and suspended).
 
     RESPONSE FIELDS per participant:
-      user_id, email, full_name, mobile, college_name, department, profile_image
+      user_id, email, full_name, mobile, college_name, department, profile_image, is_active, is_suspended, status, events_attended, certificates_count, attendance_percentage
     """
     from app.models.user import User
     from app.core.constants import UserRole
+    from app.utils.helpers import get_user_performance_stats
     from sqlalchemy import select
 
-    # Query only users with PARTICIPANT role who are still active
-    query = select(User).where(User.role == UserRole.PARTICIPANT, User.is_active == True)
+    query = select(User).where(User.role == UserRole.PARTICIPANT)
+    if not include_inactive:
+        query = query.where(User.is_active == True)
     participants = db.execute(query).scalars().all()
 
-    data = [
-        {
+    data = []
+    for u in participants:
+        stats = get_user_performance_stats(db, u.user_id)
+        data.append({
             "user_id": u.user_id,
             "email": u.email,
             "full_name": u.full_name or (u.profile.full_name if u.profile else None) or u.email.split("@")[0],
@@ -209,9 +193,14 @@ def list_participants(
             "college_name": u.college_name or (u.profile.college.college_name if u.profile and u.profile.college else None),
             "department": u.department or (u.profile.department if u.profile else None),
             "profile_image": u.profile_image or (u.profile.profile_picture if u.profile else None),
-        }
-        for u in participants
-    ]
+            "is_active": u.is_active,
+            "is_suspended": not u.is_active,
+            "status": "active" if u.is_active else "suspended",
+            "events_attended": stats["events_attended"],
+            "certificates_count": stats["certificates_count"],
+            "certificates": stats["certificates"],
+            "attendance_percentage": stats["attendance_percentage"],
+        })
     return success_response(message="Participants fetched successfully", data=data)
 
 
@@ -264,6 +253,7 @@ def create_student(
     summary="List all students (Admin/Organizer only)",
 )
 def list_students(
+    include_inactive: bool = Query(default=True),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -272,7 +262,7 @@ def list_students(
     This is an alias for /participants — both return the same data.
     """
     # Delegates to list_participants since students = participants
-    return list_participants(db=db, current_user=current_user)
+    return list_participants(include_inactive=include_inactive, db=db, current_user=current_user)
 
 
 @router.get(
@@ -296,18 +286,27 @@ def list_users(
     NOTE: This is an admin panel endpoint — detailed profile info is not included here.
     Use GET /users/{user_id} for full details of a specific user.
     """
+    from app.utils.helpers import get_user_performance_stats
     service = UserService(db)
     users, total = service.get_all_users(page=page, size=size, search=search, role=role)
-    users_data = [
-        {
+
+    users_data = []
+    for u in users:
+        stats = get_user_performance_stats(db, u.user_id)
+        users_data.append({
             "user_id": u.user_id,
             "email": u.email,
+            "full_name": u.full_name or (u.profile.full_name if u.profile else None) or u.email.split("@")[0],
             "role": u.role,
             "is_active": u.is_active,
+            "is_suspended": not u.is_active,
+            "status": "active" if u.is_active else "suspended",
             "created_at": u.created_at.isoformat(),
-        }
-        for u in users
-    ]
+            "events_attended": stats["events_attended"],
+            "certificates_count": stats["certificates_count"],
+            "certificates": stats["certificates"],
+            "attendance_percentage": stats["attendance_percentage"],
+        })
     return paginated_response(
         message="Users fetched successfully",
         data=users_data,
@@ -329,14 +328,26 @@ def get_user(
     """
     service = UserService(db)
     user = service.get_user_with_profile(user_id)
+    stats = get_user_performance_stats(db, user.user_id)
     return success_response(
         message="User fetched",
-        data={"user_id": user.user_id, "email": user.email, "role": user.role, "is_active": user.is_active},
+        data={
+            "user_id": user.user_id,
+            "email": user.email,
+            "role": user.role,
+            "is_active": user.is_active,
+            "is_suspended": not user.is_active,
+            "status": "active" if user.is_active else "suspended",
+            "events_attended": stats["events_attended"],
+            "certificates_count": stats["certificates_count"],
+            "certificates": stats["certificates"],
+            "attendance_percentage": stats["attendance_percentage"],
+        },
     )
 
 
 @router.patch("/{user_id}/deactivate", summary="Deactivate user (Admin only)")
-def deactivate_user(
+async def deactivate_user(
     user_id: str,
     admin: User = Depends(require_admin),  # Only admins can do this
     db: Session = Depends(get_db),
@@ -351,12 +362,12 @@ def deactivate_user(
       - Admins cannot deactivate their own account.
     """
     service = UserService(db)
-    user = service.deactivate_user(user_id, admin)
+    user = await service.deactivate_user(user_id, admin)
     return success_response(message=f"User {user.email} deactivated")
 
 
 @router.patch("/{user_id}/activate", summary="Activate user (Admin only)")
-def activate_user(
+async def activate_user(
     user_id: str,
     admin: User = Depends(require_admin),  # Only admins can do this
     db: Session = Depends(get_db),
@@ -366,7 +377,7 @@ def activate_user(
     Sets is_active = True so the user can log in again.
     """
     service = UserService(db)
-    user = service.activate_user(user_id)
+    user = await service.activate_user(user_id)
     return success_response(message=f"User {user.email} activated")
 
 

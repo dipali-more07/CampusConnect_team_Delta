@@ -13,23 +13,49 @@ router = APIRouter()
 
 
 def _reg_to_dict(reg) -> dict:
-    
+    event_title = reg.event.title if (hasattr(reg, "event") and reg.event) else None
+    participant_name = reg.user.full_name if (hasattr(reg, "user") and reg.user) else None
+    participant_email = reg.user.email if (hasattr(reg, "user") and reg.user) else None
+
+    event_obj = None
+    if hasattr(reg, "event") and reg.event:
+        event_obj = {
+            "event_id": reg.event.event_id,
+            "event_name": reg.event.title,
+            "title": reg.event.title,
+            "category": reg.event.category,
+            "event_type": reg.event.event_type,
+            "venue": reg.event.venue,
+            "start_datetime": reg.event.start_datetime.isoformat() if reg.event.start_datetime else None,
+            "end_datetime": reg.event.end_datetime.isoformat() if reg.event.end_datetime else None,
+            "poster": reg.event.poster,
+            "status": reg.event.status,
+            "fees": float(reg.event.fees) if reg.event.fees is not None else None,
+        }
+
     return {
         "registration_id": reg.registration_id,
         "event_id": reg.event_id,
         "user_id": reg.user_id,                          # NOTE: maps to participant_id in DB
+        "participant_id": reg.participant_id,
+        "event_name": event_title,
+        "event_title": event_title,
+        "title": event_title,
+        "user_name": participant_name,
+        "participant_name": participant_name,
+        "user_email": participant_email,
+        "participant_email": participant_email,
         "registration_status": reg.registration_status,  # confirmed / waitlisted / cancelled
         "payment_status": reg.payment_status,            # free / pending / completed
         "registered_at": reg.registered_at.isoformat(),  # ISO 8601 date string
         "registration_type": reg.registration_type,      # "individual" or "team"
         "team_id": reg.team_id,                          # None for individual registrations
-        "event_name": reg.event.title if reg.event else None,
-        "title": reg.event.title if reg.event else None,
+        "event": event_obj,
     }
 
 
 
-@router.post("/", status_code=201, summary="Register for an event")
+@router.post("", status_code=201, summary="Register for an event")
 async def register_for_event(
     data: RegisterForEventRequest,
     current_user: User = Depends(get_current_user),  # Must be logged in
@@ -92,13 +118,46 @@ def event_registrations(
 
 
 @router.patch("/{registration_id}/cancel", summary="Cancel registration")
+@router.post("/{registration_id}/cancel", summary="Cancel registration (POST alias)")
+@router.delete("/{registration_id}", summary="Cancel registration (DELETE alias)")
 def cancel_registration(
     registration_id: str,
     current_user: User = Depends(get_current_user),  # Must be logged in
     db: Session = Depends(get_db),
 ):
-    
     service = RegistrationService(db)
     reg = service.cancel_registration(registration_id, current_user)
     return success_response(message="Registration cancelled", data=_reg_to_dict(reg))
+
+
+@router.post("/event/{event_id}/cancel", summary="Cancel registration by event ID")
+@router.delete("/event/{event_id}", summary="Cancel registration by event ID (DELETE alias)")
+def cancel_event_registration(
+    event_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RegistrationService(db)
+    reg = service.cancel_registration(event_id, current_user)
+    return success_response(message="Registration cancelled", data=_reg_to_dict(reg))
+
+
+@router.get("/{registration_id}/qrcode", summary="Get ticket QR code for registration")
+def get_registration_qrcode(
+    registration_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from fastapi import Response
+    from app.services.qr_service import qr_service
+    from app.core.exceptions import NotFoundException
+
+    service = RegistrationService(db)
+    reg = service.reg_repo.get_by_id(registration_id)
+    if not reg:
+        raise NotFoundException(f"Registration {registration_id} not found")
+
+    qr_bytes = qr_service.generate_registration_qr(registration_id)
+    return Response(content=qr_bytes, media_type="image/png")
+
 

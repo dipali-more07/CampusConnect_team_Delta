@@ -24,12 +24,14 @@ PREVENTING DUPLICATE SCANS:
   This prevents students from sharing ticket QR codes or scanning event QR codes multiple times.
 """
 
+from sqlalchemy.orm import unitofwork
 from datetime import datetime, timedelta
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.registration_repository import RegistrationRepository
+from app.repositories.event_repository import EventRepository
 from app.core.exceptions import (
     NotFoundException, BadRequestException, ForbiddenException
 )
@@ -43,6 +45,23 @@ class AttendanceService:
         self.db = db
         self.attendance_repo = AttendanceRepository(db)
         self.reg_repo = RegistrationRepository(db)
+        self.event_repo = EventRepository(db)
+
+    def _validate_attendance_window(self, event_id: str) -> None:
+        """
+        Validates that attendance is recorded after event start_datetime
+        and within the 15-minute validity window.
+        """
+        event = self.event_repo.get_by_id(event_id)
+        if not event:
+            raise NotFoundException(f"Event {event_id} not found")
+
+        now = datetime.utcnow()
+        if event.start_datetime and now < event.start_datetime:
+            raise BadRequestException("Attendance has not started yet. Attendance opens at event start time.")
+
+        if event.start_datetime and now > (event.start_datetime + timedelta(minutes=15)):
+            raise BadRequestException("Attendance window has closed. QR code is valid for 15 minutes after event start time.")
 
     def check_in(
         self, registration_id: str, event_id: str, scanned_by_user: User
@@ -53,8 +72,9 @@ class AttendanceService:
         Validates:
           1. Registration exists
           2. Registration belongs to the claimed event
-          3. Registration is confirmed (not cancelled/waitlisted)
-          4. Student hasn't already checked in (duplicate scan prevention)
+          3. Attendance window is active (starts at event start_datetime, valid for 15 mins)
+          4. Registration is confirmed (not cancelled/waitlisted)
+          5. Student hasn't already checked in (duplicate scan prevention)
         """
         # Validate registration exists
         registration = self.reg_repo.get_by_id(registration_id)
@@ -64,6 +84,9 @@ class AttendanceService:
         # Validate it's for the correct event
         if registration.event_id != event_id:
             raise BadRequestException("QR code does not belong to this event")
+
+        # Validate 15-minute attendance window
+        self._validate_attendance_window(event_id)
 
         # Check registration is confirmed
         if registration.registration_status != RegistrationStatus.CONFIRMED:
@@ -119,6 +142,9 @@ class AttendanceService:
         registration = self.reg_repo.get_by_event_and_user(event_id, participant.user_id)
         if not registration:
             raise BadRequestException("You are not registered for this event")
+
+        # Validate 15-minute attendance window
+        self._validate_attendance_window(event_id)
 
         # Check registration is confirmed or already attended
         if registration.registration_status not in [RegistrationStatus.CONFIRMED, RegistrationStatus.ATTENDED]:

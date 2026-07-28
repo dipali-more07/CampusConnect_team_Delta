@@ -404,3 +404,4 @@ class AnalyticsService:
                     daily_stats[day]["registrations"] += 1
 
         return sorted(daily_stats.values(), key=lambda x: x["date"])
+

@@ -181,6 +181,8 @@ class EventResponse(BaseModel):
     status: str
     approval_status: str
     qr_code: Optional[str] = None
+    total_registrations: int = 0
+    registration_count: int = 0
     created_at: datetime
     updated_at: datetime
     model_config = {"from_attributes": True}
@@ -203,4 +205,14 @@ class EventListResponse(BaseModel):
     participation_type: str
     fees: Optional[float] = None
     event_date: Optional[date] = None
+    total_registrations: int = 0
+    registration_count: int = 0
+    model_config = {"from_attributes": True}
+    max_participants: Optional[int] = None
+    capacity: Optional[int] = None
+    participation_type: str
+    fees: Optional[float] = None
+    event_date: Optional[date] = None
+    total_registrations: int = 0
+    registration_count: int = 0
     model_config = {"from_attributes": True}

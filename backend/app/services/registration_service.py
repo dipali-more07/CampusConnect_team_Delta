@@ -92,7 +92,7 @@ class RegistrationService:
                     return existing
                 raise ConflictException("You are already registered for this event")
 
-            # --- CHECK CAPACITY ---
+            # --- CHECK CAPACITY & FEES ---
             # max_participants = 0 or None means unlimited seats
             status = RegistrationStatus.CONFIRMED
             if event.max_participants:
@@ -102,6 +102,13 @@ class RegistrationService:
                     # When someone cancels, _promote_from_waitlist() will auto-upgrade them
                     status = RegistrationStatus.WAITLISTED
 
+            is_paid_event = False
+            if event.fees is not None:
+                try:
+                    is_paid_event = float(event.fees) > 0
+                except (ValueError, TypeError):
+                    is_paid_event = False
+
             # --- CREATE REGISTRATION RECORD ---
             registration = EventRegistration(
                 event_id=data.event_id,
@@ -109,16 +116,21 @@ class RegistrationService:
                 registration_status=status,
                 registration_type="individual",
                 # Payment status: FREE if event has no fees, PENDING if fees > 0
-                payment_status=PaymentStatus.PENDING if (event.fees and event.fees > 0) else PaymentStatus.FREE,
+                payment_status=PaymentStatus.PENDING if is_paid_event else PaymentStatus.FREE,
             )
             self.reg_repo.create(registration)
 
             # Create in-app notification
             from app.models.notification import Notification
+            if status == RegistrationStatus.CONFIRMED:
+                notif_title = "Registration Confirmed" if not is_paid_event else "Registration Placed (Payment Pending)"
+            else:
+                notif_title = "Added to Waitlist"
+
             notification = Notification(
                 user_id=current_user.user_id,
-                title="Registration Confirmed" if status == RegistrationStatus.CONFIRMED else "Added to Waitlist",
-                message=f"Your registration for '{event.title}' has been {status.value}.",
+                title=notif_title,
+                message=f"Your registration for '{event.title}' has been recorded.",
                 notification_type=NotificationType.REGISTRATION,
             )
             self.notif_repo.create(notification)
@@ -163,12 +175,19 @@ class RegistrationService:
                 if existing and existing.registration_status != RegistrationStatus.CANCELLED:
                     raise ConflictException(f"Participant {member.email} is already registered for this event")
 
-            # Check capacity
+            # Check capacity & fees
             status = RegistrationStatus.CONFIRMED
             if event.max_participants:
                 confirmed_count = self.reg_repo.count_confirmed_registrations(data.event_id)
                 if confirmed_count + len(all_members) > event.max_participants:
                     status = RegistrationStatus.WAITLISTED
+
+            is_paid_event = False
+            if event.fees is not None:
+                try:
+                    is_paid_event = float(event.fees) > 0
+                except (ValueError, TypeError):
+                    is_paid_event = False
 
             # Create Team
             from app.models.team import Team
@@ -199,7 +218,7 @@ class RegistrationService:
                     registration_status=status,
                     registration_type="team",
                     team_id=team.team_id,
-                    payment_status=PaymentStatus.PENDING if (event.fees and event.fees > 0) else PaymentStatus.FREE,
+                    payment_status=PaymentStatus.PENDING if is_paid_event else PaymentStatus.FREE,
                 )
                 self.reg_repo.create(reg)
                 if member.user_id == current_user.user_id:
@@ -207,10 +226,15 @@ class RegistrationService:
 
                 # Create in-app notification
                 from app.models.notification import Notification
+                if status == RegistrationStatus.CONFIRMED:
+                    notif_title = "Team Registration Confirmed" if not is_paid_event else "Team Registration Placed (Payment Pending)"
+                else:
+                    notif_title = "Added to Waitlist"
+
                 notification = Notification(
                     user_id=member.user_id,
-                    title="Team Registration Confirmed" if status == RegistrationStatus.CONFIRMED else "Added to Waitlist",
-                    message=f"Your registration in team '{data.team_name}' for '{event.title}' has been {status.value}.",
+                    title=notif_title,
+                    message=f"Your registration in team '{data.team_name}' for '{event.title}' has been recorded.",
                     notification_type=NotificationType.REGISTRATION,
                 )
                 self.notif_repo.create(notification)
@@ -230,12 +254,15 @@ class RegistrationService:
             return leader_registration
 
     def cancel_registration(
-        self, registration_id: str, current_user: User
+        self, identifier: str, current_user: User
     ) -> EventRegistration:
         """Cancel a registration. Only the registered user can cancel."""
-        registration = self.reg_repo.get_by_id(registration_id)
+        registration = self.reg_repo.get_by_id(identifier)
         if not registration:
-            raise NotFoundException(f"Registration {registration_id} not found")
+            registration = self.reg_repo.get_by_event_and_user(identifier, current_user.user_id)
+
+        if not registration:
+            raise NotFoundException(f"Registration or event registration '{identifier}' not found")
 
         # Only the owner can cancel (or admin)
         from app.core.constants import UserRole

@@ -16,20 +16,52 @@ router = APIRouter()
 
 
 def _payment_to_dict(payment) -> dict:
+    event_title = payment.event.title if (hasattr(payment, "event") and payment.event) else None
+    
+    participant_id = None
+    participant_name = None
+    participant_email = None
+    if hasattr(payment, "registration") and payment.registration:
+        participant_id = payment.registration.participant_id
+        if hasattr(payment.registration, "user") and payment.registration.user:
+            participant_name = payment.registration.user.full_name
+            participant_email = payment.registration.user.email
+
+    event_obj = None
+    if hasattr(payment, "event") and payment.event:
+        event_obj = {
+            "event_id": payment.event.event_id,
+            "event_name": payment.event.title,
+            "title": payment.event.title,
+            "category": payment.event.category,
+            "venue": payment.event.venue,
+            "poster": payment.event.poster,
+        }
+
     return {
         "payment_id": payment.payment_id,
         "event_id": payment.event_id,
         "registration_id": payment.registration_id,
+        "user_id": participant_id,
+        "participant_id": participant_id,
+        "event_name": event_title,
+        "event_title": event_title,
+        "title": event_title,
+        "user_name": participant_name,
+        "participant_name": participant_name,
+        "user_email": participant_email,
+        "participant_email": participant_email,
         "amount": float(payment.amount),
         "payment_gateway": payment.payment_gateway,
         "payment_method": payment.payment_method,
         "transaction_id": payment.transaction_id,
         "payment_status": payment.payment_status,
         "payment_date": payment.payment_date.isoformat(),
+        "event": event_obj,
     }
 
 
-@router.post("/", status_code=201, summary="Initiate a payment")
+@router.post("", status_code=201, summary="Initiate a payment")
 async def initiate_payment(
     data: PaymentCreate,
     current_user: User = Depends(get_current_user),

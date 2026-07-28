@@ -30,7 +30,7 @@ def _notif_to_dict(n) -> dict:
     }
 
 
-@router.get("/", summary="Get my notifications")
+@router.get("", summary="Get my notifications")
 def get_my_notifications(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),

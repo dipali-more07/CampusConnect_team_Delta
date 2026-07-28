@@ -15,8 +15,16 @@ from app.core.constants import EventStatus, ApprovalStatus
 router = APIRouter()
 
 
-def _event_to_dict(event) -> dict:
-   
+def _has_event_started(event) -> bool:
+    if not event or not event.start_datetime:
+        return True
+    from datetime import datetime, timedelta
+    now_utc = datetime.utcnow()
+    now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+    return (now_utc >= event.start_datetime) or (now_ist >= event.start_datetime)
+
+
+def _event_to_dict(event, db: Optional[Session] = None) -> dict:
     # Combine status + approval_status into a single human-readable status string
     status_val = event.status.value if hasattr(event.status, "value") else event.status
     if event.status == EventStatus.DRAFT:
@@ -31,6 +39,30 @@ def _event_to_dict(event) -> dict:
         organizer_name = event.organizer.full_name
         if not organizer_name and event.organizer.profile:
             organizer_name = event.organizer.profile.full_name
+
+    # Calculate total registrations count
+    reg_count = 0
+    if db is not None:
+        from app.models.registration import EventRegistration
+        from sqlalchemy import select, func
+        reg_count = db.scalar(
+            select(func.count()).select_from(EventRegistration).where(EventRegistration.event_id == event.event_id)
+        ) or 0
+    elif hasattr(event, "registrations") and event.registrations is not None:
+        try:
+            reg_count = len(event.registrations)
+        except Exception:
+            reg_count = 0
+
+    qr_code_val = event.qr_code
+    if not _has_event_started(event):
+        qr_code_val = None
+    elif qr_code_val:
+        qr_code_val = qr_code_val.replace("\\", "/")
+        if not qr_code_val.startswith("/") and not qr_code_val.startswith("http"):
+            qr_code_val = f"/{qr_code_val}"
+    else:
+        qr_code_val = None
 
     return {
         "event_id": event.event_id,
@@ -56,12 +88,14 @@ def _event_to_dict(event) -> dict:
         "poster": event.poster,           # File path / URL to the event poster image
         "status": status_val,             # Combined status (see logic above)
         "approval_status": event.approval_status,
-        "qr_code": event.qr_code,        # QR code path (set when event is published)
+        "qr_code": qr_code_val,          # Clean relative QR code URL path
+        "total_registrations": reg_count,
+        "registration_count": reg_count,
         "created_at": event.created_at.isoformat(),
     }
 
 
-@router.post("/", status_code=201, summary="Create event (Organizer/Admin)")
+@router.post("", status_code=201, summary="Create event (Organizer/Admin)")
 def create_event(
     data: CreateEventRequest,
     current_user: User = Depends(require_organizer),
@@ -69,10 +103,10 @@ def create_event(
 ):
     service = EventService(db)
     event = service.create_event(data, current_user)
-    return success_response(message="Event created as draft. Submit for admin approval.", data=_event_to_dict(event), status_code=201)
+    return success_response(message="Event created as draft. Submit for admin approval.", data=_event_to_dict(event, db), status_code=201)
 
 
-@router.get("/", summary="List events (with filters and pagination)")
+@router.get("", summary="List events (with filters and pagination)")
 def list_events(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
@@ -91,7 +125,7 @@ def list_events(
     )
     return paginated_response(
         message="Events fetched",
-        data=[_event_to_dict(e) for e in events],
+        data=[_event_to_dict(e, db) for e in events],
         total=total, page=page, size=size
     )
 
@@ -103,7 +137,7 @@ def get_upcoming_events(
 ):
     service = EventService(db)
     events = service.get_upcoming_events(limit=limit)
-    return success_response(message="Upcoming events", data=[_event_to_dict(e) for e in events])
+    return success_response(message="Upcoming events", data=[_event_to_dict(e, db) for e in events])
 
 
 @router.get("/trending", summary="Get trending events (most registrations)")
@@ -113,7 +147,7 @@ def get_trending_events(
 ):
     service = EventService(db)
     events = service.get_trending_events(limit=limit)
-    return success_response(message="Trending events", data=[_event_to_dict(e) for e in events])
+    return success_response(message="Trending events", data=[_event_to_dict(e, db) for e in events])
 
 
 @router.get("/pending-approval", summary="Events waiting for admin approval (Admin only)")
@@ -124,14 +158,14 @@ def get_pending_approval(
     from app.repositories.event_repository import EventRepository
     repo = EventRepository(db)
     events = repo.get_pending_approval()
-    return success_response(message="Pending events", data=[_event_to_dict(e) for e in events])
+    return success_response(message="Pending events", data=[_event_to_dict(e, db) for e in events])
 
 
 @router.get("/{event_id}", summary="Get event by ID")
 def get_event(event_id: str, db: Session = Depends(get_db)):
     service = EventService(db)
     event = service.get_event(event_id)
-    return success_response(message="Event fetched", data=_event_to_dict(event))
+    return success_response(message="Event fetched", data=_event_to_dict(event, db))
 
 
 @router.patch("/{event_id}", summary="Update event (Organizer who owns it, or Admin)")
@@ -144,7 +178,7 @@ def update_event(
 ):
     service = EventService(db)
     event = service.update_event(event_id, data, current_user)
-    return success_response(message="Event updated", data=_event_to_dict(event))
+    return success_response(message="Event updated", data=_event_to_dict(event, db))
 
 
 @router.delete("/{event_id}", summary="Delete event (Draft only)")
@@ -166,7 +200,7 @@ def publish_event(
 ):
     service = EventService(db)
     event = service.publish_event(event_id, current_user)
-    return success_response(message="Event published! Students can now register.", data=_event_to_dict(event))
+    return success_response(message="Event published! Students can now register.", data=_event_to_dict(event, db))
 
 
 @router.post("/{event_id}/cancel", summary="Cancel event")
@@ -177,7 +211,7 @@ def cancel_event(
 ):
     service = EventService(db)
     event = service.cancel_event(event_id, current_user)
-    return success_response(message="Event cancelled", data=_event_to_dict(event))
+    return success_response(message="Event cancelled", data=_event_to_dict(event, db))
 
 
 @router.post("/{event_id}/complete", summary="Mark event as completed (Admin only)")
@@ -188,7 +222,7 @@ def complete_event(
 ):
     service = EventService(db)
     event = service.mark_event_completed(event_id)
-    return success_response(message="Event marked as completed", data=_event_to_dict(event))
+    return success_response(message="Event marked as completed", data=_event_to_dict(event, db))
 
 
 @router.post("/{event_id}/approve", summary="Approve or reject event (Admin only)")
@@ -204,7 +238,7 @@ def approve_event(
     event = service.approve_event(event_id, data, admin)
     return success_response(
         message=f"Event {data.approval_status.value} successfully",
-        data=_event_to_dict(event)
+        data=_event_to_dict(event, db)
     )
 
 
@@ -224,22 +258,41 @@ def upload_poster(
     return success_response(message="Poster uploaded", data={"poster": poster_path})
 
 
-@router.get("/{event_id}/qrcode", summary="Get check-in QR code for an event (Organizer only)")
+@router.get("/{event_id}/qrcode", summary="Get check-in QR code for an event (Organizer/Admin only)")
+@router.post("/{event_id}/qrcode", summary="Get check-in QR code for an event (Organizer/Admin only)")
 def get_event_qrcode(
     event_id: str,
     current_user: User = Depends(require_organizer),
     db: Session = Depends(get_db),
 ):
     from fastapi import Response
-    from app.services.qr_service import QRService
-    from app.core.exceptions import NotFoundException
+    from datetime import datetime, timedelta
+    from app.services.qr_service import qr_service
+    from app.core.exceptions import NotFoundException, BadRequestException
 
     service = EventService(db)
     event = service.event_repo.get_by_id(event_id)
     if not event:
         raise NotFoundException(f"Event {event_id} not found")
 
-    qr_service = QRService()
+    now_utc = datetime.utcnow()
+    now_ist = datetime.utcnow() + timedelta(hours=5, minutes=30)
+
+    has_started = False
+    if event.start_datetime:
+        has_started = (now_utc >= event.start_datetime) or (now_ist >= event.start_datetime)
+    elif event.status in [EventStatus.PUBLISHED, EventStatus.COMPLETED]:
+        has_started = True
+
+    if not has_started:
+        raise BadRequestException("Event check-in QR code can only be generated after the event has started")
+
     qr_data = f"campusconnect://checkin?event_id={event_id}"
     qr_bytes = qr_service._create_qr_code(qr_data)
+
+    if not event.qr_code:
+        event.qr_code = qr_service.generate_event_qr(event_id)
+        db.commit()
+
     return Response(content=qr_bytes, media_type="image/png")
+

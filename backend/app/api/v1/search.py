@@ -14,7 +14,7 @@ from app.core.responses import success_response
 router = APIRouter()
 
 
-@router.get("/", summary="Global search across events, users, colleges")
+@router.get("", summary="Global search across events, users, colleges")
 def global_search(
     q: str = Query(..., min_length=2, description="Search query (min 2 characters)"),
     search_type: str = Query(

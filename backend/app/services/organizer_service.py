@@ -40,10 +40,12 @@ class OrganizerService:
         self.db.refresh(organizer)
         return organizer
 
-    def get_organizer(self, organizer_id: str) -> Organizer:
-        org = self.organizer_repo.get_by_id(organizer_id)
+    def get_organizer(self, identifier: str) -> Organizer:
+        org = self.organizer_repo.get_by_id(identifier)
         if not org:
-            raise NotFoundException(f"Organizer {organizer_id} not found")
+            org = self.organizer_repo.get_by_user_id(identifier)
+        if not org:
+            raise NotFoundException(f"Organizer with ID or User ID '{identifier}' not found")
         return org
 
     def get_organizer_by_user(self, user_id: str) -> Organizer:
@@ -61,20 +63,46 @@ class OrganizerService:
         return organizers, total
 
     def update_organizer(
-        self, organizer_id: str, data: UpdateOrganizerRequest
+        self, identifier: str, data: UpdateOrganizerRequest
     ) -> Organizer:
-        organizer = self.get_organizer(organizer_id)
+        organizer = self.get_organizer(identifier)
         update_data = data.model_dump(exclude_none=True)
-        for field, value in update_data.items():
-            setattr(organizer, field, value)
+
+        if "designation" in update_data:
+            organizer.designation = update_data.pop("designation")
+        if "permissions" in update_data:
+            organizer.permissions = update_data.pop("permissions")
+
+        # Update profile fields (bio, full_name, phone, etc.) on UserProfile if provided
+        if update_data:
+            from app.services.user_service import UserService
+            from app.schemas.user import UpdateProfileRequest
+            user_service = UserService(self.db)
+            profile_req = UpdateProfileRequest(**update_data)
+            user_service.update_profile(organizer.user_id, profile_req)
+
         self.db.commit()
         self.db.refresh(organizer)
         return organizer
 
-    def remove_organizer(self, organizer_id: str) -> None:
-        organizer = self.get_organizer(organizer_id)
-        user = self.user_repo.get_by_id(organizer.user_id)
+    def remove_organizer(self, identifier: str) -> None:
+        org = self.organizer_repo.get_by_id(identifier)
+        if not org:
+            org = self.organizer_repo.get_by_user_id(identifier)
+
+        if org:
+            user = self.user_repo.get_by_id(org.user_id)
+            if user:
+                user.role = UserRole.PARTICIPANT
+            self.organizer_repo.delete(org)
+            self.db.commit()
+            return
+
+        # Fallback: Check if user exists by user_id
+        user = self.user_repo.get_by_id(identifier)
         if user:
             user.role = UserRole.PARTICIPANT
-        self.organizer_repo.delete(organizer)
-        self.db.commit()
+            self.db.commit()
+            return
+
+        raise NotFoundException(f"Organizer or User with ID '{identifier}' not found")

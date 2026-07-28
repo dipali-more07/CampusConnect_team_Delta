@@ -25,6 +25,7 @@ DATA MODEL NOTE:
     (full_name, mobile/phone, department, course, college_name, gender)
   This is done for quick lookups. When updating, we MUST sync BOTH tables.
 """
+from app.core.constants import Gender
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
@@ -151,11 +152,24 @@ class UserService:
         user = self.user_repo.get_by_id(user_id)
 
         for field, value in update_data.items():
-            # Update the profile field
-            setattr(profile, field, value)
+            if field == "gender" and value:
+                from app.core.constants import Gender
+                gender_enum = None
+                if isinstance(value, Gender):
+                    gender_enum = value
+                else:
+                    try:
+                        gender_enum = Gender(str(value).lower())
+                    except ValueError:
+                        gender_enum = None
+                profile.gender = gender_enum
+                if user:
+                    user.gender = gender_enum.value if gender_enum else str(value)
+            else:
+                setattr(profile, field, value)
 
             # Sync matching fields to the users table (denormalization sync)
-            if user:
+            if user and field != "gender":
                 if field == "full_name":
                     user.full_name = value
                 elif field == "phone":
@@ -164,9 +178,6 @@ class UserService:
                     user.department = value
                 elif field == "course":
                     user.course = value
-                elif field == "gender":
-                    # Enum might be a Gender object or a plain string — handle both
-                    user.gender = value.value if hasattr(value, "value") else value
 
         # Save everything in one transaction
         self.db.commit()
@@ -194,7 +205,7 @@ class UserService:
         total = self.user_repo.count_users(search=search, role=role)
         return users, total
 
-    def deactivate_user(self, user_id: str, admin_user: User) -> User:
+    async def deactivate_user(self, user_id: str, admin_user: User) -> User:
         """
         Deactivate a user account (soft delete — data is kept, just blocked).
 
@@ -214,10 +225,29 @@ class UserService:
             raise ForbiddenException("You cannot deactivate your own admin account")
 
         user.is_active = False
+
+        from app.models.notification import Notification
+        from app.core.constants import NotificationType
+        notif = Notification(
+            user_id=user.user_id,
+            title="Account Suspended",
+            message="Your account has been deactivated/suspended by an administrator.",
+            notification_type=NotificationType.SYSTEM,
+        )
+        self.db.add(notif)
         self.db.commit()
+
+        # Send suspension email
+        try:
+            from app.services.email_service import email_service
+            user_name = user.full_name or (user.profile.full_name if user.profile else None)
+            await email_service.send_account_suspension_email(user.email, user_name)
+        except Exception:
+            pass
+
         return user
 
-    def activate_user(self, user_id: str) -> User:
+    async def activate_user(self, user_id: str) -> User:
         """
         Re-activate a previously deactivated user.
         Sets is_active = True so they can log in again.
@@ -225,8 +255,28 @@ class UserService:
         user = self.user_repo.get_by_id(user_id)
         if not user:
             raise NotFoundException(f"User {user_id} not found")
+
         user.is_active = True
+
+        from app.models.notification import Notification
+        from app.core.constants import NotificationType
+        notif = Notification(
+            user_id=user.user_id,
+            title="Account Reactivated",
+            message="Your account has been reactivated. Welcome back!",
+            notification_type=NotificationType.SYSTEM,
+        )
+        self.db.add(notif)
         self.db.commit()
+
+        # Send activation email
+        try:
+            from app.services.email_service import email_service
+            user_name = user.full_name or (user.profile.full_name if user.profile else None)
+            await email_service.send_account_activation_email(user.email, user_name)
+        except Exception:
+            pass
+
         return user
 
     def delete_user(self, user_id: str, admin_user: User) -> None:
@@ -238,7 +288,13 @@ class UserService:
 
         user = self.user_repo.get_by_id(user_id)
         if not user:
-            raise NotFoundException(f"User {user_id} not found")
+            from app.repositories.organizer_repository import OrganizerRepository
+            org = OrganizerRepository(self.db).get_by_id(user_id)
+            if org:
+                user = self.user_repo.get_by_id(org.user_id)
+
+        if not user:
+            raise NotFoundException(f"User with ID or Organizer ID '{user_id}' not found")
 
         if user.user_id == admin_user.user_id:
             raise ForbiddenException("You cannot delete your own admin account")
@@ -295,6 +351,18 @@ class UserService:
         pwd_hash = hash_password(data.password)
 
         # 4. Create User record
+        from app.core.constants import Gender
+        gender_enum = None
+        if data.gender:
+            if isinstance(data.gender, Gender):
+                gender_enum = data.gender
+            else:
+                try:
+                    gender_enum = Gender(str(data.gender).lower())
+                except ValueError:
+                    gender_enum = None
+
+        # 4. Create User record
         user = User(
             email=data.email,
             password_hash=pwd_hash,
@@ -305,7 +373,7 @@ class UserService:
             mobile=data.phone,
             college_name=college.college_name,
             department=data.department,
-            gender=data.gender.value if data.gender else None,
+            gender=gender_enum.value if gender_enum else (str(data.gender) if data.gender else None),
         )
         self.user_repo.create(user)
         self.db.flush()                 # Generate user_id before creating profile
@@ -317,7 +385,7 @@ class UserService:
             full_name=data.full_name,
             phone=data.phone,
             department=data.department,
-            gender=data.gender,
+            gender=gender_enum,
         )
         self.profile_repo.create(profile)
 
@@ -379,6 +447,16 @@ class UserService:
         # 3. Hash the password
         pwd_hash = hash_password(data.password)
 
+        gender_enum = None
+        if data.gender:
+            if isinstance(data.gender, Gender):
+                gender_enum = data.gender
+            else:
+                try:
+                    gender_enum = Gender(str(data.gender).lower())
+                except ValueError:
+                    gender_enum = None
+
         # 4. Create User record
         user = User(
             email=data.email,
@@ -391,7 +469,7 @@ class UserService:
             college_name=college.college_name,
             department=data.department,
             course=data.course,
-            gender=data.gender.value if data.gender else None,
+            gender=gender_enum.value if gender_enum else (str(data.gender) if data.gender else None),
         )
         self.user_repo.create(user)
         self.db.flush()
@@ -404,7 +482,7 @@ class UserService:
             phone=data.phone,
             department=data.department,
             course=data.course,
-            gender=data.gender,
+            gender=gender_enum,
             year_of_study=data.year_of_study,  # Stored only in profile, not in users table
         )
         self.profile_repo.create(profile)

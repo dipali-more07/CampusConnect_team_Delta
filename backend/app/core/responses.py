@@ -37,28 +37,6 @@ def success_response(
     data: Any = None,
     status_code: int = 200
 ) -> JSONResponse:
-    """
-    Return a successful API response.
-
-    Args:
-        message: Human-readable success message
-        data: The actual response data (dict, list, etc.)
-        status_code: HTTP status code (200, 201, etc.)
-
-    Example:
-        return success_response(
-            message="User created successfully",
-            data={"user_id": "abc-123", "email": "john@example.com"},
-            status_code=201
-        )
-
-    Returns:
-        {
-            "success": true,
-            "message": "User created successfully",
-            "data": {"user_id": "abc-123", "email": "john@example.com"}
-        }
-    """
     return JSONResponse(
         status_code=status_code,
         content={
@@ -74,27 +52,6 @@ def error_response(
     status_code: int = 400,
     errors: Optional[Any] = None
 ) -> JSONResponse:
-    """
-    Return an error API response.
-
-    Args:
-        message: Human-readable error message
-        status_code: HTTP error status code (400, 404, 403, etc.)
-        errors: Optional detailed error information
-
-    Example:
-        return error_response(
-            message="Invalid email format",
-            status_code=400
-        )
-
-    Returns:
-        {
-            "success": false,
-            "message": "Invalid email format",
-            "data": null
-        }
-    """
     return JSONResponse(
         status_code=status_code,
         content={
@@ -113,29 +70,9 @@ def paginated_response(
     size: int = 10,
     status_code: int = 200
 ) -> JSONResponse:
-    """
-    Return a paginated list response.
+    if data is None:
+        data = []
 
-    WHY PAGINATION:
-      Returning all 10,000 events at once would be very slow.
-      Pagination breaks the list into pages (e.g., 10 items per page).
-      The frontend loads one page at a time.
-
-    Returns:
-        {
-            "success": true,
-            "message": "Events fetched successfully",
-            "data": [...],
-            "pagination": {
-                "total": 150,
-                "page": 1,
-                "size": 10,
-                "total_pages": 15,
-                "has_next": true,
-                "has_previous": false
-            }
-        }
-    """
     total_pages = (total + size - 1) // size if size > 0 else 0
 
     return JSONResponse(

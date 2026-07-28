@@ -126,10 +126,21 @@ class TestProtectedRoutes:
 
     def test_admin_endpoint_with_participant_token_returns_403(self, client, participant_token):
         response = client.get(
-            "/api/v1/users/",
+            "/api/v1/users",
             headers=auth_headers(participant_token)
         )
         assert response.status_code == 403
+
+    def test_token_role_mismatch_returns_401(self, client, db, participant_user):
+        from app.core.security import create_access_token
+        # Create token claiming to be admin for a participant user
+        fake_token = create_access_token(data={"sub": participant_user.user_id, "role": "admin"})
+        response = client.get(
+            "/api/v1/users",
+            headers=auth_headers(fake_token)
+        )
+        assert response.status_code == 401
+        assert "mismatch" in response.json()["message"].lower()
 
 
 class TestEmailVerification:

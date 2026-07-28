@@ -61,11 +61,17 @@ class QRService:
         qr.add_data(data)
         qr.make(fit=True)  # Auto-size the QR code
 
-        # Create the image
-        img = qr.make_image(fill_color="black", back_color="white")
-        img_bytes = io.BytesIO()
-        img.save(img_bytes, format="PNG")
-        return img_bytes.getvalue()
+        # Create the image with fallback support
+        try:
+            img = qr.make_image(fill_color="black", back_color="white")
+            img_bytes = io.BytesIO()
+            img.save(img_bytes, format="PNG")
+            return img_bytes.getvalue()
+        except Exception:
+            img = qr.make_image(image_factory=PyPNGImage)
+            img_bytes = io.BytesIO()
+            img.save(img_bytes)
+            return img_bytes.getvalue()
 
     def generate_event_qr(self, event_id: str) -> str:
         """
@@ -82,13 +88,16 @@ class QRService:
 
         # Save to file
         filename = f"event_{event_id}.png"
-        file_path = str(self.qr_dir / filename)
-        with open(file_path, "wb") as f:
+        full_path = self.qr_dir / filename
+        with open(full_path, "wb") as f:
             f.write(qr_bytes)
 
-        return file_path
+        return f"/uploads/qrcodes/{filename}"
 
-
+    def generate_registration_qr(self, registration_id: str) -> bytes:
+        """Generate QR code bytes for a registration ticket."""
+        qr_data = f"campusconnect://checkin?registration_id={registration_id}"
+        return self._create_qr_code(qr_data)
 
     def generate_certificate_qr(self, certificate_number: str) -> bytes:
         """
