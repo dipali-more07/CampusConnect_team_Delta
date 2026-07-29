@@ -75,6 +75,7 @@ def upgrade() -> None:
     op.execute("""
         ALTER TABLE registrations ADD COLUMN IF NOT EXISTS registration_type VARCHAR(100);
         ALTER TABLE registrations ADD COLUMN IF NOT EXISTS qr_code VARCHAR(500);
+        ALTER TABLE registrations ADD COLUMN IF NOT EXISTS team_id UUID;
     """)
 
     # 6. Organizers Table
