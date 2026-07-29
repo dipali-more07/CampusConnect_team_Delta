@@ -296,3 +296,39 @@ def get_event_qrcode(
 
     return Response(content=qr_bytes, media_type="image/png")
 
+
+@router.post("/{event_id}/register", summary="Register for event")
+async def register_for_event_in_events(
+    event_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.registration_service import RegistrationService
+    from app.schemas.registration import RegisterForEventRequest
+    from app.api.v1.registrations import _reg_to_dict
+
+    service = RegistrationService(db)
+    req = RegisterForEventRequest(event_id=event_id, registration_type="individual")
+    registration = await service.register_for_event(req, current_user)
+    return success_response(
+        message="Registration successful",
+        data=_reg_to_dict(registration),
+        status_code=201
+    )
+
+
+@router.post("/{event_id}/cancel-registration", summary="Cancel event registration")
+@router.delete("/{event_id}/register", summary="Cancel event registration (DELETE alias)")
+@router.delete("/{event_id}/registration", summary="Cancel event registration (DELETE alias)")
+def cancel_event_registration_in_events(
+    event_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.registration_service import RegistrationService
+    from app.api.v1.registrations import _reg_to_dict
+
+    service = RegistrationService(db)
+    reg = service.cancel_registration(event_id, current_user)
+    return success_response(message="Registration cancelled", data=_reg_to_dict(reg))
+

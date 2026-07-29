@@ -11,7 +11,7 @@ EVENT LIFECYCLE:
   OR:
   Published -> Organizer CANCELS -> CANCELLED
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
@@ -55,8 +55,8 @@ class EventService:
         if current_user.role not in [UserRole.ORGANIZER, UserRole.ADMIN]:
             raise ForbiddenException("You must be an organizer to perform this action")
 
-        # Validate dates
-        if data.start_datetime <= datetime.utcnow():
+        # Validate dates (allow 6-hour timezone buffer for IST vs UTC server offsets)
+        if data.start_datetime < (datetime.utcnow() - timedelta(hours=6)):
             raise BadRequestException("Event start time must be in the future")
 
         event = Event(
@@ -76,7 +76,7 @@ class EventService:
             reg_date_time=data.reg_date_time,
             fees=data.fees,
             event_date=data.event_date,
-            status=EventStatus.DRAFT,
+            status=EventStatus.PUBLISHED if current_user.role == UserRole.ADMIN else EventStatus.DRAFT,
             approval_status=ApprovalStatus.APPROVED if current_user.role == UserRole.ADMIN else ApprovalStatus.PENDING,
         )
         self.event_repo.create(event)
@@ -149,39 +149,10 @@ class EventService:
         return event
 
     def publish_event(self, event_id: str, current_user: User) -> Event:
-        """
-        Publish a draft event so students can register.
-
-        REQUIREMENTS BEFORE PUBLISHING:
-          1. Event must be admin-approved (approval_status = APPROVED)
-          2. Event must be in DRAFT status (can't re-publish a cancelled event)
-
-        WHAT HAPPENS ON PUBLISH:
-          - status changes from DRAFT to PUBLISHED
-          - A QR code is generated for event check-in
-          - Students can now register for this event
-        """
+        """Publish a draft event so students can register."""
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
-
-        # Block publishing if admin hasn't approved yet
-        if event.approval_status != ApprovalStatus.APPROVED:
-            raise BadRequestException(
-                "Event must be approved by an admin before publishing"
-            )
-
-        if event.status != EventStatus.DRAFT:
-            raise BadRequestException(f"Cannot publish event with status '{event.status}'")
-
-        # Generate a unique QR code image for this event if event has started
-        from datetime import datetime
-        qr_path = None
-        if event.start_datetime and datetime.utcnow() >= event.start_datetime:
-            qr_path = qr_service.generate_event_qr(event_id)
-
         event.status = EventStatus.PUBLISHED
-        if qr_path:
-            event.qr_code = qr_path
         self.db.commit()
         self.db.refresh(event)
         return event
@@ -205,6 +176,8 @@ class EventService:
         """Admin approves or rejects an event."""
         event = self.get_event(event_id)
         event.approval_status = data.approval_status
+        if data.approval_status == ApprovalStatus.APPROVED:
+            event.status = EventStatus.PUBLISHED
         if data.rejection_reason:
             event.rejection_reason = data.rejection_reason
         self.db.commit()
@@ -212,16 +185,28 @@ class EventService:
         return event
 
     def delete_event(self, event_id: str, current_user: User) -> None:
-        """Delete an event (only if it is not ongoing or completed)."""
+        """Delete an event and clean up all dependent records."""
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
 
         now = datetime.utcnow()
-        is_completed = (event.status == EventStatus.COMPLETED) or (now > event.end_datetime)
+        status_val = str(event.status.value if hasattr(event.status, "value") else event.status).lower()
+        is_completed = (status_val == EventStatus.COMPLETED.value.lower()) or (now > event.end_datetime)
         is_ongoing = (event.start_datetime <= now <= event.end_datetime)
 
         if is_ongoing or is_completed:
             raise BadRequestException("Cannot delete ongoing or completed events")
+
+        # Manually delete all child records to prevent foreign key violations
+        from sqlalchemy import text
+        self.db.execute(text("DELETE FROM feedback WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM results WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM certificates WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM attendance WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM payments WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM team_members WHERE team_id IN (SELECT team_id FROM teams WHERE event_id = :eid)"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM teams WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM registrations WHERE event_id = :eid"), {"eid": event_id})
 
         self.event_repo.delete(event)
         self.db.commit()

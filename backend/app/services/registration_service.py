@@ -60,13 +60,18 @@ class RegistrationService:
           3. User not already registered (either individually or in a team)
           4. Event not at capacity
         """
-        # Rule 1: Event must exist and be published
+        # Rule 1: Event must exist and be accepting registrations
         event = self.event_repo.get_by_id(data.event_id)
         if not event:
             raise NotFoundException(f"Event {data.event_id} not found")
 
-        if event.status != EventStatus.PUBLISHED:
-            raise BadRequestException("This event is not accepting registrations")
+        status_str = str(event.status.value if hasattr(event.status, "value") else event.status).lower()
+        if status_str in ["cancelled", "completed"]:
+            raise BadRequestException("This event is cancelled or completed and not accepting registrations")
+        
+        approval_str = str(event.approval_status.value if hasattr(event.approval_status, "value") else event.approval_status).lower()
+        if approval_str not in ["approved"] and status_str not in ["published"]:
+            raise BadRequestException("This event is pending approval and not accepting registrations yet")
 
         registration_type = data.registration_type or "individual"
 
@@ -200,41 +205,47 @@ class RegistrationService:
             self.db.add(team)
             self.db.flush()
 
-            # Create TeamMembers and registrations
+            # Create Team Members
             from app.models.team_member import TeamMember
-            leader_registration = None
             for member in all_members:
-                team_member = TeamMember(
+                tm = TeamMember(
                     team_id=team.team_id,
                     participant_id=member.user_id,
                     total_team_members=len(all_members)
                 )
-                self.db.add(team_member)
+                self.db.add(tm)
 
-                # Create registration for each member
-                reg = EventRegistration(
+            # Create Registration for Team Leader
+            leader_registration = EventRegistration(
+                event_id=data.event_id,
+                participant_id=current_user.user_id,
+                registration_status=status,
+                registration_type="team",
+                team_id=team.team_id,
+                payment_status=PaymentStatus.PENDING if is_paid_event else PaymentStatus.FREE,
+            )
+            self.reg_repo.create(leader_registration)
+
+            # Create Registration records for teammates
+            for teammate in teammates:
+                member_reg = EventRegistration(
                     event_id=data.event_id,
-                    participant_id=member.user_id,
+                    participant_id=teammate.user_id,
                     registration_status=status,
                     registration_type="team",
                     team_id=team.team_id,
                     payment_status=PaymentStatus.PENDING if is_paid_event else PaymentStatus.FREE,
                 )
-                self.reg_repo.create(reg)
-                if member.user_id == current_user.user_id:
-                    leader_registration = reg
+                self.reg_repo.create(member_reg)
 
-                # Create in-app notification
-                from app.models.notification import Notification
-                if status == RegistrationStatus.CONFIRMED:
-                    notif_title = "Team Registration Confirmed" if not is_paid_event else "Team Registration Placed (Payment Pending)"
-                else:
-                    notif_title = "Added to Waitlist"
-
+            # Create Notification for all members
+            from app.models.notification import Notification
+            for member in all_members:
+                notif_title = f"Team Registration: {data.team_name}" if status == RegistrationStatus.CONFIRMED else "Team Added to Waitlist"
                 notification = Notification(
                     user_id=member.user_id,
                     title=notif_title,
-                    message=f"Your registration in team '{data.team_name}' for '{event.title}' has been recorded.",
+                    message=f"You have been registered for '{event.title}' under team '{data.team_name}'.",
                     notification_type=NotificationType.REGISTRATION,
                 )
                 self.notif_repo.create(notification)
@@ -262,20 +273,23 @@ class RegistrationService:
             registration = self.reg_repo.get_by_event_and_user(identifier, current_user.user_id)
 
         if not registration:
-            raise NotFoundException(f"Registration or event registration '{identifier}' not found")
+            raise NotFoundException(f"Registration for '{identifier}' not found")
 
         # Only the owner can cancel (or admin)
         from app.core.constants import UserRole
-        if registration.user_id != current_user.user_id and current_user.role != UserRole.ADMIN:
+        if registration.participant_id != current_user.user_id and registration.user_id != current_user.user_id and current_user.role != UserRole.ADMIN:
             raise ForbiddenException("You can only cancel your own registrations")
 
         if registration.registration_status == RegistrationStatus.CANCELLED:
-            raise BadRequestException("Registration is already cancelled")
+            return registration
 
         registration.registration_status = RegistrationStatus.CANCELLED
 
         # Promote next person from waitlist if capacity freed up
-        self._promote_from_waitlist(registration.event_id)
+        try:
+            self._promote_from_waitlist(registration.event_id)
+        except Exception:
+            pass
 
         self.db.commit()
         self.db.refresh(registration)
