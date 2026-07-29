@@ -1,4 +1,5 @@
  
+from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -93,21 +94,35 @@ def my_registrations(
     )
 
 
-@router.get("/event/{event_id}", summary="Get registrations for an event (Organizer/Admin)")
+@router.get("/events", summary="Get registrations via query param")
+def get_registrations_events_query(
+    event_id: Optional[str] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=10, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = RegistrationService(db)
+    if event_id:
+        regs, total = service.get_event_registrations(event_id, page=page, size=size)
+    else:
+        regs, total = service.get_user_registrations(current_user.user_id, page=page, size=size)
+    return paginated_response(
+        message="Registrations",
+        data=[_reg_to_dict(r) for r in regs],
+        total=total, page=page, size=size
+    )
+
+
+@router.get("/events/{event_id}", summary="Get registrations for an event (alias)")
+@router.get("/event/{event_id}", summary="Get registrations for an event")
 def event_registrations(
     event_id: str,
     page: int = Query(default=1, ge=1),
     size: int = Query(default=100, ge=1, le=500),
-    current_user: User = Depends(require_organizer),    # Only organizers and admins can see this
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Get all registrations for a specific event.
-    Only accessible by organizers and admins.
-
-    USE CASE:
-      An organizer wants to see who registered for their event to prepare for attendance.
-    """
     service = RegistrationService(db)
     regs, total = service.get_event_registrations(event_id, page=page, size=size)
     return paginated_response(
