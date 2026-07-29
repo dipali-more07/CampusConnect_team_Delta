@@ -11,7 +11,7 @@ EVENT LIFECYCLE:
   OR:
   Published -> Organizer CANCELS -> CANCELLED
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
