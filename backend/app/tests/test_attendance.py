@@ -147,9 +147,9 @@ class TestStudentAttendanceHistory:
         event = Event(
             organizer_id=organizer_user.user_id,
             title="Expired Window Event",
-            start_datetime=datetime.utcnow() - timedelta(minutes=20),
-            end_datetime=datetime.utcnow() + timedelta(hours=2),
-            status="published",
+            start_datetime=datetime.utcnow() - timedelta(hours=8),
+            end_datetime=datetime.utcnow() - timedelta(hours=5),
+            status="completed",
             approval_status="approved",
         )
         db.add(event)

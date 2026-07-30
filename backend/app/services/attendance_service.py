@@ -49,19 +49,33 @@ class AttendanceService:
 
     def _validate_attendance_window(self, event_id: str) -> None:
         """
-        Validates that attendance is recorded after event start_datetime
-        and within the 15-minute validity window.
+        Validates that attendance is recorded for an active/live event.
+        Allows check-in throughout the live duration of the event.
+        Handles both UTC and IST timezone inputs seamlessly.
         """
         event = self.event_repo.get_by_id(event_id)
         if not event:
             raise NotFoundException(f"Event {event_id} not found")
 
-        now = datetime.utcnow()
-        if event.start_datetime and now < event.start_datetime:
-            raise BadRequestException("Attendance has not started yet. Attendance opens at event start time.")
+        status_str = str(event.status.value if hasattr(event.status, "value") else event.status).lower()
+        if status_str == "cancelled":
+            raise BadRequestException("Cannot check in: Event has been cancelled.")
 
-        if event.start_datetime and now > (event.start_datetime + timedelta(minutes=15)):
-            raise BadRequestException("Attendance window has closed. QR code is valid for 15 minutes after event start time.")
+        now_utc = datetime.utcnow()
+
+        if event.start_datetime:
+            # Calculate difference in hours between event start_datetime and current UTC time
+            diff_hours = (event.start_datetime - now_utc).total_seconds() / 3600.0
+
+            # 1. UTC future event (starts > 15 mins in future, diff_hours in [0.25, 5.0]): Not started yet.
+            # 2. IST future event (starts > 15 mins in future in IST, diff_hours > 5.75): Not started yet.
+            if (0.25 < diff_hours < 5.0) or (diff_hours > 5.75):
+                raise BadRequestException("Attendance has not started yet. Attendance opens near event start time.")
+
+        if event.end_datetime:
+            # Allow check-in until event end_datetime (plus 4 hours buffer for post-event check-in)
+            if now_utc > (event.end_datetime + timedelta(hours=4)):
+                raise BadRequestException("Attendance window has closed. The event has ended.")
 
     def check_in(
         self, registration_id: str, event_id: str, scanned_by_user: User

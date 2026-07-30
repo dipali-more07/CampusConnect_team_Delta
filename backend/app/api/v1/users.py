@@ -185,6 +185,8 @@ def list_participants(
     data = []
     for u in participants:
         stats = get_user_performance_stats(db, u.user_id)
+        yr_val = u.profile.year_of_study if (u.profile and u.profile.year_of_study) else None
+        yr_str = f"{yr_val}st" if yr_val == 1 else (f"{yr_val}nd" if yr_val == 2 else (f"{yr_val}rd" if yr_val == 3 else (f"{yr_val}th" if yr_val else None)))
         data.append({
             "user_id": u.user_id,
             "email": u.email,
@@ -192,6 +194,10 @@ def list_participants(
             "mobile": u.mobile or (u.profile.phone if u.profile else None),
             "college_name": u.college_name or (u.profile.college.college_name if u.profile and u.profile.college else None),
             "department": u.department or (u.profile.department if u.profile else None),
+            "course": u.course or (u.profile.course if u.profile else None),
+            "year": yr_str or yr_val,
+            "year_of_study": yr_val,
+            "academic_year": yr_str or yr_val,
             "profile_image": u.profile_image or (u.profile.profile_picture if u.profile else None),
             "is_active": u.is_active,
             "is_suspended": not u.is_active,
@@ -293,10 +299,17 @@ def list_users(
     users_data = []
     for u in users:
         stats = get_user_performance_stats(db, u.user_id)
+        yr_val = u.profile.year_of_study if (u.profile and u.profile.year_of_study) else None
+        yr_str = f"{yr_val}st" if yr_val == 1 else (f"{yr_val}nd" if yr_val == 2 else (f"{yr_val}rd" if yr_val == 3 else (f"{yr_val}th" if yr_val else None)))
         users_data.append({
             "user_id": u.user_id,
             "email": u.email,
             "full_name": u.full_name or (u.profile.full_name if u.profile else None) or u.email.split("@")[0],
+            "department": u.department or (u.profile.department if u.profile else None),
+            "course": u.course or (u.profile.course if u.profile else None),
+            "year": yr_str or yr_val,
+            "year_of_study": yr_val,
+            "academic_year": yr_str or yr_val,
             "role": u.role,
             "is_active": u.is_active,
             "is_suspended": not u.is_active,

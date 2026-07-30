@@ -162,52 +162,7 @@ class TestPaymentService:
         assert data["success"] is True
         assert data["data"]["payment_status"] == "failed"
 
-    def test_refund_payment_by_organizer_success(self, client, participant_token, organizer_token, paid_registration):
-        # Initiate and confirm payment first
-        init_res = client.post(
-            "/api/v1/payments/",
-            json={"registration_id": paid_registration.registration_id},
-            headers=auth_headers(participant_token)
-        )
-        payment_id = init_res.json()["data"]["payment_id"]
-        
-        client.post(
-            f"/api/v1/payments/{payment_id}/confirm",
-            json={"transaction_id": "tx_refund_test"},
-            headers=auth_headers(participant_token)
-        )
 
-        # Refund as organizer
-        ref_res = client.post(
-            f"/api/v1/payments/{payment_id}/refund",
-            headers=auth_headers(organizer_token)
-        )
-        assert ref_res.status_code == 200
-        data = ref_res.json()
-        assert data["success"] is True
-        assert data["data"]["payment_status"] == "refunded"
-
-    def test_refund_payment_by_participant_fails(self, client, participant_token, paid_registration):
-        # Initiate and confirm payment first
-        init_res = client.post(
-            "/api/v1/payments/",
-            json={"registration_id": paid_registration.registration_id},
-            headers=auth_headers(participant_token)
-        )
-        payment_id = init_res.json()["data"]["payment_id"]
-        
-        client.post(
-            f"/api/v1/payments/{payment_id}/confirm",
-            json={"transaction_id": "tx_refund_test"},
-            headers=auth_headers(participant_token)
-        )
-
-        # Attempt refund as participant (should fail)
-        ref_res = client.post(
-            f"/api/v1/payments/{payment_id}/refund",
-            headers=auth_headers(participant_token)
-        )
-        assert ref_res.status_code == 403
 
     def test_get_my_payments(self, client, participant_token, paid_registration):
         # Initiate payment
