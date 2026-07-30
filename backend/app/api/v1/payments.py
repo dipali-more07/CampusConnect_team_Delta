@@ -116,21 +116,7 @@ async def fail_payment(
     )
 
 
-@router.post("/{payment_id}/refund", summary="Refund a payment (Organizer/Admin)")
-async def refund_payment(
-    payment_id: str,
-    current_user: User = Depends(require_organizer),
-    db: Session = Depends(get_db),
-):
-    """
-    Refund a completed payment. Only accessible by event organizers or admins.
-    """
-    service = PaymentService(db)
-    payment = await service.refund_payment(payment_id, current_user)
-    return success_response(
-        message="Payment refunded successfully",
-        data=_payment_to_dict(payment),
-    )
+
 
 
 @router.get("/my", summary="Get my payments")

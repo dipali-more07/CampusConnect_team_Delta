@@ -1,8 +1,32 @@
  
-from pydantic import BaseModel, Field, field_validator
+import re
+from pydantic import BaseModel, Field, field_validator, model_validator
 from typing import Optional
 from datetime import datetime
 from app.core.constants import UserRole, Gender
+
+
+def parse_year_of_study(v: any) -> Optional[int]:
+    if v is None:
+        return None
+    if isinstance(v, int):
+        return v
+    if isinstance(v, str):
+        v_clean = v.strip().lower()
+        if v_clean in ["1", "1st", "first", "fe"]:
+            return 1
+        if v_clean in ["2", "2nd", "second", "se"]:
+            return 2
+        if v_clean in ["3", "3rd", "third", "te"]:
+            return 3
+        if v_clean in ["4", "4th", "fourth", "final", "be"]:
+            return 4
+        digits = re.findall(r'\d+', v_clean)
+        if digits:
+            num = int(digits[0])
+            if 1 <= num <= 10:
+                return num
+    return None
 
 
 class UserResponse(BaseModel):
@@ -193,6 +217,17 @@ class CreateStudentRequest(BaseModel):
         raise ValueError("Invalid gender value. Must be 'male' or 'female'")
 
     year_of_study: Optional[int] = Field(None, ge=1, le=10)
+
+    @model_validator(mode="before")
+    @classmethod
+    def map_student_aliases(cls, data):
+        if isinstance(data, dict):
+            year_val = data.get("year_of_study") or data.get("year") or data.get("academic_year")
+            if year_val is not None:
+                parsed = parse_year_of_study(year_val)
+                if parsed is not None:
+                    data["year_of_study"] = parsed
+        return data
 
 
 class AppearancePreferencesRequest(BaseModel):
