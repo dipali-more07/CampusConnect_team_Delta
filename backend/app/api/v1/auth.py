@@ -98,28 +98,29 @@ async def forgot_password(
 ):
     service = AuthService(db)
 
+    from app.utils.validators import validate_and_sanitize_frontend_url
+
     # Detect frontend origin URL from Origin, Referer, or Host header
     origin = request.headers.get("origin")
     referer = request.headers.get("referer")
 
-    frontend_url = None
+    raw_url = None
     if origin:
-        frontend_url = origin.rstrip("/")
+        raw_url = origin.rstrip("/")
     elif referer:
         from urllib.parse import urlparse
         parsed = urlparse(referer)
-        frontend_url = f"{parsed.scheme}://{parsed.netloc}"
+        raw_url = f"{parsed.scheme}://{parsed.netloc}"
 
-    if not frontend_url:
+    if not raw_url:
         host = request.headers.get("host", "")
         proto = request.headers.get("x-forwarded-proto", "https" if "zapto.org" in host else "http")
-        frontend_url = f"{proto}://{host}".rstrip("/")
+        raw_url = f"{proto}://{host}".rstrip("/")
 
-    # Force HTTPS for non-localhost server domains
-    if "localhost" not in frontend_url and "127.0.0.1" not in frontend_url and frontend_url.startswith("http://"):
-        frontend_url = "https://" + frontend_url[7:]
+    # Sanitize and validate against Host Header / URL Injection attacks
+    safe_frontend_url = validate_and_sanitize_frontend_url(raw_url)
 
-    await service.forgot_password(data.email, frontend_url)
+    await service.forgot_password(data.email, safe_frontend_url)
     return success_response(
         message="If an account with this email exists, a reset link has been sent."
     )

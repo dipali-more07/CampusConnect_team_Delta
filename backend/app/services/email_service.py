@@ -210,13 +210,11 @@ class EmailService:
     async def send_password_reset_email(self, email: str, token: str, base_url: Optional[str] = None) -> bool:
         """
         Send password reset link to user's email.
-        Ensures HTTPS for live server domains.
+        Ensures HTTPS for live server domains and protects against URL/Host injection.
         """
-        app_url = (base_url or settings.APP_URL).rstrip("/")
-        
-        # Enforce HTTPS for non-localhost domains
-        if "localhost" not in app_url and "127.0.0.1" not in app_url and app_url.startswith("http://"):
-            app_url = "https://" + app_url[7:]
+        from app.utils.validators import validate_and_sanitize_frontend_url
+
+        app_url = validate_and_sanitize_frontend_url(base_url or settings.APP_URL)
 
         reset_url = f"{app_url}/reset-password?token={token}"
 
