@@ -37,13 +37,110 @@ class EmailService:
     Integrates with fastapi-mail for real SMTP sending when configured.
     """
 
+def build_email_template(
+    title: str,
+    subtitle: str,
+    content_html: str,
+    cta_text: Optional[str] = None,
+    cta_url: Optional[str] = None,
+    code_box: Optional[str] = None,
+    footer_text: Optional[str] = None
+) -> str:
+    """
+    Generate a stunning, premium HTML email template with modern typography,
+    gradient accents, glassmorphic styling, and clean call-to-action buttons.
+    """
+    button_html = ""
+    if cta_text and cta_url:
+        button_html = f"""
+        <div style="text-align: center; margin: 32px 0;">
+            <a href="{cta_url}" target="_blank" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 16px 36px; border-radius: 12px; display: inline-block; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35); letter-spacing: 0.5px;">
+                {cta_text} &rarr;
+            </a>
+        </div>
+        """
+
+    code_box_html = ""
+    if code_box:
+        code_box_html = f"""
+        <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+            <span style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; display: block; margin-bottom: 8px;">VERIFICATION / RESET CODE</span>
+            <code style="font-size: 28px; font-weight: 800; color: #4f46e5; letter-spacing: 4px; font-family: 'Courier New', monospace;">{code_box}</code>
+        </div>
+        """
+
+    footer_str = footer_text or "If you did not request this email, please ignore it or contact platform support."
+
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
+        <tr>
+            <td align="center">
+                <table role="presentation" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0;">
+                    <!-- HEADER GRADIENT -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%); padding: 36px 32px; text-align: center;">
+                            <div style="display: inline-block; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); padding: 8px 18px; border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 12px;">
+                                <span style="color: #818cf8; font-size: 18px; vertical-align: middle;">✦</span>
+                                <span style="color: #ffffff; font-weight: 800; font-size: 16px; letter-spacing: 1px; vertical-align: middle; margin-left: 6px;">CampusConnect</span>
+                            </div>
+                            <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 12px 0 6px 0; letter-spacing: -0.5px;">{title}</h1>
+                            <p style="color: #94a3b8; font-size: 14px; margin: 0; font-weight: 500;">{subtitle}</p>
+                        </td>
+                    </tr>
+                    
+                    <!-- BODY CONTENT -->
+                    <tr>
+                        <td style="padding: 36px 32px; background-color: #ffffff;">
+                            <div style="font-size: 15px; line-height: 1.7; color: #334155;">
+                                {content_html}
+                            </div>
+                            
+                            {code_box_html}
+                            {button_html}
+                            
+                            <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 32px 0 24px 0;">
+                            
+                            <p style="font-size: 13px; color: #64748b; line-height: 1.5; margin: 0;">
+                                💡 <strong>Tip:</strong> {footer_str}
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- FOOTER -->
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 24px 32px; text-align: center; border-top: 1px solid #f1f5f9;">
+                            <p style="font-size: 12px; color: #94a3b8; margin: 0 0 6px 0;">CampusConnect • Academic & Event Operations Platform</p>
+                            <p style="font-size: 11px; color: #cbd5e1; margin: 0;">© 2026 CampusConnect. All rights reserved.</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>"""
+
+
+class EmailService:
+    """
+    Handles all email sending in the application.
+    Integrates with fastapi-mail for real SMTP sending when configured.
+    """
+
     def _should_mock(self) -> bool:
         """
         Check if SMTP credentials are missing or if MOCK_EMAIL is configured to True.
         """
         return settings.MOCK_EMAIL or not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD
 
-    async def _send(self, email: str, subject: str, body: str) -> bool:
+    async def _send(self, email: str, subject: str, body: str, html_body: Optional[str] = None) -> bool:
         """
         Helper method to dispatch emails or fallback to logging.
         """
@@ -60,112 +157,174 @@ class EmailService:
             message = MessageSchema(
                 subject=subject,
                 recipients=[email],
-                body=body,
-                subtype=MessageType.plain,
+                body=html_body or body,
+                subtype=MessageType.html if html_body else MessageType.plain,
             )
             fm = FastMail(mail_config)
             await fm.send_message(message)
-            logger.info(f"✅  email successfully sent to {email} with subject: '{subject}'")
+            logger.info(f"✅ Email successfully sent to {email} with subject: '{subject}'")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to send email to {email} (Subject: '{subject}'): {e}", exc_info=True)
-            # Return False but don't crash the server request
             return False
 
     async def send_verification_email(self, email: str, token: str) -> bool:
         """
         Send email verification link to newly registered user.
-        Link format: /auth/verify-email?token=<token>
         """
         verification_url = f"{settings.APP_URL}/api/v1/auth/verify-email?token={token}"
-        subject = "Verify your CampusConnect account"
-        body = (
-            f"Welcome to CampusConnect!\n\n"
-            f"Please verify your account by clicking the link below:\n"
-            f"{verification_url}\n\n"
-            f"If you did not sign up for this account, you can ignore this email."
+        subject = "✨ Verify your CampusConnect account"
+        content_html = """
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">Welcome to CampusConnect!</p>
+        <p>We are thrilled to have you join our academic & event platform. Please verify your email address to unlock full access to events, hackathons, and certifications.</p>
+        """
+        html_body = build_email_template(
+            title="Verify Your Account",
+            subtitle="CampusConnect Registration",
+            content_html=content_html,
+            cta_text="Verify Email Address",
+            cta_url=verification_url,
+            footer_text=f"Direct link: <a href='{verification_url}' style='color: #6366f1;'>{verification_url}</a>"
         )
-        return await self._send(email, subject, body)
+        return await self._send(email, subject, verification_url, html_body=html_body)
 
     async def send_verification_otp(self, email: str, otp: str) -> bool:
         """
         Send a 6-digit OTP verification code to the user.
         """
-        subject = "Verify your CampusConnect account"
-        body = (
-            f"Welcome to CampusConnect!\n\n"
-            f"Your verification code is: {otp}\n\n"
-            f"Please enter this code on the application to verify your email.\n"
-            f"If you did not sign up for this account, you can safely ignore this email."
+        subject = "🔑 Your CampusConnect Verification Code"
+        content_html = """
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">Welcome to CampusConnect!</p>
+        <p>Use the 6-digit verification code below to verify your email address and activate your account.</p>
+        """
+        html_body = build_email_template(
+            title="Email Verification Code",
+            subtitle="CampusConnect Authentication",
+            content_html=content_html,
+            code_box=otp,
+            footer_text="This verification code will expire shortly. Do not share it with anyone."
         )
-        return await self._send(email, subject, body)
+        plain_body = f"Welcome to CampusConnect!\nYour verification code is: {otp}"
+        return await self._send(email, subject, plain_body, html_body=html_body)
 
     async def send_password_reset_email(self, email: str, token: str, base_url: Optional[str] = None) -> bool:
         """
         Send password reset link to user's email.
-        Link format: /reset-password?token=<token>
+        Ensures HTTPS for live server domains.
         """
-        app_url = base_url or settings.APP_URL
-        if app_url.endswith("/"):
-            app_url = app_url[:-1]
+        app_url = (base_url or settings.APP_URL).rstrip("/")
+        
+        # Enforce HTTPS for non-localhost domains
+        if "localhost" not in app_url and "127.0.0.1" not in app_url and app_url.startswith("http://"):
+            app_url = "https://" + app_url[7:]
+
         reset_url = f"{app_url}/reset-password?token={token}"
-        subject = "Reset your CampusConnect password"
-        body = (
+
+        subject = "🔐 Reset your CampusConnect password"
+        content_html = f"""
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">Hello,</p>
+        <p>We received a request to reset the password for your <strong>CampusConnect</strong> account associated with <code>{email}</code>.</p>
+        <p>Click the button below to set a new password. This link is valid for <strong>1 hour</strong>.</p>
+        """
+        html_body = build_email_template(
+            title="Reset Your Password",
+            subtitle="CampusConnect Security Center",
+            content_html=content_html,
+            cta_text="Reset Password",
+            cta_url=reset_url,
+            code_box=token,
+            footer_text=f"If the button above does not open, copy and paste this link into your browser:<br><a href='{reset_url}' style='color: #6366f1; word-break: break-all;'>{reset_url}</a>"
+        )
+        plain_body = (
             f"You requested to reset your password for your CampusConnect account.\n\n"
             f"Please click the link below to set a new password:\n"
             f"{reset_url}\n\n"
-            f"This link will expire in 1 hour.\n"
-            f"If you did not request a password reset, you can safely ignore this email."
+            f"Token: {token}\n"
+            f"This link will expire in 1 hour."
         )
-        return await self._send(email, subject, body)
+        return await self._send(email, subject, plain_body, html_body=html_body)
 
     async def send_registration_confirmation(
         self, email: str, event_title: str, event_date: str
     ) -> bool:
         """Send event registration confirmation email."""
-        subject = f"Registration confirmed for {event_title}"
-        body = (
-            f"Congratulations!\n\n"
-            f"Your registration for the event '{event_title}' has been successfully confirmed.\n"
-            f"Event Date: {event_date}\n\n"
-            f"We look forward to seeing you there!"
+        subject = f"🎉 Registration Confirmed: {event_title}"
+        content_html = f"""
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">Great news!</p>
+        <p>Your registration for <strong>{event_title}</strong> has been successfully confirmed.</p>
+        <div style="background: #f8fafc; border-left: 4px solid #6366f1; padding: 16px; margin: 20px 0; border-radius: 6px;">
+            <p style="margin: 0; font-size: 14px; color: #475569;"><strong>Event:</strong> {event_title}</p>
+            <p style="margin: 6px 0 0 0; font-size: 14px; color: #475569;"><strong>Date & Time:</strong> {event_date}</p>
+        </div>
+        <p>Get ready to participate and show your skills!</p>
+        """
+        html_body = build_email_template(
+            title="Registration Confirmed!",
+            subtitle="CampusConnect Event Desk",
+            content_html=content_html,
+            footer_text="View your registered events and pass on your CampusConnect dashboard."
         )
-        return await self._send(email, subject, body)
+        plain_body = f"Registration confirmed for {event_title}\nDate: {event_date}"
+        return await self._send(email, subject, plain_body, html_body=html_body)
 
     async def send_certificate_notification(
         self, email: str, event_title: str, certificate_number: str
     ) -> bool:
         """Notify user that their certificate is ready."""
-        subject = f"Your certificate for {event_title} is ready"
-        body = (
-            f"Great news!\n\n"
-            f"Your participation certificate for the event '{event_title}' has been generated.\n"
-            f"Certificate Number: {certificate_number}\n\n"
-            f"You can view and download your certificate from your profile on CampusConnect."
+        subject = f"🏆 Certificate Ready: {event_title}"
+        content_html = f"""
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">Congratulations!</p>
+        <p>Your official participation certificate for <strong>{event_title}</strong> is now ready for download.</p>
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; text-align: center; margin: 20px 0;">
+            <span style="font-size: 12px; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">CERTIFICATE ID</span>
+            <code style="font-size: 22px; font-weight: 800; color: #15803d; display: block; margin-top: 6px;">{certificate_number}</code>
+        </div>
+        <p>You can view and download your verified PDF certificate directly from your CampusConnect profile.</p>
+        """
+        html_body = build_email_template(
+            title="Certificate Issued!",
+            subtitle="CampusConnect Certifications",
+            content_html=content_html,
+            footer_text="Your certificate includes a unique verification code for credential validation."
         )
-        return await self._send(email, subject, body)
+        plain_body = f"Your certificate for {event_title} is ready. Number: {certificate_number}"
+        return await self._send(email, subject, plain_body, html_body=html_body)
 
     async def send_account_suspension_email(self, email: str, user_name: Optional[str] = None) -> bool:
         """Send email notification when an account is suspended/deactivated."""
-        name_str = f"Dear {user_name},\n\n" if user_name else "Hello,\n\n"
-        subject = "Account Suspended - CampusConnect"
-        body = (
-            f"{name_str}"
-            f"Your CampusConnect account ({email}) has been suspended/deactivated by an administrator.\n\n"
-            f"If you believe this was done in error or need further clarification, please contact platform support."
+        name_str = f"Dear {user_name}," if user_name else "Hello,"
+        subject = "⚠️ Account Notice - CampusConnect"
+        content_html = f"""
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">{name_str}</p>
+        <p>Your CampusConnect account (<code>{email}</code>) has been deactivated by a platform administrator.</p>
+        <p>If you believe this was done in error or require support, please contact your institution administrator.</p>
+        """
+        html_body = build_email_template(
+            title="Account Suspended",
+            subtitle="CampusConnect Administration",
+            content_html=content_html,
+            footer_text="Your account history remains preserved. Contact support for assistance."
         )
-        return await self._send(email, subject, body)
+        plain_body = f"{name_str}\nYour account ({email}) has been suspended."
+        return await self._send(email, subject, plain_body, html_body=html_body)
 
     async def send_account_activation_email(self, email: str, user_name: Optional[str] = None) -> bool:
         """Send email notification when an account is reactivated."""
-        name_str = f"Dear {user_name},\n\n" if user_name else "Hello,\n\n"
-        subject = "Account Reactivated - CampusConnect"
-        body = (
-            f"{name_str}"
-            f"Good news! Your CampusConnect account ({email}) has been reactivated.\n\n"
-            f"You can now log in and access all platform features again."
+        name_str = f"Dear {user_name}," if user_name else "Hello,"
+        subject = "✅ Account Reactivated - CampusConnect"
+        content_html = f"""
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">{name_str}</p>
+        <p>Good news! Your CampusConnect account (<code>{email}</code>) has been reactivated.</p>
+        <p>You can now log in and access all platform features, events, and certificates again.</p>
+        """
+        html_body = build_email_template(
+            title="Welcome Back!",
+            subtitle="CampusConnect Account Status",
+            content_html=content_html,
+            footer_text="You can now sign in using your existing credentials."
         )
-        return await self._send(email, subject, body)
+        plain_body = f"{name_str}\nYour account ({email}) has been reactivated."
+        return await self._send(email, subject, plain_body, html_body=html_body)
 
 
 # Single instance used across the app (singleton)
