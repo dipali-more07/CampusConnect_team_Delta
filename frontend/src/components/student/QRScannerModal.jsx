@@ -238,23 +238,30 @@ export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed,
     }
   }
 
+  const [isClosing, setIsClosing] = useState(false)
+
+  const handleClose = () => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(onClose, 180)
+  }
+
   if (!isOpen) return null
 
   const selectedEventObj = eventsList.find(e => String(e.id || e.event_id) === String(selectedEventId))
 
   return createPortal(
     <div
-      className="fixed inset-0 z-100 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      className={`fixed inset-0 z-100 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`}
+      onClick={e => { if (e.target === e.currentTarget) handleClose() }}
     >
       {/* Modal Dialog */}
       <div
-        className="relative z-10 w-full max-w-md rounded-3xl transition-colors duration-300 shadow-2xl overflow-hidden p-6 sm:p-7 max-h-[90vh] overflow-y-auto"
+        className={`relative z-10 w-full max-w-md rounded-3xl transition-colors duration-300 shadow-2xl overflow-hidden p-6 sm:p-7 max-h-[90vh] overflow-y-auto ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         style={{
           background: dark ? '#0a1220' : '#ffffff',
           border: `1px solid ${dark ? '#1a2942' : '#e2e8f0'}`,
           color: dark ? '#f8fafc' : '#0f172a',
-          animation: 'modalScaleIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1)'
         }}
       >
         {/* Header */}
@@ -273,7 +280,7 @@ export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed,
             </div>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#15243c] border-none bg-transparent cursor-pointer transition-colors"
           >
             <X size={18} />

@@ -46,11 +46,13 @@ async function mockLogin(email, password) {
         String(s.id) === String(user.id) ||
         (s.email && user.email && s.email.toLowerCase() === user.email.toLowerCase())
       )
-      if (currentStudent && currentStudent.status === 'Suspended') {
+      if (currentStudent?.status === 'Suspended') {
         return { success: false, message: 'Your account has been suspended by the administration. Please contact your campus admin.' }
       }
     }
-  } catch (_e) { }
+  } catch {
+    /* ignore */
+  }
 
   if (user.status === 'Suspended' || user.is_active === false) {
     return { success: false, message: 'Your account has been suspended by the administration. Please contact your campus admin.' }
@@ -74,13 +76,15 @@ async function mockRegister(payload) {
   const userList = getMockUsers()
 
   // Duplicate check
-  const duplicate = userList.find(u => u.email.toLowerCase() === email.toLowerCase())
-  if (duplicate) {
+  const isDuplicate = userList.some(u => u.email.toLowerCase() === email.toLowerCase())
+  if (isDuplicate) {
     return { success: false, message: 'Email address is already registered.' }
   }
 
-  // Generate a mock code and save it in sessionStorage for verification
-  const mockCode = String(Math.floor(100000 + Math.random() * 900000))
+  // Generate a mock code securely and save it in sessionStorage for verification
+  const randomBuffer = new Uint32Array(1)
+  crypto.getRandomValues(randomBuffer)
+  const mockCode = String(100000 + (randomBuffer[0] % 900000))
   sessionStorage.setItem(`mock_otp_${email.toLowerCase()}`, mockCode)
 
   // Add user
@@ -135,14 +139,48 @@ async function mockVerifyEmail(email, code) {
 async function mockForgotPassword(email) {
   await new Promise(r => setTimeout(r, 900))
   const userList = getMockUsers()
-  const user = userList.find(u => u.email.toLowerCase() === email.toLowerCase())
-  if (!user) {
+  const exists = userList.some(u => u.email.toLowerCase() === email.toLowerCase())
+  if (!exists) {
     return { success: false, message: 'No account found with this email address.' }
   }
   return { success: true, message: `Password reset link sent to ${email}` }
 }
 
-import { encryptPayload } from '../utils/payloadCrypto'
+function determineRole(rawRole, email) {
+  const norm = (rawRole || '').toString().toLowerCase()
+  if (['admin', 'superadmin', 'super_admin'].includes(norm)) return 'admin'
+  if (['organizer', 'event_organizer'].includes(norm)) return 'organizer'
+  if (['student', 'participant'].includes(norm)) return 'student'
+  if (email.toLowerCase().includes('admin')) return 'admin'
+  if (email.toLowerCase().includes('organizer')) return 'organizer'
+  return 'student'
+}
+
+async function fetchUserProfile(token, email) {
+  try {
+    const meRes = await fetch(`${API_BASE}/auth/me`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    if (!meRes.ok) return null
+    const meData = await meRes.json()
+    const rawProfile = meData.data?.user || meData.user || meData.data || meData
+    const rawRole = (
+      rawProfile.role || rawProfile.role_name || rawProfile.roleName ||
+      rawProfile.userType || rawProfile.user_type || meData.data?.role || meData.role || ''
+    )
+
+    return {
+      ...rawProfile,
+      name: rawProfile.full_name || rawProfile.name || rawProfile.fullName || rawProfile.username || email.split('@')[0] || 'User',
+      role: determineRole(rawRole, email),
+    }
+  } catch {
+    return null
+  }
+}
 
 /* ── REAL API LOGIN ─────────────────────────────────────── */
 async function apiLogin(email, password) {
@@ -161,69 +199,30 @@ async function apiLogin(email, password) {
       return { success: false, message: data.message || 'Login failed.' }
     }
 
-    // Support flexible backend token formats
     const token = data.data?.access_token || data.token || data.accessToken || data.data?.token || ''
     const refreshToken = data.data?.refresh_token || data.refresh_token || data.refreshToken || ''
 
-    // Store tokens immediately for auto-refresh to work
     if (token || refreshToken) {
       saveTokens(token, refreshToken)
     }
 
     let user = null
     if (token) {
-      try {
-        const meRes = await fetch(`${API_BASE}/auth/me`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        if (meRes.ok) {
-          const meData = await meRes.json()
-          const rawProfile = meData.data?.user || meData.user || meData.data || meData
-          const rawRole = (
-            rawProfile.role || rawProfile.role_name || rawProfile.roleName || 
-            rawProfile.userType || rawProfile.user_type || meData.data?.role || meData.role || ''
-          ).toString().toLowerCase()
-
-          let role = 'student'
-          if (['admin', 'superadmin', 'super_admin'].includes(rawRole)) role = 'admin'
-          else if (['organizer', 'event_organizer'].includes(rawRole)) role = 'organizer'
-          else if (['student', 'participant'].includes(rawRole)) role = 'student'
-          else if (email.toLowerCase().includes('admin')) role = 'admin'
-          else if (email.toLowerCase().includes('organizer')) role = 'organizer'
-
-          user = {
-            ...rawProfile,
-            name: rawProfile.full_name || rawProfile.name || rawProfile.fullName || rawProfile.username || email.split('@')[0] || 'User',
-            role,
-          }
-        }
-      } catch (meErr) {
-      }
+      user = await fetchUserProfile(token, email)
     }
 
-    // Fallback user object if /me failed or returned nothing
     if (!user) {
       const loginProfile = data.data?.user || data.user || data.data || data
       const rawRole = (
-        loginProfile.role || loginProfile.role_name || loginProfile.roleName || 
+        loginProfile.role || loginProfile.role_name || loginProfile.roleName ||
         loginProfile.userType || loginProfile.user_type || data.data?.role || data.role || ''
-      ).toString().toLowerCase()
-
-      let role = 'student'
-      if (['admin', 'superadmin', 'super_admin'].includes(rawRole)) role = 'admin'
-      else if (['organizer', 'event_organizer'].includes(rawRole)) role = 'organizer'
-      else if (['student', 'participant'].includes(rawRole)) role = 'student'
-      else if (email.toLowerCase().includes('admin')) role = 'admin'
-      else if (email.toLowerCase().includes('organizer')) role = 'organizer'
+      )
 
       user = {
         ...loginProfile,
         email,
         name: loginProfile.full_name || loginProfile.name || loginProfile.fullName || email.split('@')[0] || 'User',
-        role
+        role: determineRole(rawRole, email)
       }
     }
 
@@ -246,7 +245,7 @@ async function apiRegister(payload) {
       department: payload.department,
       college_id: payload.collegeId || payload.college,
       gender: payload.gender || 'male',
-      year_of_study: parseInt(payload.yearOfStudy || payload.year_of_study || 1, 10),
+      year_of_study: Number.parseInt(payload.yearOfStudy || payload.year_of_study || 1, 10),
     }
 
     const res = await fetch(`${API_BASE}/auth/register`, {
@@ -271,7 +270,7 @@ async function apiRegister(payload) {
 
     const rawUser = data.user || data.data?.user || (data.data && typeof data.data === 'object' ? data.data : data)
     return { success: true, user: rawUser, message: data.message || 'Registration successful!' }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
@@ -317,7 +316,7 @@ async function apiVerifyEmail(email, code) {
     }
 
     return { success: true, message: data.message || 'Email verified successfully!' }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }
@@ -340,7 +339,7 @@ async function apiResendCode(email) {
     }
 
     return { success: true, message: data.message || 'Verification code resent successfully!' }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Unable to reach server. Check your connection.' }
   }
 }

@@ -20,7 +20,7 @@ const MOCK_SCANS_KEY = 'campus_connect_mock_scans'
 
 function getMockScans() {
   const local = localStorage.getItem(MOCK_SCANS_KEY)
-  if (local) { try { return JSON.parse(local) } catch {} }
+  if (local) { try { return JSON.parse(local) } catch { /* ignore */ } }
   localStorage.setItem(MOCK_SCANS_KEY, JSON.stringify(DEFAULT_SCANS))
   return [...DEFAULT_SCANS]
 }
@@ -34,7 +34,7 @@ const MOCK_ATTENDANCE_KEY = 'campus_connect_mock_attendance'
 function getMockAttendance() {
   const local = localStorage.getItem(MOCK_ATTENDANCE_KEY)
   if (local) {
-    try { return JSON.parse(local) } catch { }
+    try { return JSON.parse(local) } catch { /* ignore */ }
   }
   localStorage.setItem(MOCK_ATTENDANCE_KEY, JSON.stringify(defaultAttendance))
   return defaultAttendance
@@ -105,13 +105,18 @@ async function mockAddScan(studentName, rollNo, status) {
   const AVATAR_COLORS = ['#615FFF','#00BC7D','#FE9A00','#0284c7','#e11d48','#7c3aed','#0891b2','#dc2626']
   const now = new Date()
   const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+
+  const randomBuf = new Uint32Array(1)
+  crypto.getRandomValues(randomBuf)
+  const avatarColor = AVATAR_COLORS[randomBuf[0] % AVATAR_COLORS.length]
+
   const newScan = {
     id: `SC${Date.now()}`,
     studentName,
     rollNo,
     status: status || 'Present',
     time,
-    avatarColor: AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)],
+    avatarColor,
   }
   const updated = [newScan, ...scans].slice(0, 20)   // keep latest 20
   saveMockScans(updated)
@@ -166,8 +171,8 @@ async function apiFetchAll(eventId) {
     const raw = data.data || data.records || data || []
     const records = Array.isArray(raw) ? raw.map(mapAttendanceRecord) : []
     return { success: true, records }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -184,8 +189,8 @@ async function apiUpdateStatus(id, status) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update attendance.' }
     return { success: true, record: data.record || data.data || data }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -199,8 +204,8 @@ async function apiMarkPresent(id) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to mark present.' }
     return { success: true, record: data.record || data.data || data }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -210,8 +215,8 @@ async function apiFetchRecentScans() {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch scans.' }
     return { success: true, scans: data.scans || [] }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -225,40 +230,47 @@ async function apiAddScan(studentName, rollNo, status) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to add scan.' }
     return { success: true, scan: data.scan, scans: data.scans }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
+}
+
+function resolveItemHour(item) {
+  if (item.hour !== undefined) return item.hour
+  if (item.check_in_hour !== undefined) return item.check_in_hour
+  return item.time_slot || ''
+}
+
+function resolveItemCount(item) {
+  if (item.count !== undefined) return Number(item.count)
+  if (item.attendance_count !== undefined) return Number(item.attendance_count)
+  return Number(item.value || item.count || 0)
 }
 
 function mapHourlyTrend(raw) {
   if (!raw) return []
-  
-  // Format hour helper (e.g. 9 -> "9AM", "09:00" -> "9AM", "9AM" -> "9AM")
+
   const formatHour = (h) => {
     if (typeof h === 'string' && (h.includes('AM') || h.includes('PM'))) {
       return h;
     }
-    const num = parseInt(h, 10);
-    if (isNaN(num)) return String(h);
+    const num = Number.parseInt(h, 10);
+    if (Number.isNaN(num)) return String(h);
     const ampm = num >= 12 ? 'PM' : 'AM';
     let displayHour = num % 12;
     if (displayHour === 0) displayHour = 12;
     return `${displayHour}${ampm}`;
   }
 
-  // Case 1: Array of objects
   if (Array.isArray(raw)) {
     return raw.map(item => {
       if (typeof item === 'object' && item !== null) {
-        const hour = item.hour !== undefined ? item.hour : (item.check_in_hour !== undefined ? item.check_in_hour : (item.time_slot || ''));
-        const count = item.count !== undefined ? Number(item.count) : (item.attendance_count !== undefined ? Number(item.attendance_count) : Number(item.count || 0));
-        return { hour: formatHour(hour), count };
+        return { hour: formatHour(resolveItemHour(item)), count: resolveItemCount(item) };
       }
       return null;
     }).filter(Boolean);
   }
 
-  // Case 2: Object with key-value pairs (e.g., { "09:00": 85, "10:00": 134 })
   if (typeof raw === 'object' && raw !== null) {
     return Object.entries(raw).map(([h, c]) => ({
       hour: formatHour(h),
@@ -280,21 +292,21 @@ async function apiFetchLiveChart(eventId) {
     const url = `${API_BASE}/analytics/hourly-attendance`
     const res = await fetch(url, { headers: authHeaders() })
     const data = await parseJSON(res)
-    
+
     if (!res.ok) {
-            return { success: false, chart: [], message: 'Failed to fetch hourly chart.' }
+      return { success: false, chart: [], message: 'Failed to fetch hourly chart.' }
     }
 
     const raw = data.data || data.chart || data || []
     const mapped = mapHourlyTrend(raw)
-    
+
     if (mapped.length === 0) {
-            return { success: false, chart: [], message: 'No hourly data available.' }
+      return { success: false, chart: [], message: 'No hourly data available.' }
     }
 
     return { success: true, chart: mapped, eventId }
-  } catch (err) {
-        return { success: false, chart: [], message: 'Server unreachable.' }
+  } catch {
+    return { success: false, chart: [], message: 'Server unreachable.' }
   }
 }
 
@@ -303,12 +315,11 @@ function mapDeptAttendance(raw) {
 
   const DEPT_COLORS = ['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#e11d48', '#7c3aed', '#0891b2', '#dc2626']
 
-  // Case 1: Array of objects
   if (Array.isArray(raw)) {
     return raw.map((item, idx) => {
       if (typeof item === 'object' && item !== null) {
         const dept = item.department || item.dept || item.name || '';
-        const count = item.count !== undefined ? Number(item.count) : (item.attendance_count !== undefined ? Number(item.attendance_count) : Number(item.value || 0));
+        const count = resolveItemCount(item);
         const color = item.color || DEPT_COLORS[idx % DEPT_COLORS.length];
         return { dept, count, color };
       }
@@ -316,7 +327,6 @@ function mapDeptAttendance(raw) {
     }).filter(Boolean);
   }
 
-  // Case 2: Object with key-value pairs (e.g., { "CSE": 35, "ECE": 26 })
   if (typeof raw === 'object' && raw !== null) {
     return Object.entries(raw).map(([dept, count], idx) => ({
       dept,
@@ -338,24 +348,23 @@ async function apiFetchDeptAttendance(eventId) {
     const url = `${API_BASE}/analytics/department-attendance`
     const res = await fetch(url, { headers: authHeaders() })
     const data = await parseJSON(res)
-    
+
     if (!res.ok) {
-            return { success: false, depts: [], message: 'Failed to fetch department attendance.' }
+      return { success: false, depts: [], message: 'Failed to fetch department attendance.' }
     }
 
     const raw = data.data || data.depts || data || []
     const mapped = mapDeptAttendance(raw)
 
     if (mapped.length === 0) {
-            return { success: false, depts: [], message: 'No department data available.' }
+      return { success: false, depts: [], message: 'No department data available.' }
     }
 
     return { success: true, depts: mapped, eventId }
-  } catch (err) {
-        return { success: false, depts: [], message: 'Server unreachable.' }
+  } catch {
+    return { success: false, depts: [], message: 'Server unreachable.' }
   }
 }
-
 
 async function apiGenerateQR(eventId, session) {
   try {
@@ -367,8 +376,8 @@ async function apiGenerateQR(eventId, session) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to generate QR.' }
     return { success: true, qrData: data.qrData, payload: data.payload }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 

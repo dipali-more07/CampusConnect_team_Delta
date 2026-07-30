@@ -77,12 +77,12 @@ async function mockFetchNotifications() {
   return { success: true, notifications: MOCK_NOTIFICATIONS, stats: MOCK_STATS }
 }
 
-async function mockMarkRead(ids) {
+async function mockMarkRead() {
   await new Promise(r => setTimeout(r, 200))
   return { success: true }
 }
 
-async function mockDelete(id) {
+async function mockDelete() {
   await new Promise(r => setTimeout(r, 200))
   return { success: true }
 }
@@ -112,8 +112,8 @@ function formatLocalTime(dateStr) {
       cleanStr += 'Z'
     }
     const date = new Date(cleanStr)
-    if (isNaN(date.getTime())) return dateStr
-    
+    if (Number.isNaN(date.getTime())) return dateStr
+
     return date.toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
@@ -122,7 +122,7 @@ function formatLocalTime(dateStr) {
       minute: '2-digit',
       hour12: true
     })
-  } catch (err) {
+  } catch {
     return dateStr
   }
 }
@@ -137,6 +137,12 @@ function getCategoryFromType(type) {
   return 'System'
 }
 
+function resolveUnreadStatus(n) {
+  if (n.is_read !== undefined) return !n.is_read
+  if (n.unread !== undefined) return n.unread
+  return true
+}
+
 function mapNotification(n) {
   const type = n.notification_type || n.type || 'system'
   const category = n.category || getCategoryFromType(type)
@@ -147,7 +153,7 @@ function mapNotification(n) {
     category,
     title: n.title,
     message: n.message,
-    unread: n.is_read !== undefined ? !n.is_read : (n.unread !== undefined ? n.unread : true),
+    unread: resolveUnreadStatus(n),
     time: n.created_at ? formatLocalTime(n.created_at) : (n.time || ''),
     priority: n.priority || 'normal',
   }
@@ -170,7 +176,7 @@ async function apiFetchNotifications() {
     const rawList = data.data?.notifications ?? data.stats?.notifications ?? data.notifications ?? []
     const list = rawList.map(mapNotification)
     return { success: true, notifications: list, stats: data.data ?? data.stats ?? {} }
-  } catch (err) {
+  } catch {
     return { success: false, notifications: [], stats: {}, message: 'Server unreachable.' }
   }
 }
@@ -204,7 +210,7 @@ async function apiMarkRead(ids) {
       }
       return { success: true }
     }
-  } catch (err) {
+  } catch {
     return { success: false }
   }
 }
@@ -220,12 +226,11 @@ async function apiDelete(id) {
       method: 'DELETE',
       headers: authHeaders(),
     })
-    const data = await parseJSON(res)
     if (!res.ok) {
       return { success: false }
     }
     return { success: true }
-  } catch (err) {
+  } catch {
     return { success: false }
   }
 }
@@ -259,15 +264,15 @@ async function apiSend(payload) {
     const data = await parseJSON(res)
     if (!res.ok) {
       const errMsg = data?.error || data?.message || 'Failed to send notification.'
-            return { success: false, message: errMsg }
+      return { success: false, message: errMsg }
     }
     return {
       success: true,
       message: data.message || 'Notification broadcasted successfully.',
       sentAt: data.sentAt || null,
     }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable. Please try again.' }
+  } catch {
+    return { success: false, message: 'Server unreachable. Please try again.' }
   }
 }
 

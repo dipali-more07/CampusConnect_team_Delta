@@ -221,7 +221,7 @@ export default function LoginPage() {
       if (result.success && result.user) {
         login(result.user, result.token, result.refreshToken)
         const userName = result.user?.name || result.user?.fullName || result.user?.email || 'User'
-        showToast(`Logged in successfully! User: ${userName}, Role: ${result.user.role}`, 'success')
+        showToast(`Logged in successfully! Welcome, ${userName}.`, 'success')
       } else {
         showToast(result.message || 'Login failed. Please try again.', 'error')
       }

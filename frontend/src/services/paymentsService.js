@@ -33,7 +33,39 @@ const MOCK_PAYMENTS = [
   { id: 'PAY015', transactionId: 'TXN82910385', studentName: 'Varun Dhawan', rollNo: '21ME045', email: 'varun.d@gmail.com', eventId: 'EVT086', eventName: 'Research Symposium', amount: 0, method: 'Free', status: 'Success', date: '2025-06-12 15:45' }
 ]
 
-/* ── Shared mapper ──────────────────────────────────────────────── */
+function formatIST(dateStr) {
+  if (!dateStr) return ''
+  try {
+    let cleanStr = String(dateStr).trim()
+    if (!cleanStr) return ''
+
+    // If ISO string without Z or timezone offset, append 'Z' so JS treats as UTC from server
+    if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.includes(' GMT') && !cleanStr.includes(' IST')) {
+      if (cleanStr.includes('T')) {
+        cleanStr += 'Z'
+      } else if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}/.test(cleanStr)) {
+        cleanStr = cleanStr.replace(' ', 'T') + 'Z'
+      }
+    }
+
+    const d = new Date(cleanStr)
+    if (isNaN(d.getTime())) return String(dateStr)
+
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: 'numeric',
+      month: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    }).toLowerCase()
+  } catch (_e) {
+    return String(dateStr)
+  }
+}
+
 /* ── Shared mapper ──────────────────────────────────────────────── */
 function mapPayment(p, index, eventsMap = {}) {
   // Student can be nested under student/user/registration object
@@ -131,6 +163,8 @@ function mapPayment(p, index, eventsMap = {}) {
     p.payment_id ||
     `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`
 
+  const rawDate = p.payment_date || p.created_at || p.paid_at || p.date || ''
+
   return {
     id: p.payment_id || p.id || `PAY${String(index + 1).padStart(3, '0')}`,
     registrationId: p.registration_id || p.registrationId || reg.id || p.id,
@@ -143,11 +177,7 @@ function mapPayment(p, index, eventsMap = {}) {
     amount: amt,
     method: p.payment_method || p.method || p.gateway || p.payment_gateway || (amt === 0 ? 'Free' : 'UPI'),
     status: normStatus,
-    date: p.payment_date
-      ? new Date(p.payment_date).toLocaleString('en-IN')
-      : p.created_at
-        ? new Date(p.created_at).toLocaleString('en-IN')
-        : (p.paid_at ? new Date(p.paid_at).toLocaleString('en-IN') : (p.date || ''))
+    date: formatIST(rawDate)
   }
 }
 

@@ -9,14 +9,16 @@
  */
 export function encryptPayload(data) {
   if (data === null || data === undefined) return data
+  if (typeof FormData !== 'undefined' && data instanceof FormData) return data
+
   try {
     const jsonStr = typeof data === 'string' ? data : JSON.stringify(data)
     // UTF-8 safe base64 encoding using btoa
     const base64 = btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-      String.fromCharCode('0x' + p1)
+      String.fromCodePoint(Number('0x' + p1))
     ))
     return base64
-  } catch (_err) {
+  } catch {
     return typeof data === 'string' ? data : JSON.stringify(data)
   }
 }
@@ -29,7 +31,7 @@ export function decryptPayload(encodedStr) {
   try {
     const decodedStr = decodeURIComponent(
       Array.prototype.map.call(atob(encodedStr), c =>
-        '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+        '%' + ('00' + c.codePointAt(0).toString(16)).slice(-2)
       ).join('')
     )
     try {
@@ -37,7 +39,7 @@ export function decryptPayload(encodedStr) {
     } catch {
       return decodedStr
     }
-  } catch (err) {
+  } catch {
     return encodedStr
   }
 }

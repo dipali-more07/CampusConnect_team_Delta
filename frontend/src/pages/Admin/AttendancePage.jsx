@@ -59,33 +59,67 @@ export default function AttendancePage({ tokens }) {
   const [qrLoading, setQrLoading] = useState(false)
   const [qrImageUrl, setQrImageUrl] = useState(null)
   const [countdown, setCountdown] = useState(0)
+  const [qrExpired, setQrExpired] = useState(false)
   const countdownRef = useRef(null)
 
-  // Fetch events list
+  const isEventCompleted = (ev) => {
+    const st = String(ev.status || '').toLowerCase()
+    if (st === 'completed' || st === 'finished') return true
+
+    const rawEnd = ev.end_datetime || ev.endDateTime
+    const rawStart = ev.start_datetime || ev.startDateTime || ev.date || ev.event_date
+
+    let endDate = null
+    if (rawEnd) {
+      endDate = new Date(rawEnd)
+    } else if (rawStart) {
+      if (String(rawStart).includes('T') || String(rawStart).includes(':')) {
+        endDate = new Date(new Date(rawStart).getTime() + 3 * 60 * 60 * 1000)
+      } else {
+        endDate = new Date(rawStart)
+        endDate.setHours(23, 59, 59, 999)
+      }
+    }
+
+    if (endDate && !isNaN(endDate.getTime())) {
+      return new Date() >= endDate
+    }
+
+    return false
+  }
+
+  // Fetch events list (only active: upcoming or ongoing)
   useEffect(() => {
     eventsService.fetchAll().then(res => {
       if (res.success && Array.isArray(res.events)) {
-        const mapped = res.events.map(ev => ({
+        const activeEvents = res.events.filter(ev => !isEventCompleted(ev))
+        const mapped = activeEvents.map(ev => ({
+          ...ev,
           id: ev.id || ev.event_id,
           name: ev.name || ev.event_name || ev.title || 'Untitled Event'
         }))
         setEventsList(mapped)
         if (mapped.length > 0) {
           setSelectedEvent(mapped[0].id)
+        } else {
+          setSelectedEvent('')
         }
       } else {
         setEventsList([])
+        setSelectedEvent('')
       }
     }).catch(err => {
-            setEventsList([])
+      setEventsList([])
+      setSelectedEvent('')
     })
   }, [])
 
   /* start countdown when QR is generated */
   const startCountdown = useCallback((targetExpiresAt) => {
     if (countdownRef.current) clearInterval(countdownRef.current)
-    const expiresAt = targetExpiresAt || (Date.now() + (8 * 3600 + 32 * 60 + 14) * 1000)
+    const expiresAt = targetExpiresAt || (Date.now() + 15 * 60 * 1000)
     setCountdown(Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)))
+    setQrExpired(false)
     countdownRef.current = setInterval(() => {
       const secs = Math.floor((expiresAt - Date.now()) / 1000)
       if (secs <= 0) {
@@ -93,6 +127,7 @@ export default function AttendancePage({ tokens }) {
         setCountdown(0)
         setQrGenerated(false)
         setQrImageUrl(null)
+        setQrExpired(true)
       } else {
         setCountdown(secs)
       }
@@ -102,6 +137,7 @@ export default function AttendancePage({ tokens }) {
   // Load saved QR for selected event if not expired
   useEffect(() => {
     if (!selectedEvent) return
+    setQrExpired(false)
     const saved = localStorage.getItem(`cc_qr_${selectedEvent}`)
     if (saved) {
       try {
@@ -109,9 +145,11 @@ export default function AttendancePage({ tokens }) {
         if (parsed.expiresAt > Date.now() && parsed.qrUrl && !parsed.qrUrl.startsWith('blob:')) {
           setQrImageUrl(parsed.qrUrl)
           setQrGenerated(true)
+          setQrExpired(false)
           startCountdown(parsed.expiresAt)
           return
-        } else if (parsed.qrUrl?.startsWith('blob:')) {
+        } else {
+          setQrExpired(true)
           localStorage.removeItem(`cc_qr_${selectedEvent}`)
         }
       } catch (e) {}
@@ -384,9 +422,13 @@ export default function AttendancePage({ tokens }) {
             className="px-4 py-2.5 rounded-xl text-[13px] outline-none cursor-pointer border font-bold transition-all hover:opacity-90"
             style={{ ...inp, minWidth: '220px' }}
           >
-            {(eventsList || []).map(ev => (
-              <option key={ev.id} value={ev.id}>{ev.name}</option>
-            ))}
+            {eventsList.length === 0 ? (
+              <option value="">No Active Events</option>
+            ) : (
+              (eventsList || []).map(ev => (
+                <option key={ev.id} value={ev.id}>{ev.name}</option>
+              ))
+            )}
           </select>
         </div>
       </div>
@@ -437,6 +479,7 @@ export default function AttendancePage({ tokens }) {
           inp={inp}
           label={label}
           fmtCountdown={fmtCountdown}
+          qrExpired={qrExpired}
         />
       )}
 

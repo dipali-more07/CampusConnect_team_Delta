@@ -9,10 +9,30 @@ import analyticsService from '../../../services/analyticsService'
 import studentService from '../../../services/studentService'
 import certificatesService from '../../../services/certificatesService'
 
+import { useAuth } from '../../../context/AuthContext'
+
 export default function EventDetailView({ event, onBack, onEdit, tokens, showToast }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
+  const { user } = useAuth() || {}
   const [activeTab, setActiveTab] = useState('Overview')
+
+  const currentUserRole = String(user?.role || user?.userType || '').toLowerCase()
+  const isOrganizerRole = currentUserRole.includes('organizer') && !currentUserRole.includes('admin')
+
+  const isMyEvent = (() => {
+    if (!user) return false
+    const currentUserId = String(user.id || user.user_id || user.student_id || '').toLowerCase()
+    const currentUserEmail = String(user.email || '').toLowerCase()
+    const currentUserName = String(user.name || user.full_name || user.username || '').toLowerCase()
+    const evOrganizerId = String(event.organizer_id || event.organizerId || event.created_by || event.user_id || '').toLowerCase()
+    const evOrganizer = String(event.organizer || event.organizer_name || event.organized_by || '').toLowerCase()
+    if (currentUserId && evOrganizerId && currentUserId === evOrganizerId) return true
+    if (currentUserName && evOrganizer && (evOrganizer.includes(currentUserName) || currentUserName.includes(evOrganizer))) return true
+    if (currentUserEmail && evOrganizer && evOrganizer.includes(currentUserEmail)) return true
+    if (currentUserRole.includes('organizer') && (evOrganizer === 'organizer' || evOrganizer === 'oragnizer')) return true
+    return false
+  })()
 
   const [registrations, setRegistrations] = useState([])
   const [loadingRegs, setLoadingRegs] = useState(false)
@@ -392,15 +412,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
           </div>
         </div>
 
-        <button
-          onClick={onEdit}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12.5px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px"
-          style={{ background: BRAND, boxShadow: '0 4px 14px rgba(97,95,255,0.4)' }}
-          onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 6px 20px rgba(97,95,255,0.55)' }}
-          onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 4px 14px rgba(97,95,255,0.4)' }}
-        >
-          <Pencil size={13} /> Edit Event
-        </button>
+
       </div>
 
       {/* ── BANNER CARD ── */}
@@ -547,7 +559,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                           >
                             <div className="flex items-center justify-between flex-wrap gap-2">
                               <span className="text-[13px] font-black truncate max-w-[200px]" style={{ color: dark ? '#e8f0fe' : '#1e293b' }}>
-                                {f.student_name || f.studentName || f.user_name || f.username || 'Student Participant'}
+                                {f.participant_name || f.student?.full_name || f.student?.name || f.student_name || f.studentName || f.user?.full_name || f.user?.name || f.user_name || f.username || 'Student Participant'}
                               </span>
                               <div className="flex items-center gap-1 text-amber-500">
                                 {[...Array(5)].map((_, i) => (

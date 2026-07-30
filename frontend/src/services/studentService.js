@@ -1,5 +1,3 @@
-import { encryptPayload } from '../utils/payloadCrypto'
-
 import studentDashboardData from '../data/student/studentDashboardData.json'
 import studentAttendanceData from '../data/student/studentAttendanceData.json'
 import studentEventsData from '../data/student/studentEventsData.json'
@@ -30,7 +28,9 @@ async function safeFetch(url, options = {}) {
       if (altRes.ok || altRes.status !== 404) {
         res = altRes
       }
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
   }
   return res
 }
@@ -422,6 +422,9 @@ function mapStudentEvent(e) {
     mode,
     date: formatEventDate(e.start_datetime || e.startDateTime || e.event_date, e.event_date || e.date),
     time: formatEventTime(e.start_datetime || e.startDateTime),
+    // Preserve raw datetime strings so components can compute accurate time ranges / status
+    start_datetime: e.start_datetime || e.startDateTime || null,
+    end_datetime: e.end_datetime || e.endDateTime || null,
     venue: e.venue || 'TBD',
     registered: !!e.registered,
     status: e.status || 'Open',

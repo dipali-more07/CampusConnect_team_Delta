@@ -1,5 +1,5 @@
 import { 
-  Calendar, Check, X, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, CheckCircle2, UserCheck, User, Sparkles 
+  Calendar, Check, X, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, CheckCircle2, UserCheck, User, Sparkles, Clock
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
@@ -48,10 +48,10 @@ export default function EventsTable({
             >
               <th className="px-5 py-4">Event ID</th>
               <th className="px-5 py-4">Event Name</th>
-              <th className="px-5 py-4">Category & Type</th>
+              <th className="px-5 py-4">Category &amp; Type</th>
               <th className="px-5 py-4">Venue</th>
               <th className="px-5 py-4">Date</th>
-              <th className="px-5 py-4">Registration & Capacity</th>
+              <th className="px-5 py-4">Registration &amp; Capacity</th>
               <th className="px-5 py-4">Status</th>
               <th className="px-5 py-4">Admin Approval</th>
               <th className="px-5 py-4 text-right">Actions</th>
@@ -92,21 +92,54 @@ export default function EventsTable({
                 const regPercent = isApproved && event.capacity ? Math.min(Math.round((effectiveRegCount / event.capacity) * 100), 100) : 0
                 const badge = getStatusBadgeStyles(event.status)
 
-                // Check if event is finished/completed (by status or past date)
+                // Calculate event start and end dates accurately
+                const getEventStartAndEnd = (ev) => {
+                  let start = null
+                  let end = null
+
+                  const rawStart = ev.start_datetime || ev.startDateTime || ev.date || ev.event_date
+                  if (rawStart) {
+                    let dtStr = rawStart
+                    if (ev.time && !String(rawStart).includes('T') && !String(rawStart).includes(':')) {
+                      dtStr += ` ${ev.time}`
+                    }
+                    const d = new Date(dtStr)
+                    if (!isNaN(d.getTime())) start = d
+                  }
+
+                  const rawEnd = ev.end_datetime || ev.endDateTime
+                  if (rawEnd) {
+                    const d = new Date(rawEnd)
+                    if (!isNaN(d.getTime())) end = d
+                  } else if (start) {
+                    if (String(rawStart).includes('T') || String(rawStart).includes(':')) {
+                      end = new Date(start.getTime() + 3 * 60 * 60 * 1000)
+                    } else {
+                      end = new Date(start)
+                      end.setHours(23, 59, 59, 999)
+                    }
+                  }
+
+                  return { start, end }
+                }
+
+                const { start: eventStart, end: eventEnd } = getEventStartAndEnd(event)
+                const now = new Date()
+
+                const isOngoing = (() => {
+                  const st = String(event.status || '').toLowerCase()
+                  if (st === 'ongoing' || st === 'running') return true
+                  if (eventStart && eventEnd) {
+                    return now >= eventStart && now < eventEnd
+                  }
+                  return false
+                })()
+
                 const isCompleted = (() => {
                   const st = String(event.status || '').toLowerCase()
                   if (st === 'completed' || st === 'finished') return true
-                  const rawDate = event.start_datetime || event.startDateTime || event.date || event.event_date
-                  if (rawDate) {
-                    try {
-                      const d = new Date(rawDate)
-                      if (!isNaN(d.getTime())) {
-                        if (!String(rawDate).includes('T') && !String(rawDate).includes(':')) {
-                          d.setHours(23, 59, 59, 999)
-                        }
-                        return d < new Date()
-                      }
-                    } catch (_) {}
+                  if (eventEnd) {
+                    return now >= eventEnd
                   }
                   return false
                 })()
@@ -127,6 +160,9 @@ export default function EventsTable({
                   if (currentUserRole.includes('organizer') && (evOrganizer === 'organizer' || evOrganizer === 'oragnizer')) return true
                   return false
                 })()
+
+                const currentUserRole = String(user?.role || user?.userType || '').toLowerCase()
+                const isOrganizerRole = currentUserRole.includes('organizer') && !currentUserRole.includes('admin')
 
                 return (
                   <tr 
@@ -231,6 +267,18 @@ export default function EventsTable({
                           <CheckCircle2 size={11} />
                           Completed
                         </span>
+                      ) : isOngoing ? (
+                        <span 
+                          className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border"
+                          style={{
+                            background: dark ? 'rgba(59, 130, 246, 0.15)' : '#dbeafe',
+                            color: dark ? '#60a5fa' : '#1d4ed8',
+                            borderColor: dark ? 'rgba(59, 130, 246, 0.3)' : '#bfdbfe'
+                          }}
+                        >
+                          <Clock size={11} className="animate-pulse" />
+                          Ongoing
+                        </span>
                       ) : (
                         <span 
                           className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
@@ -299,6 +347,16 @@ export default function EventsTable({
                           >
                             <Pencil size={12.5} />
                           </button>
+                        ) : (isOrganizerRole && !isMyEvent) ? (
+                          <button
+                            disabled
+                            onClick={(e) => e.stopPropagation()}
+                            title="You can't edit this event"
+                            className="w-[28px] h-[28px] rounded-lg bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed flex items-center justify-center opacity-40 transition-all duration-150"
+                            style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#475569' : '#94a3b8' }}
+                          >
+                            <Pencil size={12.5} />
+                          </button>
                         ) : (
                           <button
                             onClick={(e) => onOpenEdit(event, e)}
@@ -312,16 +370,28 @@ export default function EventsTable({
                           </button>
                         )}
 
-                        <button
-                          onClick={(e) => onOpenDelete(event, e)}
-                          title="Delete event"
-                          className="w-[28px] h-[28px] rounded-lg bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
-                          style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#7a98bb' : '#94a3b8' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#7a98bb' : '#94a3b8' }}
-                        >
-                          <Trash2 size={12.5} />
-                        </button>
+                        {(isOrganizerRole && !isMyEvent) ? (
+                          <button
+                            disabled
+                            onClick={(e) => e.stopPropagation()}
+                            title="You can't delete this event"
+                            className="w-[28px] h-[28px] rounded-lg bg-slate-100 dark:bg-slate-800/60 cursor-not-allowed flex items-center justify-center opacity-40 transition-all duration-150"
+                            style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#475569' : '#94a3b8' }}
+                          >
+                            <Trash2 size={12.5} />
+                          </button>
+                        ) : (
+                          <button
+                            onClick={(e) => onOpenDelete(event, e)}
+                            title="Delete event"
+                            className="w-[28px] h-[28px] rounded-lg bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
+                            style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#7a98bb' : '#94a3b8' }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444' }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#7a98bb' : '#94a3b8' }}
+                          >
+                            <Trash2 size={12.5} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

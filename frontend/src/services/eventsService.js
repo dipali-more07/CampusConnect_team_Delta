@@ -1,6 +1,6 @@
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
-import { fetchWithAuth, getAccessToken } from '../utils/apiClient'
+import { fetchWithAuth } from '../utils/apiClient'
 import defaultRegistrations from '../data/registrations.json'
 import defaultEvents from '../data/events.json'
 import defaultAttendance from '../data/attendance.json'
@@ -47,8 +47,8 @@ function getMockEvents() {
           { time: '04:00 PM', title: 'Closing & Distribution of Certificates', description: 'Organizing Committee' }
         ]
       }))
-    } catch (e) {
-      // fallback
+    } catch {
+      /* ignore */
     }
   }
   localStorage.setItem('cc_mock_events', JSON.stringify(defaultEvents))
@@ -80,17 +80,17 @@ async function mockFetchUpcomingEvents(limit = 10) {
 async function mockCreateEvent(payload) {
   await new Promise(r => setTimeout(r, 500))
   const events = getMockEvents()
-  
+
   // Find highest numeric ID or generate sequential
   let nextNum = 88
   events.forEach(e => {
-    const match = e.id.match(/^EVT0*(\d+)$/)
+    const match = e.id.match(/^EVT(\d+)$/)
     if (match) {
-      const num = parseInt(match[1], 10)
+      const num = Number.parseInt(match[1], 10)
       if (num >= nextNum) nextNum = num + 1
     }
   })
-  
+
   const idStr = String(nextNum).padStart(3, '0')
   const newEvent = {
     id: `EVT${idStr}`,
@@ -102,8 +102,8 @@ async function mockCreateEvent(payload) {
     venue: payload.venue || 'TBD',
     date: payload.date || new Date().toISOString().split('T')[0],
     time: payload.time || '09:00',
-    capacity: parseInt(payload.capacity, 10) || 100,
-    registrationsCount: parseInt(payload.registrationsCount, 10) || 0,
+    capacity: Number.parseInt(payload.capacity, 10) || 100,
+    registrationsCount: Number.parseInt(payload.registrationsCount, 10) || 0,
     status: payload.status || 'Upcoming',
     qrAttendance: payload.qrAttendance || 'Enabled',
     description: payload.description || `${payload.name || 'This event'} is an interactive campus event designed to foster learning, collaboration, and networking among students and faculty members.`,
@@ -119,10 +119,14 @@ async function mockCreateEvent(payload) {
       { time: '04:00 PM', title: 'Closing & Distribution of Certificates', description: 'Organizing Committee' }
     ]
   }
-  
+
   events.unshift(newEvent) // Add to top
   saveMockEvents(events)
   return { success: true, event: newEvent }
+}
+
+function getProp(val, fallback) {
+  return val !== undefined ? val : fallback
 }
 
 async function mockUpdateEvent(id, payload) {
@@ -132,27 +136,28 @@ async function mockUpdateEvent(id, payload) {
   if (idx === -1) {
     return { success: false, message: 'Event not found' }
   }
-  
+
+  const prev = events[idx]
   const updatedEvent = {
-    ...events[idx],
-    name: payload.name !== undefined ? payload.name : events[idx].name,
-    organizer: payload.organizer !== undefined ? payload.organizer : events[idx].organizer,
-    category: payload.category !== undefined ? payload.category : events[idx].category,
-    eventType: payload.eventType !== undefined ? payload.eventType : events[idx].eventType,
-    approvalStatus: payload.approvalStatus !== undefined ? payload.approvalStatus : events[idx].approvalStatus,
-    venue: payload.venue !== undefined ? payload.venue : events[idx].venue,
-    date: payload.date !== undefined ? payload.date : events[idx].date,
-    time: payload.time !== undefined ? payload.time : events[idx].time,
-    capacity: payload.capacity !== undefined ? parseInt(payload.capacity, 10) : events[idx].capacity,
-    registrationsCount: payload.registrationsCount !== undefined ? parseInt(payload.registrationsCount, 10) : events[idx].registrationsCount,
-    status: payload.status !== undefined ? payload.status : events[idx].status,
-    qrAttendance: payload.qrAttendance !== undefined ? payload.qrAttendance : events[idx].qrAttendance,
-    description: payload.description !== undefined ? payload.description : events[idx].description,
-    schedule: payload.schedule !== undefined ? payload.schedule : events[idx].schedule,
-    registrationDeadline: payload.registrationDeadline !== undefined ? payload.registrationDeadline : events[idx].registrationDeadline,
-    banner: payload.banner !== undefined ? payload.banner : events[idx].banner,
+    ...prev,
+    name: getProp(payload.name, prev.name),
+    organizer: getProp(payload.organizer, prev.organizer),
+    category: getProp(payload.category, prev.category),
+    eventType: getProp(payload.eventType, prev.eventType),
+    approvalStatus: getProp(payload.approvalStatus, prev.approvalStatus),
+    venue: getProp(payload.venue, prev.venue),
+    date: getProp(payload.date, prev.date),
+    time: getProp(payload.time, prev.time),
+    capacity: payload.capacity !== undefined ? Number.parseInt(payload.capacity, 10) : prev.capacity,
+    registrationsCount: payload.registrationsCount !== undefined ? Number.parseInt(payload.registrationsCount, 10) : prev.registrationsCount,
+    status: getProp(payload.status, prev.status),
+    qrAttendance: getProp(payload.qrAttendance, prev.qrAttendance),
+    description: getProp(payload.description, prev.description),
+    schedule: getProp(payload.schedule, prev.schedule),
+    registrationDeadline: getProp(payload.registrationDeadline, prev.registrationDeadline),
+    banner: getProp(payload.banner, prev.banner),
   }
-  
+
   events[idx] = updatedEvent
   saveMockEvents(events)
   return { success: true, event: updatedEvent }
@@ -169,12 +174,12 @@ async function mockDeleteEvent(id) {
 async function mockImportEvents(importedList) {
   await new Promise(r => setTimeout(r, 600))
   const events = getMockEvents()
-  
+
   let nextNum = 88
   events.forEach(e => {
-    const match = e.id.match(/^EVT0*(\d+)$/)
+    const match = e.id.match(/^EVT(\d+)$/)
     if (match) {
-      const num = parseInt(match[1], 10)
+      const num = Number.parseInt(match[1], 10)
       if (num >= nextNum) nextNum = num + 1
     }
   })
@@ -188,8 +193,8 @@ async function mockImportEvents(importedList) {
       category: item.category || 'Technical',
       venue: item.venue || 'Main Auditorium',
       date: item.date || '2025-10-10',
-      capacity: parseInt(item.capacity, 10) || 200,
-      registrationsCount: parseInt(item.registrationsCount, 10) || 0,
+      capacity: Number.parseInt(item.capacity, 10) || 200,
+      registrationsCount: Number.parseInt(item.registrationsCount, 10) || 0,
       status: item.status || 'Upcoming'
     }
   })
@@ -210,12 +215,22 @@ async function mockApproveEvent(eventId, approvalStatus) {
   return { success: true }
 }
 
+function resolveQrCodeUrl(qrCode) {
+  if (!qrCode) return null
+  if (qrCode.startsWith('http') || qrCode.startsWith('data:')) {
+    return qrCode
+  }
+  const cleanBase = (API_BASE || '').replace(/\/api\/v1\/?$/, '')
+  const leadingSlash = qrCode.startsWith('/') ? '' : '/'
+  return `${cleanBase}${leadingSlash}${qrCode}`
+}
+
 // Helper to map backend event fields to frontend expected fields
 function mapEvent(e) {
   if (!e) return null
 
-  // 🔍 TEMP DEBUG — console mein dekho exact backend fields
-  
+  const qrCodeVal = e.qr_code || e.qrcode
+
   return {
     id: e.event_id || e.id,
     name: e.event_name || e.name || e.title || '',
@@ -242,16 +257,23 @@ function mapEvent(e) {
     regDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
     registrationStartDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
     banner: e.poster || e.banner || null,
-    qr_code: e.qr_code || e.qrcode || null,
-    qrCodeImage: (e.qr_code || e.qrcode) ? (
-      (e.qr_code || e.qrcode).startsWith('http') || (e.qr_code || e.qrcode).startsWith('data:')
-        ? (e.qr_code || e.qrcode)
-        : `${(API_BASE || '').replace(/\/api\/v1\/?$/, '')}${(e.qr_code || e.qrcode).startsWith('/') ? '' : '/'}${e.qr_code || e.qrcode}`
-    ) : null,
+    qr_code: qrCodeVal || null,
+    qrCodeImage: resolveQrCodeUrl(qrCodeVal),
     created_at: e.created_at || e.createdAt || null,
   }
 }
 
+function resolveEventsList(data) {
+  if (Array.isArray(data.data)) return data.data
+  if (Array.isArray(data.events)) return data.events
+  return []
+}
+
+function resolveUpcomingEventsList(data) {
+  if (Array.isArray(data.data)) return data.data
+  if (Array.isArray(data)) return data
+  return data.events || []
+}
 
 // ─────────────────────────────────────────────────────────────────
 // REAL API FUNCTIONS
@@ -261,13 +283,13 @@ async function apiFetchEvents() {
     const res = await fetchWithAuth(`${API_BASE}/events`, { method: 'GET' })
     const data = await parseJSON(res)
     if (!res.ok) {
-            return { success: false, events: [] }
+      return { success: false, events: [] }
     }
-    const eventsArray = Array.isArray(data.data) ? data.data : Array.isArray(data.events) ? data.events : []
+    const eventsArray = resolveEventsList(data)
     const mapped = eventsArray.map(e => mapEvent(e))
     return { success: true, events: mapped }
-  } catch (err) {
-        return { success: false, events: [], message: 'Server unreachable.' }
+  } catch {
+    return { success: false, events: [], message: 'Server unreachable.' }
   }
 }
 
@@ -276,7 +298,7 @@ async function apiFetchUpcomingEvents(limit = 10) {
     let res = await fetchWithAuth(`${API_BASE}/events/upcoming?limit=${limit}`, { method: 'GET' })
     if (res.ok) {
       const data = await parseJSON(res)
-      const eventsArray = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : (data.events || []))
+      const eventsArray = resolveUpcomingEventsList(data)
       if (eventsArray.length > 0) {
         const mapped = eventsArray.map(e => mapEvent(e))
         return { success: true, events: mapped }
@@ -294,7 +316,7 @@ async function apiFetchUpcomingEvents(limit = 10) {
     }
 
     return { success: false, events: [] }
-  } catch (err) {
+  } catch {
     return { success: false, events: [], message: 'Server unreachable.' }
   }
 }
@@ -307,12 +329,12 @@ async function apiCreateEvent(payload) {
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-            return { success: false, message: data.message || 'Failed to create event.' }
+      return { success: false, message: data.message || 'Failed to create event.' }
     }
     const rawEvent = data.data || data.event || data
     return { success: true, event: mapEvent(rawEvent) }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -324,19 +346,19 @@ async function apiUpdateEvent(id, payload) {
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-            return { success: false, message: data.message || 'Failed to update event.' }
+      return { success: false, message: data.message || 'Failed to update event.' }
     }
     const rawEvent = data.data || data.event || data
     return { success: true, event: mapEvent(rawEvent) }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiDeleteEvent(id) {
   try {
     const token = getToken()
-        const res = await fetch(`${API_BASE}/events/${id}`, {
+    const res = await fetch(`${API_BASE}/events/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -345,11 +367,11 @@ async function apiDeleteEvent(id) {
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-            return { success: false, message: data.message || data.detail || 'Failed to delete event.' }
+      return { success: false, message: data.message || data.detail || 'Failed to delete event.' }
     }
     return { success: true }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -359,7 +381,7 @@ const MOCK_REGISTRATIONS_KEY = 'campus_connect_mock_registrations'
 function getMockRegistrations() {
   const local = localStorage.getItem(MOCK_REGISTRATIONS_KEY)
   if (local) {
-    try { return JSON.parse(local) } catch { }
+    try { return JSON.parse(local) } catch { /* ignore */ }
   }
   localStorage.setItem(MOCK_REGISTRATIONS_KEY, JSON.stringify(defaultRegistrations))
   return defaultRegistrations
@@ -373,7 +395,7 @@ async function mockFetchRegistrations(eventId) {
   await new Promise(r => setTimeout(r, 300))
   const regs = getMockRegistrations()
   const eventRegs = regs.filter(r => r.eventId === eventId)
-  
+
   if (eventRegs.length === 0) {
     const seeded = [
       { id: `REG_${eventId}_1`, eventId, studentName: 'Arjun Patel', rollNo: '21CS001', department: 'CSE', year: '3rd', date: '2025-07-01', status: 'Approved' },
@@ -411,7 +433,7 @@ async function mockUpdateRegistrationStatus(id, status) {
     let change = 0
     if (oldStatus !== 'Approved' && status === 'Approved') change = 1
     else if (oldStatus === 'Approved' && status !== 'Approved') change = -1
-    
+
     if (change !== 0) {
       events[eventIdx].registrationsCount = Math.max(0, (events[eventIdx].registrationsCount || 0) + change)
       saveMockEvents(events)
@@ -427,7 +449,7 @@ const MOCK_ATTENDANCE_KEY = 'campus_connect_mock_attendance'
 function getMockAttendance() {
   const local = localStorage.getItem(MOCK_ATTENDANCE_KEY)
   if (local) {
-    try { return JSON.parse(local) } catch { }
+    try { return JSON.parse(local) } catch { /* ignore */ }
   }
   localStorage.setItem(MOCK_ATTENDANCE_KEY, JSON.stringify(defaultAttendance))
   return defaultAttendance
@@ -441,7 +463,7 @@ async function mockFetchAttendance(eventId) {
   await new Promise(r => setTimeout(r, 300))
   const attendance = getMockAttendance()
   const eventAttendance = attendance.filter(a => a.eventId === eventId)
-  
+
   if (eventAttendance.length === 0) {
     const seeded = defaultAttendance.map((a, i) => ({
       ...a,
@@ -476,7 +498,7 @@ async function apiFetchRegistrations(eventId) {
 
     const regs = data.registrations || data.data || data.items || data || []
     return { success: true, registrations: Array.isArray(regs) ? regs : [] }
-  } catch (err) {
+  } catch {
     return { success: false, registrations: [], message: 'Server unreachable.' }
   }
 }
@@ -493,8 +515,8 @@ async function apiUpdateRegistrationStatus(id, status) {
       return { success: false, message: data.message || 'Failed to update status.' }
     }
     return { success: true, registration: data.registration }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -540,8 +562,8 @@ async function apiFetchAttendance(eventId) {
     const raw = data.attendance || data.data || data || []
     const attendance = Array.isArray(raw) ? raw.map(mapAttendanceRecord) : []
     return { success: true, attendance }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -561,8 +583,8 @@ async function apiApproveEvent(eventId, approvalStatus, rejectionReason = null) 
       return { success: false, message: data.message || 'Failed to update event approval status.' }
     }
     return { success: true, message: data.message }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -580,8 +602,8 @@ async function apiPublishEvent(eventId) {
       return { success: false, message: data.message || 'Failed to publish event.' }
     }
     return { success: true, message: data.message || 'Event published successfully!' }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -617,7 +639,7 @@ const eventsService = {
     USE_MOCK ? mockFetchAttendance(eventId) : apiFetchAttendance(eventId),
 
   approve: (eventId, approvalStatus, rejectionReason) =>
-    USE_MOCK ? Promise.resolve({ success: true }) : apiApproveEvent(eventId, approvalStatus, rejectionReason),
+    USE_MOCK ? mockApproveEvent(eventId, approvalStatus) : apiApproveEvent(eventId, approvalStatus, rejectionReason),
 
   publish: (eventId) =>
     USE_MOCK ? Promise.resolve({ success: true, message: 'Event published (mock).' }) : apiPublishEvent(eventId),
