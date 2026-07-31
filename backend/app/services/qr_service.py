@@ -25,6 +25,7 @@ SECURITY:
   - Checking that the registration status is confirmed (not cancelled)
   - Enforcing single-scan limits to prevent duplicate entries
 """
+import logging
 import io
 import os
 import uuid
@@ -34,6 +35,8 @@ from qrcode.image.pure import PyPNGImage
 from typing import Optional
 
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class QRService:
@@ -67,7 +70,8 @@ class QRService:
             img_bytes = io.BytesIO()
             img.save(img_bytes, format="PNG")
             return img_bytes.getvalue()
-        except Exception:
+        except Exception as e:
+            logger.warning("Default PIL QR image generation failed, using PyPNGImage fallback: %s", e)
             img = qr.make_image(image_factory=PyPNGImage)
             img_bytes = io.BytesIO()
             img.save(img_bytes)

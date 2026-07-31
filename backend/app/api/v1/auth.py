@@ -97,9 +97,30 @@ async def forgot_password(
     db: Session = Depends(get_db),
 ):
     service = AuthService(db)
-    base_url = str(request.base_url)
-    await service.forgot_password(data.email, base_url)
-    # Always return success (don't reveal if email exists)
+
+    from app.utils.validators import validate_and_sanitize_frontend_url
+
+    # Detect frontend origin URL from Origin, Referer, or Host header
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+
+    raw_url = None
+    if origin:
+        raw_url = origin.rstrip("/")
+    elif referer:
+        from urllib.parse import urlparse
+        parsed = urlparse(referer)
+        raw_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    if not raw_url:
+        host = request.headers.get("host", "")
+        proto = request.headers.get("x-forwarded-proto", "https" if "zapto.org" in host else "http")
+        raw_url = f"{proto}://{host}".rstrip("/")
+
+    # Sanitize and validate against Host Header / URL Injection attacks
+    safe_frontend_url = validate_and_sanitize_frontend_url(raw_url)
+
+    await service.forgot_password(data.email, safe_frontend_url)
     return success_response(
         message="If an account with this email exists, a reset link has been sent."
     )
