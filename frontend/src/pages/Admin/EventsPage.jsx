@@ -199,18 +199,26 @@ export default function EventsPage({ tokens }) {
   const handleOpenEdit = (event, e) => {
     if (e) e.stopPropagation()
 
-    // Check if event is completed
+    // Check if event is completed (by end date/time)
     const st = String(event.status || '').toLowerCase()
-    const rawDate = event.start_datetime || event.startDateTime || event.date || event.event_date
     let isCompleted = st === 'completed' || st === 'finished'
-    if (!isCompleted && rawDate) {
-      try {
-        const d = new Date(rawDate)
-        if (!isNaN(d.getTime())) {
-          if (!String(rawDate).includes('T') && !String(rawDate).includes(':')) d.setHours(23, 59, 59, 999)
-          isCompleted = d < new Date()
+    if (!isCompleted) {
+      const rawEnd = event.end_datetime || event.endDateTime
+      const rawStart = event.start_datetime || event.startDateTime || event.date || event.event_date
+      let endDate = null
+      if (rawEnd) {
+        endDate = new Date(rawEnd)
+      } else if (rawStart) {
+        if (String(rawStart).includes('T') || String(rawStart).includes(':')) {
+          endDate = new Date(new Date(rawStart).getTime() + 3 * 60 * 60 * 1000)
+        } else {
+          endDate = new Date(rawStart)
+          endDate.setHours(23, 59, 59, 999)
         }
-      } catch (_) {}
+      }
+      if (endDate && !isNaN(endDate.getTime())) {
+        isCompleted = new Date() >= endDate
+      }
     }
 
     if (isCompleted) {
@@ -269,9 +277,10 @@ export default function EventsPage({ tokens }) {
   // Delete Action
   const handleDeleteConfirm = async () => {
     if (!selectedEvent) return
+    const eventName = selectedEvent.name || selectedEvent.title || 'Event'
     const res = await eventsService.delete(selectedEvent.id)
     if (res.success) {
-      showToast(`Event ${selectedEvent.id} deleted successfully.`, 'success')
+      showToast(`Event "${eventName}" deleted successfully.`, 'success')
       setDeleteConfirmOpen(false);
       loadEvents()
     } else {
@@ -388,9 +397,10 @@ export default function EventsPage({ tokens }) {
 
     setSubmitting(false)
     if (res.success) {
+      const eventName = formState.name || selectedEvent?.name || selectedEvent?.title || 'Event'
       showToast(
         selectedEvent 
-          ? `Event ${selectedEvent.id} updated successfully.` 
+          ? `Event "${eventName}" updated successfully.` 
           : (isDraft ? 'Draft saved successfully.' : 'New event created and published successfully.'), 
         'success'
       )

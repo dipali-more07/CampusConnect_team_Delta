@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { X, User, Building2, BookOpen, Mail, Phone, Calendar, Star, Info } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import studentService from '../../services/studentService'
 
 export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdated }) {
-  const { dark, accentColor, tokens } = useTheme()
+  const { dark, accentColor } = useTheme()
   const BRAND = accentColor || '#615FFF'
   const showToast = useToast()
 
@@ -25,16 +25,18 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
   // Sync form state when the modal is opened
   useEffect(() => {
     if (isOpen && user) {
-      setFormData({
-        name: user.name || user.full_name || '',
-        college: user.college || user.college_id || '',
-        course: user.course || '',
-        email: user.email || '',
-        mobile: user.mobile || user.phone || '',
-        gender: user.gender || 'male',
-        department: user.department || '',
-        yearOfStudy: user.year_of_study || user.yearOfStudy || 1,
-        bio: user.bio || ''
+      queueMicrotask(() => {
+        setFormData({
+          name: user.name || user.full_name || '',
+          college: user.college || user.college_id || '',
+          course: user.course || '',
+          email: user.email || '',
+          mobile: user.mobile || user.phone || '',
+          gender: user.gender || 'male',
+          department: user.department || '',
+          yearOfStudy: user.year_of_study || user.yearOfStudy || 1,
+          bio: user.bio || ''
+        })
       })
     }
   }, [isOpen, user])
@@ -68,7 +70,12 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={onClose} />
+      <button
+        type="button"
+        aria-label="Close edit profile modal"
+        className="absolute inset-0 bg-black/60 backdrop-blur-xs border-none p-0 cursor-default"
+        onClick={onClose}
+      />
 
       {/* Modal Dialog */}
       <div
@@ -84,6 +91,7 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
         <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-[#1b2a42] shrink-0">
           <h3 className="text-lg font-extrabold m-0 text-slate-900 dark:text-white">Edit Profile</h3>
           <button
+            type="button"
             onClick={onClose}
             className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-[#1a2d48] border-none bg-transparent cursor-pointer transition-colors"
           >
@@ -97,10 +105,14 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
             {/* Initials Avatar */}
             <div className="flex items-center gap-4">
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-black shadow-md shrink-0"
+                className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-black shadow-md shrink-0"
                 style={{ background: BRAND }}
               >
-                {formData.name ? formData.name.substring(0, 2).toUpperCase() : 'AS'}
+                {formData.name ? (() => {
+                  const parts = formData.name.trim().split(/\s+/)
+                  const lastPart = parts.at(-1)
+                  return parts.length >= 2 && lastPart ? (parts[0][0] + lastPart[0]).toUpperCase() : formData.name.slice(0, 2).toUpperCase()
+                })() : 'JN'}
               </div>
               <div>
                 <p className="text-[13px] font-bold m-0 text-slate-900 dark:text-white">{formData.name || 'Student'}</p>
@@ -112,10 +124,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Full Name */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Full Name</label>
+                <label htmlFor="edit-profile-name" className="text-xs font-bold text-slate-700 dark:text-slate-300">Full Name</label>
                 <div className="relative">
                   <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="edit-profile-name"
                     type="text"
                     name="name"
                     value={formData.name}
@@ -128,10 +141,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* College ID */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">College / College ID</label>
+                <label htmlFor="edit-profile-college" className="text-xs font-bold text-slate-700 dark:text-slate-300">College / College ID</label>
                 <div className="relative">
                   <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="edit-profile-college"
                     type="text"
                     name="college"
                     value={formData.college}
@@ -144,10 +158,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* Course */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Course</label>
+                <label htmlFor="edit-profile-course" className="text-xs font-bold text-slate-700 dark:text-slate-300">Course</label>
                 <div className="relative">
                   <BookOpen size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="edit-profile-course"
                     type="text"
                     name="course"
                     value={formData.course}
@@ -160,13 +175,14 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* Email (Read-Only) */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <label htmlFor="edit-profile-email" className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
                   <span>Email</span>
                   <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-[#15253e] text-slate-400">Locked</span>
                 </label>
                 <div className="relative">
                   <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="edit-profile-email"
                     type="email"
                     name="email"
                     value={formData.email}
@@ -179,10 +195,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* Mobile */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Mobile</label>
+                <label htmlFor="edit-profile-mobile" className="text-xs font-bold text-slate-700 dark:text-slate-300">Mobile</label>
                 <div className="relative">
                   <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="edit-profile-mobile"
                     type="tel"
                     name="mobile"
                     value={formData.mobile}
@@ -195,10 +212,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* Gender */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Gender</label>
+                <label htmlFor="edit-profile-gender" className="text-xs font-bold text-slate-700 dark:text-slate-300">Gender</label>
                 <div className="relative">
                   <Star size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <select
+                    id="edit-profile-gender"
                     name="gender"
                     value={formData.gender}
                     onChange={handleChange}
@@ -215,10 +233,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* Department */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Department</label>
+                <label htmlFor="edit-profile-department" className="text-xs font-bold text-slate-700 dark:text-slate-300">Department</label>
                 <div className="relative">
                   <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="edit-profile-department"
                     type="text"
                     name="department"
                     value={formData.department}
@@ -231,10 +250,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* Year of Study */}
               <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Year of Study</label>
+                <label htmlFor="edit-profile-year" className="text-xs font-bold text-slate-700 dark:text-slate-300">Year of Study</label>
                 <div className="relative">
                   <Calendar size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="edit-profile-year"
                     type="number"
                     name="yearOfStudy"
                     value={formData.yearOfStudy}
@@ -249,10 +269,11 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
 
               {/* Bio (Full Width) */}
               <div className="sm:col-span-2 flex flex-col gap-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">Bio</label>
+                <label htmlFor="edit-profile-bio" className="text-xs font-bold text-slate-700 dark:text-slate-300">Bio</label>
                 <div className="relative">
                   <Info size={16} className="absolute left-3.5 top-3 text-slate-400" />
                   <textarea
+                    id="edit-profile-bio"
                     name="bio"
                     value={formData.bio}
                     onChange={handleChange}

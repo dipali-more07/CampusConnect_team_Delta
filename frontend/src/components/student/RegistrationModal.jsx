@@ -10,13 +10,23 @@ import studentService from '../../services/studentService'
 
 const STEPS = { FORM: 'form', PAYMENT_PROMPT: 'payment_prompt', SUCCESS: 'success' }
 
-export default function RegistrationModal({ event, onClose, onSuccess }) {
+export default function RegistrationModal({ event, onClose, onSuccess, initialRegType }) {
   const { dark, accentColor } = useTheme()
   const BRAND = accentColor || '#615FFF'
+  const [isClosing, setIsClosing] = useState(false)
+
+  const handleClose = (cb) => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(() => {
+      if (typeof cb === 'function') cb()
+      else if (onClose) onClose()
+    }, 180)
+  }
 
   // participation_type: "individual" | "team" | "both"
   const rawMode = (event.mode || 'Solo').toLowerCase()
-  const defaultType = rawMode === 'team' ? 'team' : 'individual'
+  const defaultType = initialRegType || (event.registered ? 'team' : (rawMode === 'team' ? 'team' : 'individual'))
   const [regType, setRegType] = useState(defaultType)
 
   const [step, setStep] = useState(STEPS.FORM)
@@ -247,11 +257,11 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
   const modal = (
     <div className="fixed inset-0 z-999 flex items-center justify-center px-4" style={{ fontFamily: 'Manrope, sans-serif' }}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`} onClick={() => handleClose()} />
 
       <div
-        className="relative w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col"
-        style={{ background: card, border: `1px solid ${border}`, animation: 'regModalIn 0.22s cubic-bezier(0.34,1.56,0.64,1)' }}
+        className={`relative w-full max-w-lg max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl flex flex-col ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        style={{ background: card, border: `1px solid ${border}` }}
       >
         {/* Gradient top bar */}
         <div className="h-1 w-full shrink-0 rounded-t-2xl" style={{ background: `linear-gradient(90deg, ${BRAND}, #a855f7)` }} />
@@ -273,7 +283,7 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
             <h2 className="text-[17px] font-black m-0" style={{ color: txt }}>{event.title}</h2>
             <p className="text-[12px] mt-0.5 m-0" style={{ color: txtSec }}>{event.date} · {event.venue}</p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg border-none cursor-pointer transition-all hover:bg-red-500/10"
+          <button onClick={() => handleClose()} className="p-1.5 rounded-lg border-none cursor-pointer transition-all hover:bg-red-500/10"
             style={{ background: 'transparent', color: txtSec }}>
             <X size={18} />
           </button>
@@ -378,14 +388,25 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
               <div>
                 <label style={labelStyle}>Participation Type</label>
                 <div className="flex gap-2">
-                  {[{ val: 'individual', label: 'Individual', Icon: User }, { val: 'team', label: 'Team', Icon: Users }].map(({ val, label, Icon }) => (
-                    <button key={val} onClick={() => setRegType(val)}
-                      className="flex-1 py-2.5 rounded-xl text-[12px] font-bold border cursor-pointer flex items-center justify-center gap-1.5 transition-all"
+                  {[
+                    { val: 'individual', label: event.registered ? 'Individual (Registered)' : 'Individual', Icon: User, isDisabled: !!event.registered },
+                    { val: 'team', label: 'Team', Icon: Users, isDisabled: false }
+                  ].map(({ val, label, Icon, isDisabled }) => (
+                    <button
+                      key={val}
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => !isDisabled && setRegType(val)}
+                      title={isDisabled ? 'You have already registered as an Individual for this event' : ''}
+                      className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold border flex items-center justify-center gap-1.5 transition-all ${
+                        isDisabled ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : 'cursor-pointer'
+                      }`}
                       style={{
                         background: regType === val ? BRAND : 'transparent',
                         color: regType === val ? '#fff' : txtSec,
                         borderColor: regType === val ? BRAND : border,
-                      }}>
+                      }}
+                    >
                       <Icon size={13} /> {label}
                     </button>
                   ))}
@@ -489,7 +510,7 @@ export default function RegistrationModal({ event, onClose, onSuccess }) {
 
             {/* Footer Buttons */}
             <div className="flex gap-3 pt-1">
-              <button onClick={onClose}
+              <button onClick={() => handleClose()}
                 className="flex-1 py-2.5 rounded-xl text-[13px] font-bold border cursor-pointer transition-all hover:opacity-80"
                 style={{ background: 'transparent', color: txtSec, borderColor: border }}>
                 Cancel

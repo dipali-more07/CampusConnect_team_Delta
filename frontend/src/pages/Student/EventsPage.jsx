@@ -7,10 +7,22 @@ import studentService from '../../services/studentService'
 import RegistrationModal from '../../components/student/RegistrationModal'
 import { processRazorpayPayment } from '../../utils/paymentUtils'
 
-export default function EventsPage({ tokens }) {
-  const { accentColor } = useTheme()
+export default function EventsPage({ tokens: inputTokens }) {
+  const { accentColor, isDarkMode } = useTheme()
   const showToast = useToast()
   const BRAND = accentColor || '#615FFF'
+
+  const isDark = inputTokens?.dark ?? isDarkMode ?? false
+  const tokens = {
+    dark: isDark,
+    card: inputTokens?.card || (isDark ? '#0c1829' : '#ffffff'),
+    border: inputTokens?.border || (isDark ? '#1a3050' : '#e2e8f0'),
+    txtPri: inputTokens?.txtPri || (isDark ? '#e8f0fe' : '#0f172a'),
+    txtSec: inputTokens?.txtSec || (isDark ? '#7a98bb' : '#64748b'),
+    txtMuted: inputTokens?.txtMuted || (isDark ? '#475569' : '#94a3b8'),
+    hoverBg: inputTokens?.hoverBg || (isDark ? '#162640' : '#f8fafc'),
+    shadow: inputTokens?.shadow || (isDark ? '0 10px 30px rgba(0,0,0,0.5)' : '0 10px 30px rgba(0,0,0,0.05)')
+  }
 
   const [filter, setFilter] = useState('All')
   const [eventsList, setEventsList] = useState([])
@@ -23,6 +35,8 @@ export default function EventsPage({ tokens }) {
   const [cancellingEventId, setCancellingEventId] = useState(null)
   // Set of event IDs where this student has marked attendance (present)
   const [attendedEventIds, setAttendedEventIds] = useState(new Set())
+  // Set of event IDs for which this student has already submitted feedback
+  const [feedbackedEventIds, setFeedbackedEventIds] = useState(new Set())
 
   useEffect(() => {
     let cancelled = false
@@ -56,8 +70,37 @@ export default function EventsPage({ tokens }) {
     return () => { cancelled = true }
   }, [])
 
+  // Fetch my feedbacks to know which events already have feedback submitted
+  useEffect(() => {
+    let cancelled = false
+    studentService.fetchMyFeedbacks().then(res => {
+      if (cancelled) return
+      if (res.success && Array.isArray(res.data)) {
+        const ids = new Set()
+        res.data.forEach(f => {
+          const eid = String(f.event_id || f.eventId || f.event?.id || '')
+          if (eid) ids.add(eid)
+        })
+        setFeedbackedEventIds(ids)
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   // Returns true only if student has marked attendance for this event
   const hasAttendance = (event) => attendedEventIds.has(String(event.id))
+
+  // Returns true if student has already submitted feedback for this event
+  const hasFeedback = (event) => feedbackedEventIds.has(String(event.id))
+
+  const handleFeedbackChange = (eventId, submitted) => {
+    setFeedbackedEventIds(prev => {
+      const next = new Set(prev)
+      if (submitted) next.add(String(eventId))
+      else next.delete(String(eventId))
+      return next
+    })
+  }
 
   const getEventStartDate = (ev) => {
     if (!ev.date) return null
@@ -66,7 +109,7 @@ export default function EventsPage({ tokens }) {
       dateTimeStr += ` ${ev.time}`
     }
     const d = new Date(dateTimeStr)
-    return isNaN(d.getTime()) ? null : d
+    return Number.isNaN(d.getTime()) ? null : d
   }
 
   const getRegDeadlineDate = (ev) => {
@@ -89,6 +132,31 @@ export default function EventsPage({ tokens }) {
       return new Date(start.getTime() + 3 * 60 * 60 * 1000)
     }
     return null
+  }
+
+  const formatSingleTime = (dateObj) => {
+    if (!dateObj || isNaN(dateObj.getTime())) return null
+    return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const getFormattedEventTimeRange = (ev) => {
+    if (!ev) return 'TBD'
+    const startD = getEventStartDate(ev)
+    const endD = getEventEndDate(ev)
+
+    const startTimeStr = formatSingleTime(startD)
+    const endTimeStr = formatSingleTime(endD)
+
+    if (startTimeStr && endTimeStr) {
+      return `${startTimeStr} - ${endTimeStr}`
+    } else if (startTimeStr) {
+      return startTimeStr
+    } else if (ev.time) {
+      if (ev.time.includes('-')) return ev.time
+      return ev.time
+    }
+
+    return 'TBD'
   }
 
   const isEventFinished = (ev) => {
@@ -221,15 +289,19 @@ export default function EventsPage({ tokens }) {
     }
   }
 
-  const handleRegisterClick = (event) => {
-    if (event.registered || isDeadlinePassed(event)) return
+  const [initialRegType, setInitialRegType] = useState('individual')
+
+  const handleRegisterClick = (event, type = 'individual') => {
+    if (isDeadlinePassed(event)) return
     setSelectedEvent(event)
+    setInitialRegType(type)
   }
 
   const handleRegistrationSuccess = (eventId) => {
     setEventsList(prev => prev.map(e => String(e.id) === String(eventId) ? { ...e, registered: true, status: 'Registered' } : e))
     showToast('Successfully registered for event! 🎉', 'success')
     setSelectedEvent(null)
+    setInitialRegType('individual')
   }
 
   const handleCancelRegistration = async (event) => {
@@ -252,10 +324,16 @@ export default function EventsPage({ tokens }) {
     setCancellingEventId(event.id)
     setEventsList(prev => markUnregistered(prev))
 
+    const isPaid = Number(event.fees || event.fee || event.price || 0) > 0 || String(event.paymentStatus || event.payment_status || '').toLowerCase() === 'paid'
+
     try {
       const res = await studentService.cancelEventRegistration(event.id)
       if (res.success) {
-        showToast('Registration cancelled successfully!', 'success')
+        if (isPaid) {
+          showToast('Registration cancelled! Payment refund will be processed soon.', 'success')
+        } else {
+          showToast('Registration cancelled successfully!', 'success')
+        }
       } else {
         // Revert if API failed
         setEventsList(prev => markRegistered(prev))
@@ -384,7 +462,7 @@ export default function EventsPage({ tokens }) {
 
                 <div className="flex flex-col gap-2 mt-4 text-xs font-medium" style={{ color: tokens.txtSec }}>
                   <div className="flex items-center gap-2"><CalendarDays size={14} /> {event.date}</div>
-                  <div className="flex items-center gap-2"><Clock size={14} /> {event.time}</div>
+                  <div className="flex items-center gap-2"><Clock size={14} /> {getFormattedEventTimeRange(event)}</div>
                   <div className="flex items-center gap-2"><MapPin size={14} /> {event.venue}</div>
                   <div className="flex items-center gap-2">
                     <Users size={14} />
@@ -421,13 +499,23 @@ export default function EventsPage({ tokens }) {
 
                 {isEventFinished(event) ? (
                   hasAttendance(event) ? (
-                    <button
-                      onClick={() => setFeedbackEvent(event)}
-                      className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:-translate-y-px shadow-md"
-                      style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
-                    >
-                      Give Feedback
-                    </button>
+                    hasFeedback(event) ? (
+                      <button
+                        onClick={() => setFeedbackEvent(event)}
+                        className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:-translate-y-px"
+                        style={{ background: tokens.dark ? '#162640' : '#f1f5f9', color: BRAND, border: `1px solid ${BRAND}40` }}
+                      >
+                        <Star size={14} /> See Feedback
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setFeedbackEvent(event)}
+                        className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:-translate-y-px shadow-md"
+                        style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
+                      >
+                        <Star size={14} /> Give Feedback
+                      </button>
+                    )
                   ) : (
                     <button
                       disabled
@@ -460,20 +548,32 @@ export default function EventsPage({ tokens }) {
                       )}
                     </button>
                   ) : (
-                    <button
-                      onClick={() => setCancelConfirmEvent(event)}
-                      disabled={cancellingEventId === event.id}
-                      className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                      style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
-                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.18)' }}
-                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)' }}
-                    >
-                      {cancellingEventId === event.id ? (
-                        <><Loader2 size={14} className="animate-spin" /> Cancelling...</>
-                      ) : (
-                        <><XCircle size={14} /> Cancel Registration</>
+                    <div className="flex-1 flex items-center gap-2">
+                      {(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) && (
+                        <button
+                          onClick={() => handleRegisterClick(event, 'team')}
+                          className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
+                          style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
+                        >
+                          <Users size={14} /> Register Team
+                        </button>
                       )}
-                    </button>
+                      <button
+                        onClick={() => setCancelConfirmEvent(event)}
+                        disabled={cancellingEventId === event.id}
+                        className={`${(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) ? 'px-3' : 'flex-1'} py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.18)' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)' }}
+                        title="Cancel Registration"
+                      >
+                        {cancellingEventId === event.id ? (
+                          <><Loader2 size={14} className="animate-spin" /></>
+                        ) : (
+                          <><XCircle size={14} /> <span className={(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) ? 'hidden sm:inline' : ''}>Cancel</span></>
+                        )}
+                      </button>
+                    </div>
                   )
                 ) : (
                   <button
@@ -494,7 +594,8 @@ export default function EventsPage({ tokens }) {
       {selectedEvent && (
         <RegistrationModal
           event={selectedEvent}
-          onClose={() => setSelectedEvent(null)}
+          initialRegType={initialRegType}
+          onClose={() => { setSelectedEvent(null); setInitialRegType('individual') }}
           onSuccess={handleRegistrationSuccess}
         />
       )}
@@ -514,6 +615,8 @@ export default function EventsPage({ tokens }) {
           setFeedbackEvent={setFeedbackEvent}
           onCancelRegistration={setCancelConfirmEvent}
           hasAttendance={hasAttendance}
+          hasFeedback={hasFeedback}
+          timeRange={getFormattedEventTimeRange(viewingEvent)}
         />
       )}
 
@@ -525,6 +628,7 @@ export default function EventsPage({ tokens }) {
           tokens={tokens}
           BRAND={BRAND}
           showToast={showToast}
+          onFeedbackChange={handleFeedbackChange}
         />
       )}
 
@@ -542,12 +646,25 @@ export default function EventsPage({ tokens }) {
   )
 }
 
-function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasPendingPayment, isDeadlinePassed, handleEventPayNow, isEventFinished, setFeedbackEvent, onCancelRegistration, hasAttendance }) {
-  const card = tokens.dark ? '#0c1829' : '#ffffff'
-  const border = tokens.dark ? '#1a3050' : '#e2e8f0'
-  const txt = tokens.dark ? '#e8f0fe' : '#0f172a'
-  const txtSec = tokens.dark ? '#7a98bb' : '#64748b'
-  const bgHeader = tokens.dark ? '#162640' : '#f8fafc'
+function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasPendingPayment, isDeadlinePassed, handleEventPayNow, isEventFinished, setFeedbackEvent, onCancelRegistration, hasAttendance, hasFeedback, timeRange }) {
+  const [isClosing, setIsClosing] = useState(false)
+  const isDark = tokens?.dark ?? false
+  const card = tokens?.card || (isDark ? '#0c1829' : '#ffffff')
+  const border = tokens?.border || (isDark ? '#1a3050' : '#e2e8f0')
+  const txt = tokens?.txtPri || (isDark ? '#e8f0fe' : '#0f172a')
+  const txtSec = tokens?.txtSec || (isDark ? '#7a98bb' : '#64748b')
+  const bgHeader = isDark ? '#162640' : '#f8fafc'
+  const hoverBg = tokens?.hoverBg || (isDark ? '#162640' : '#f8fafc')
+  const txtMuted = tokens?.txtMuted || (isDark ? '#475569' : '#94a3b8')
+
+  const handleClose = (cb) => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(() => {
+      if (typeof cb === 'function') cb()
+      else onClose()
+    }, 180)
+  }
 
   const formatDeadline = (deadlineStr) => {
     if (!deadlineStr) return 'No Deadline'
@@ -567,11 +684,11 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
   return createPortal(
     <div className="fixed inset-0 z-999 flex items-center justify-center px-4" style={{ fontFamily: 'Manrope, sans-serif' }}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`} onClick={() => handleClose()} />
 
       <div
-        className="relative w-full max-w-lg max-h-[92vh] overflow-hidden rounded-3xl shadow-2xl flex flex-col transition-all"
-        style={{ background: card, border: `1px solid ${border}`, animation: 'detailModalIn 0.22s cubic-bezier(0.34,1.56,0.64,1)' }}
+        className={`relative w-full max-w-lg max-h-[92vh] overflow-hidden rounded-3xl shadow-2xl flex flex-col transition-all ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        style={{ background: card, border: `1px solid ${border}` }}
       >
         <style>{`
           @keyframes detailModalIn {
@@ -600,7 +717,7 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
           
           {/* Close Button on Banner */}
           <button
-            onClick={onClose}
+            onClick={() => handleClose()}
             className="absolute top-4 right-4 w-8 h-8 rounded-full border-none bg-black/40 text-white cursor-pointer flex items-center justify-center backdrop-blur-sm transition-all hover:bg-black/60"
           >
             <X size={16} />
@@ -636,7 +753,7 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
           {/* Description */}
           <div className="flex flex-col gap-1.5">
             <h4 className="text-[11px] font-black uppercase tracking-wider m-0" style={{ color: txtSec }}>About Event</h4>
-            <p className="text-[13px] leading-relaxed m-0 text-justify" style={{ color: tokens.dark ? '#cbd5e1' : '#475569' }}>
+            <p className="text-[13px] leading-relaxed m-0 text-justify" style={{ color: isDark ? '#cbd5e1' : '#475569' }}>
               {event.description || 'No detailed description available for this event.'}
             </p>
           </div>
@@ -667,7 +784,7 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
               <Clock size={16} className="mt-0.5 shrink-0" style={{ color: BRAND }} />
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-wider" style={{ color: txtSec }}>Time</div>
-                <div className="text-[12px] font-black mt-0.5" style={{ color: txt }}>{event.time}</div>
+                <div className="text-[12px] font-black mt-0.5" style={{ color: txt }}>{timeRange || event.time || 'TBD'}</div>
               </div>
             </div>
 
@@ -705,7 +822,7 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
           {/* Action Footer */}
           <div className="flex gap-3 pt-2">
             <button
-              onClick={onClose}
+              onClick={() => handleClose()}
               className="flex-1 py-2.5 rounded-xl font-bold text-xs border cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-800"
               style={{ background: 'transparent', color: txtSec, borderColor: border }}
             >
@@ -713,18 +830,28 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
             </button>
             {isEventFinished(event) ? (
               hasAttendance && hasAttendance(event) ? (
-                <button
-                  onClick={() => { onClose(); setFeedbackEvent(event) }}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
-                  style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
-                >
-                  Give Feedback
-                </button>
+                hasFeedback && hasFeedback(event) ? (
+                  <button
+                    onClick={() => handleClose(() => setFeedbackEvent(event))}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90"
+                    style={{ background: tokens?.dark ? '#162640' : '#f1f5f9', color: BRAND, border: `1px solid ${BRAND}40` }}
+                  >
+                    <Star size={13} /> See Feedback
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleClose(() => setFeedbackEvent(event))}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
+                    style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
+                  >
+                    <Star size={13} /> Give Feedback
+                  </button>
+                )
               ) : (
                 <button
                   disabled
                   className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-not-allowed flex items-center justify-center gap-1.5"
-                  style={{ background: tokens.hoverBg, color: tokens.txtMuted }}
+                  style={{ background: hoverBg, color: txtMuted }}
                   title="You must attend the event to give feedback"
                 >
                   <XCircle size={13} /> Not Attended
@@ -740,30 +867,35 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
             ) : event.registered ? (
               hasPendingPayment(event) ? (
                 <button
-                  onClick={() => {
-                    onClose()
-                    handleEventPayNow(event)
-                  }}
+                  onClick={() => handleClose(() => handleEventPayNow(event))}
                   className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
                   style={{ background: BRAND }}
                 >
                   <CreditCard size={13} /> Pay Now (₹{event.fees})
                 </button>
               ) : (
-                <button
-                  onClick={() => { onClose(); onCancelRegistration && onCancelRegistration(event) }}
-                  className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90"
-                  style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
-                >
-                  <XCircle size={13} /> Cancel Registration
-                </button>
+                <div className="flex-1 flex items-center gap-2">
+                  {(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) && (
+                    <button
+                      onClick={() => handleClose(() => onRegisterClick(event, 'team'))}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
+                      style={{ background: BRAND }}
+                    >
+                      <Users size={13} /> Register Team
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleClose(() => onCancelRegistration && onCancelRegistration(event))}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90"
+                    style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                  >
+                    <XCircle size={13} /> Cancel Registration
+                  </button>
+                </div>
               )
             ) : (
               <button
-                onClick={() => {
-                  onClose()
-                  onRegisterClick(event)
-                }}
+                onClick={() => handleClose(() => onRegisterClick(event))}
                 className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 hover:-translate-y-px"
                 style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
               >
@@ -927,18 +1059,27 @@ function CountdownTimer({ event, tokens }) {
   )
 }
 
-function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
+function FeedbackModal({ event, onClose, tokens, BRAND, showToast, onFeedbackChange }) {
+  const [isClosing, setIsClosing] = useState(false)
   const [rating, setRating] = useState(5)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
   const [myFeedback, setMyFeedback] = useState(null)
   const [allFeedbacks, setAllFeedbacks] = useState([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
 
-  const card = tokens.dark ? '#0c1829' : '#ffffff'
-  const border = tokens.dark ? '#1a3050' : '#e2e8f0'
-  const txt = tokens.dark ? '#e8f0fe' : '#0f172a'
-  const txtSec = tokens.dark ? '#7a98bb' : '#64748b'
+  const isDark = tokens?.dark ?? false
+  const card = tokens?.card || (isDark ? '#0c1829' : '#ffffff')
+  const border = tokens?.border || (isDark ? '#1a3050' : '#e2e8f0')
+  const txt = tokens?.txtPri || (isDark ? '#e8f0fe' : '#0f172a')
+  const txtSec = tokens?.txtSec || (isDark ? '#7a98bb' : '#64748b')
+
+  const handleClose = () => {
+    if (isClosing) return
+    setIsClosing(true)
+    setTimeout(onClose, 180)
+  }
 
   const loadFeedbackData = async () => {
     setLoading(true)
@@ -981,6 +1122,7 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
       const res = await studentService.submitFeedback(event.id, rating, comment)
       if (res.success) {
         showToast('Feedback submitted successfully! Thank you ❤️', 'success')
+        onFeedbackChange && onFeedbackChange(event.id, true)
         loadFeedbackData()
       } else {
         showToast(res.message || 'Failed to submit feedback.', 'error')
@@ -992,8 +1134,7 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
     }
   }
 
-  const handleDelete = async (feedbackId) => {
-    if (!confirm('Are you sure you want to delete your feedback?')) return
+  const executeDelete = async (feedbackId) => {
     setSubmitting(true)
     try {
       const res = await studentService.deleteFeedback(feedbackId)
@@ -1002,6 +1143,8 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
         setMyFeedback(null)
         setComment('')
         setRating(5)
+        onFeedbackChange && onFeedbackChange(event.id, false)
+        setShowDeleteConfirm(false)
         loadFeedbackData()
       } else {
         showToast(res.message || 'Failed to delete feedback.', 'error')
@@ -1015,10 +1158,10 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
 
   return createPortal(
     <div className="fixed inset-0 z-999 flex items-center justify-center px-4" style={{ fontFamily: 'Manrope, sans-serif' }}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+      <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`} onClick={handleClose} />
       <div
-        className="relative w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl flex flex-col transition-all max-h-[90vh]"
-        style={{ background: card, border: `1px solid ${border}`, animation: 'detailModalIn 0.22s cubic-bezier(0.34,1.56,0.64,1)' }}
+        className={`relative w-full max-w-lg overflow-hidden rounded-3xl shadow-2xl flex flex-col transition-all max-h-[90vh] ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        style={{ background: card, border: `1px solid ${border}` }}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-[#1a3050]">
@@ -1028,7 +1171,7 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
               {event.title}
             </span>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full border-none bg-transparent cursor-pointer flex items-center justify-center transition-all hover:bg-slate-100 dark:hover:bg-slate-800" style={{ color: txtSec }}>
+          <button onClick={handleClose} className="w-8 h-8 rounded-full border-none bg-transparent cursor-pointer flex items-center justify-center transition-all hover:bg-slate-100 dark:hover:bg-slate-800" style={{ color: txtSec }}>
             <X size={16} />
           </button>
         </div>
@@ -1051,7 +1194,7 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
                         ✓ Your Submitted Feedback
                       </span>
                       <button
-                        onClick={() => handleDelete(myFeedback.id || myFeedback.feedback_id)}
+                        onClick={() => setShowDeleteConfirm(true)}
                         disabled={submitting}
                         className="text-red-500 hover:text-red-600 bg-transparent border-none cursor-pointer flex items-center gap-1 text-xs font-bold transition-all disabled:opacity-50"
                       >
@@ -1173,13 +1316,24 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
         {/* Footer */}
         <div className="p-4 border-t border-slate-200 dark:border-[#1a3050] flex justify-end">
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="px-5 py-2 rounded-xl font-bold text-xs border cursor-pointer transition-all hover:bg-slate-100 dark:hover:bg-slate-800"
             style={{ background: 'transparent', color: txtSec, borderColor: border }}
           >
             Close
           </button>
         </div>
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteConfirm && (
+          <DeleteFeedbackConfirmModal
+            event={event}
+            tokens={tokens}
+            deleting={submitting}
+            onConfirm={() => executeDelete(myFeedback.id || myFeedback.feedback_id)}
+            onClose={() => setShowDeleteConfirm(false)}
+          />
+        )}
       </div>
     </div>,
     document.body
@@ -1187,30 +1341,30 @@ function FeedbackModal({ event, onClose, tokens, BRAND, showToast }) {
 }
 
 function CancelConfirmModal({ event, tokens, cancelling, onConfirm, onClose }) {
-  const card = tokens.dark ? '#0c1829' : '#ffffff'
-  const border = tokens.dark ? '#1a3050' : '#e2e8f0'
-  const txt = tokens.dark ? '#e8f0fe' : '#0f172a'
-  const txtSec = tokens.dark ? '#7a98bb' : '#64748b'
+  const [isClosing, setIsClosing] = useState(false)
+  const isDark = tokens?.dark ?? false
+  const card = tokens?.card || (isDark ? '#0c1829' : '#ffffff')
+  const border = tokens?.border || (isDark ? '#1a3050' : '#e2e8f0')
+  const txt = tokens?.txtPri || (isDark ? '#e8f0fe' : '#0f172a')
+  const txtSec = tokens?.txtSec || (isDark ? '#7a98bb' : '#64748b')
+
+  const handleClose = () => {
+    if (isClosing || cancelling) return
+    setIsClosing(true)
+    setTimeout(onClose, 180)
+  }
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4" style={{ fontFamily: 'Manrope, sans-serif' }}>
-      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={!cancelling ? onClose : undefined} />
+      <div className={`absolute inset-0 bg-black/70 backdrop-blur-sm ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`} onClick={() => handleClose()} />
 
       <div
-        className="relative w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden"
+        className={`relative w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         style={{
           background: card,
-          border: `1px solid ${border}`,
-          animation: 'cancelModalIn 0.2s cubic-bezier(0.34,1.56,0.64,1)'
+          border: `1px solid ${border}`
         }}
       >
-        <style>{`
-          @keyframes cancelModalIn {
-            from { opacity: 0; transform: scale(0.88) translateY(20px); }
-            to   { opacity: 1; transform: scale(1) translateY(0); }
-          }
-        `}</style>
-
         <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #ef4444, #f97316)' }} />
 
         <div className="p-6 flex flex-col items-center gap-4">
@@ -1228,6 +1382,15 @@ function CancelConfirmModal({ event, tokens, cancelling, onConfirm, onClose }) {
             </p>
           </div>
 
+          {Number(event.fees || event.fee || event.price || 0) > 0 || String(event.paymentStatus || event.payment_status || '').toLowerCase() === 'paid' ? (
+            <div
+              className="w-full px-4 py-2.5 rounded-xl text-[12px] font-semibold leading-relaxed"
+              style={{ background: 'rgba(59,130,246,0.08)', color: '#2563eb', border: '1px solid rgba(59,130,246,0.2)' }}
+            >
+              💳 Paid Event: Payment refund will be processed soon after cancellation.
+            </div>
+          ) : null}
+
           <div
             className="w-full px-4 py-3 rounded-xl text-[12px] font-semibold leading-relaxed"
             style={{ background: 'rgba(239,68,68,0.06)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }}
@@ -1237,7 +1400,7 @@ function CancelConfirmModal({ event, tokens, cancelling, onConfirm, onClose }) {
 
           <div className="flex gap-3 w-full mt-1">
             <button
-              onClick={onClose}
+              onClick={() => handleClose()}
               disabled={cancelling}
               className="flex-1 py-2.5 rounded-xl font-bold text-xs border cursor-pointer transition-all hover:opacity-80 disabled:opacity-40"
               style={{ background: 'transparent', color: txtSec, borderColor: border }}
@@ -1254,6 +1417,84 @@ function CancelConfirmModal({ event, tokens, cancelling, onConfirm, onClose }) {
                 <><Loader2 size={13} className="animate-spin" /> Cancelling...</>
               ) : (
                 <><XCircle size={13} /> Yes, Cancel It</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function DeleteFeedbackConfirmModal({ event, tokens, deleting, onConfirm, onClose }) {
+  const [isClosing, setIsClosing] = useState(false)
+  const isDark = tokens?.dark ?? false
+  const card = tokens?.card || (isDark ? '#0c1829' : '#ffffff')
+  const border = tokens?.border || (isDark ? '#1a3050' : '#e2e8f0')
+  const txt = tokens?.txtPri || (isDark ? '#e8f0fe' : '#0f172a')
+  const txtSec = tokens?.txtSec || (isDark ? '#7a98bb' : '#64748b')
+
+  const handleClose = () => {
+    if (isClosing || deleting) return
+    setIsClosing(true)
+    setTimeout(onClose, 180)
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center px-4" style={{ fontFamily: 'Manrope, sans-serif' }}>
+      <div className={`absolute inset-0 bg-black/70 backdrop-blur-sm ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`} onClick={() => handleClose()} />
+
+      <div
+        className={`relative w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
+        style={{
+          background: card,
+          border: `1px solid ${border}`
+        }}
+      >
+        <div className="h-1.5 w-full" style={{ background: 'linear-gradient(90deg, #ef4444, #f97316)' }} />
+
+        <div className="p-6 flex flex-col items-center gap-4 text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.1)' }}>
+            <Trash2 size={32} style={{ color: '#ef4444' }} />
+          </div>
+
+          <div>
+            <h3 className="text-lg font-black m-0 mb-1" style={{ color: txt }}>Delete Feedback?</h3>
+            <p className="text-[13px] font-medium m-0 leading-relaxed" style={{ color: txtSec }}>
+              Are you sure you want to delete your feedback for
+            </p>
+            <p className="text-[13px] font-extrabold mt-0.5 m-0" style={{ color: txt }}>
+              "{event?.title || event?.name}"
+            </p>
+          </div>
+
+          <div
+            className="w-full px-4 py-3 rounded-xl text-[12px] font-semibold leading-relaxed"
+            style={{ background: 'rgba(239,68,68,0.06)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.15)' }}
+          >
+            ⚠️ This action cannot be undone. Your review will be permanently removed.
+          </div>
+
+          <div className="flex gap-3 w-full mt-1">
+            <button
+              onClick={() => handleClose()}
+              disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl font-bold text-xs border cursor-pointer transition-all hover:opacity-80 disabled:opacity-40"
+              style={{ background: 'transparent', color: txtSec, borderColor: border }}
+            >
+              Keep Feedback
+            </button>
+            <button
+              onClick={onConfirm}
+              disabled={deleting}
+              className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 4px 14px rgba(239,68,68,0.35)' }}
+            >
+              {deleting ? (
+                <><Loader2 size={13} className="animate-spin" /> Deleting...</>
+              ) : (
+                <><Trash2 size={13} /> Yes, Delete</>
               )}
             </button>
           </div>

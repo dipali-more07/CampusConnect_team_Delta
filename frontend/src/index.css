@@ -90,6 +90,59 @@
   animation: tabSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* ── Universal Modal Enter & Exit Animations ── */
+@keyframes modalBackdropIn {
+  from { opacity: 0; backdrop-filter: blur(0px); }
+  to   { opacity: 1; backdrop-filter: blur(6px); }
+}
+
+@keyframes modalBackdropOut {
+  from { opacity: 1; backdrop-filter: blur(6px); }
+  to   { opacity: 0; backdrop-filter: blur(0px); }
+}
+
+@keyframes modalPopIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92) translateY(16px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
+@keyframes modalPopOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.92) translateY(12px);
+    filter: blur(4px);
+  }
+}
+
+.animate-backdrop-in {
+  animation: modalBackdropIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-backdrop-out {
+  animation: modalBackdropOut 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal-in {
+  animation: modalPopIn 0.24s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.animate-modal-out {
+  animation: modalPopOut 0.18s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
 /* ── Custom Sleek Scrollbar ── */
 ::-webkit-scrollbar {
   width: 6px;

@@ -36,14 +36,26 @@ export function getAccessToken() {
             break
           }
         }
-      } catch (_e) {}
+      } catch {
+        /* ignore */
+      }
     }
   }
   return (token || '').trim()
 }
 
 export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_KEY) || localStorage.getItem('refresh_token') || sessionStorage.getItem(REFRESH_KEY) || sessionStorage.getItem('refresh_token') || ''
+  return sessionStorage.getItem(REFRESH_KEY) || sessionStorage.getItem('refresh_token') || localStorage.getItem(REFRESH_KEY) || localStorage.getItem('refresh_token') || ''
+}
+
+// ── Listener system for reactive state sync ──────────────────────
+const tokenListeners = new Set()
+
+export function addTokenListener(listener) {
+  if (typeof listener === 'function') {
+    tokenListeners.add(listener)
+  }
+  return () => tokenListeners.delete(listener)
 }
 
 export function saveTokens(accessToken, refreshToken) {
@@ -60,15 +72,25 @@ export function saveTokens(accessToken, refreshToken) {
     } catch { /* ignore */ }
   }
   if (refreshToken) {
-    localStorage.setItem(REFRESH_KEY, refreshToken)
-    localStorage.setItem('refresh_token', refreshToken)
+    sessionStorage.setItem(REFRESH_KEY, refreshToken)
+    sessionStorage.setItem('refresh_token', refreshToken)
   }
+  // Notify listeners
+  tokenListeners.forEach(listener => {
+    try {
+      listener(accessToken, refreshToken)
+    } catch {
+      /* ignore */
+    }
+  })
 }
 
 export function clearTokens() {
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem('token')
   sessionStorage.removeItem(SESSION_KEY)
+  sessionStorage.removeItem(REFRESH_KEY)
+  sessionStorage.removeItem('refresh_token')
   localStorage.removeItem(REFRESH_KEY)
   localStorage.removeItem('refresh_token')
 }
@@ -76,89 +98,79 @@ export function clearTokens() {
 // ── Refresh token call ───────────────────────────────────────────
 let _refreshPromise = null // prevent multiple simultaneous refreshes
 
-async function doRefresh() {
-  const refreshToken = getRefreshToken()
-  if (!refreshToken) return null
+async function tryFetchToken(attempt, currentRefreshToken) {
+  try {
+    let res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: attempt.headers,
+      ...(attempt.body ? { body: attempt.body } : {})
+    })
 
-  // 1. Primary Swagger Spec: POST /auth/refresh with body { "refresh_token": "..." }
-  // 2. Alternative Authorization Header formats
-  const attempts = [
-    {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: refreshToken })
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${refreshToken}`,
-      },
-      body: JSON.stringify({ refresh_token: refreshToken })
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${refreshToken}`,
-      }
-    }
-  ]
-
-  for (const attempt of attempts) {
-    try {
-      let res = await fetch(`${API_BASE}/auth/refresh`, {
+    if (res.status === 307 || (!res.ok && res.status === 404)) {
+      res = await fetch(`${API_BASE}/auth/refresh/`, {
         method: 'POST',
         headers: attempt.headers,
         ...(attempt.body ? { body: attempt.body } : {})
       })
+    }
 
-      // Trailing slash 307 fallback
-      if (res.status === 307 || (!res.ok && res.status === 404)) {
-        res = await fetch(`${API_BASE}/auth/refresh/`, {
-          method: 'POST',
-          headers: attempt.headers,
-          ...(attempt.body ? { body: attempt.body } : {})
-        })
-      }
+    if (!res.ok) return null
+    const data = await res.json().catch(() => ({}))
+    const newAccessToken = data.data?.access_token || data.access_token || data.token || data.accessToken || data.data?.token || null
+    const newRefreshToken = data.data?.refresh_token || data.refresh_token || data.refreshToken || currentRefreshToken
 
-      if (res.ok) {
-        const data = await res.json().catch(() => ({}))
-        const newAccessToken =
-          data.data?.access_token ||
-          data.access_token ||
-          data.token ||
-          data.accessToken ||
-          data.data?.token ||
-          null
-
-        const newRefreshToken =
-          data.data?.refresh_token ||
-          data.refresh_token ||
-          data.refreshToken ||
-          refreshToken
-
-        if (newAccessToken) {
-          saveTokens(newAccessToken, newRefreshToken)
-          return newAccessToken
-        }
-      }
-    } catch (_err) {}
+    if (newAccessToken) {
+      saveTokens(newAccessToken, newRefreshToken)
+      return newAccessToken
+    }
+    return null
+  } catch {
+    return null
   }
-
-  return null
 }
 
-// ── Main fetch wrapper ───────────────────────────────────────────
-/**
- * fetchWithAuth(url, options)
- * Drop-in replacement for fetch() that:
- *   - Adds Authorization + Content-Type headers automatically
- *   - On 401: refreshes token and retries once
- *   - On refresh failure: clears session and redirects to /
- */
-import { encryptPayload, decryptPayload } from './payloadCrypto'
+export async function refreshAccessToken() {
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) return null
+  if (_refreshPromise) return _refreshPromise
 
-export { encryptPayload, decryptPayload }
+  _refreshPromise = (async () => {
+    const attempts = [
+      {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`,
+        },
+        body: JSON.stringify({ refresh_token: refreshToken })
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${refreshToken}`,
+        }
+      }
+    ]
+
+    for (const attempt of attempts) {
+      const token = await tryFetchToken(attempt, refreshToken)
+      if (token) return token
+    }
+    return null
+  })().finally(() => {
+    _refreshPromise = null
+  })
+
+  return _refreshPromise
+}
+
+export const doRefresh = refreshAccessToken
+
+// ── Main fetch wrapper ───────────────────────────────────────────
+export { encryptPayload, decryptPayload } from './payloadCrypto'
 
 export async function fetchWithAuth(url, options = {}) {
   const makeHeaders = (token) => ({
@@ -178,7 +190,9 @@ export async function fetchWithAuth(url, options = {}) {
       if (altRes.ok || altRes.status !== 404) {
         res = altRes
       }
-    } catch (_e) {}
+    } catch {
+      /* ignore */
+    }
   }
 
   // Not 401 — return as-is

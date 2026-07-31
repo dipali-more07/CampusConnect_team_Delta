@@ -20,6 +20,13 @@ export default function EventFormModal({
 }) {
   const [cropperOpen, setCropperOpen] = useState(false)
   const [rawBannerSrc, setRawBannerSrc] = useState(null)
+  const [isClosing, setIsClosing] = useState(false)
+
+  const handleClose = () => {
+    if (isClosing || submitting) return
+    setIsClosing(true)
+    setTimeout(onClose, 180)
+  }
 
   if (!open) return null
 
@@ -34,30 +41,24 @@ export default function EventFormModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-100 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5 animate-fadeIn"
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      className={`fixed inset-0 z-100 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5 ${isClosing ? 'animate-backdrop-out' : 'animate-backdrop-in'}`}
+      onClick={e => { if (e.target === e.currentTarget) handleClose() }}
     >
       <div
-        className="rounded-[24px] w-full max-w-[650px] overflow-hidden transition-all duration-300"
+        className={`rounded-[24px] w-full max-w-[650px] overflow-hidden transition-all duration-300 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
         style={{
           background: dark ? '#0c1829' : '#ffffff',
           border: `1px solid ${dark ? '#1a3050' : '#e8edf5'}`,
           boxShadow: '0 32px 80px rgba(0,0,0,0.45)',
-          animation: 'slideUp 0.25s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
-        <style>{`
-          @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-          @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        `}</style>
-
         {/* Modal Header */}
         <div className="flex items-center justify-between px-8 py-5" style={{ borderBottom: `1px solid ${dark ? '#1a3050' : '#e8edf5'}` }}>
           <h2 className="text-[19px] font-extrabold m-0" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-            {selectedEvent ? `Edit Event — ${selectedEvent.id}` : 'Create New Event'}
+            {selectedEvent ? `Edit Event — ${selectedEvent.name || selectedEvent.title || selectedEvent.event_name || formState.name || ''}` : 'Create New Event'}
           </h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="w-8 h-8 rounded-full border-none bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
             style={{ color: dark ? '#4a6a8a' : '#94a3b8' }}
             onMouseEnter={e => { e.currentTarget.style.background = dark ? '#162640' : '#f1f5f9'; e.currentTarget.style.color = dark ? '#e8f0fe' : '#475569' }}
@@ -373,18 +374,19 @@ export default function EventFormModal({
         {/* Modal Footer */}
         <div className="flex gap-4 px-8 py-5" style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e8edf5'}` }}>
           <button
-            onClick={() => onSaveEvent(true)}
+            type="button"
+            onClick={handleClose}
             disabled={submitting}
             className="flex-1 py-3 rounded-xl text-[13.5px] font-bold bg-transparent transition-all duration-150 border cursor-pointer"
             style={{ 
-              borderColor: dark ? '#1a3050' : '#e2e8f0', 
+              borderColor: dark ? '#1a3050' : '#cbd5e1', 
               color: dark ? '#cbd5e1' : '#475569',
               background: dark ? '#162640' : '#f8fafc' 
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.color = dark ? '#cbd5e1' : '#475569' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#cbd5e1'; e.currentTarget.style.color = dark ? '#cbd5e1' : '#475569' }}
           >
-            Save Draft
+            Cancel
           </button>
 
           <button

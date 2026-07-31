@@ -21,7 +21,7 @@ const MOCK_CERTS_KEY = 'campus_connect_mock_certificates'
 
 function getMockCerts() {
   const local = localStorage.getItem(MOCK_CERTS_KEY)
-  if (local) { try { return JSON.parse(local) } catch {} }
+  if (local) { try { return JSON.parse(local) } catch { /* ignore */ } }
   localStorage.setItem(MOCK_CERTS_KEY, JSON.stringify(defaultCertificates))
   return [...defaultCertificates]
 }
@@ -53,9 +53,9 @@ async function mockGenerate(eventIdOrList, userId) {
   const certs = getMockCerts()
   
   if (Array.isArray(eventIdOrList)) {
-    const idsToGen = eventIdOrList.map(item => item.id)
+    const idsToGen = new Set(eventIdOrList.map(item => item.id))
     const updated = certs.map(c =>
-      idsToGen.includes(c.id) && c.status === 'Pending'
+      idsToGen.has(c.id) && c.status === 'Pending'
         ? { ...c, status: 'Generated', issuedDate: new Date().toISOString().split('T')[0] }
         : c
     )
@@ -132,8 +132,8 @@ async function apiFetchAll() {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch certificates.' }
     return { success: true, certificates: data.certificates || [], stats: data.stats || {} }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -152,8 +152,8 @@ async function apiGenerate(eventIdOrList, userId) {
       )
       await Promise.all(promises)
       return { success: true, message: `Batch certificates processed.` }
-    } catch (err) {
-            return { success: false, message: 'Server error during batch generation.' }
+    } catch {
+      return { success: false, message: 'Server error during batch generation.' }
     }
   }
 
@@ -169,8 +169,8 @@ async function apiGenerate(eventIdOrList, userId) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to generate certificate.' }
     return { success: true, message: data.message || 'Certificate generated successfully.' }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -184,7 +184,7 @@ async function apiBulkGenerate(eventId) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to bulk generate.' }
     return { success: true, generated: data.generated, message: data.message }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -199,8 +199,8 @@ async function apiSend(ids) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to send certificates.' }
     return { success: true, sent: data.sent, message: data.message }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -213,9 +213,15 @@ async function apiRevoke(id) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to revoke certificate.' }
     return { success: true, message: data.message }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
+}
+
+function resolveValidity(data) {
+  if (data.valid !== undefined) return data.valid
+  if (data.data?.is_valid !== undefined) return data.data.is_valid
+  return true
 }
 
 async function apiVerify(verifyCode) {
@@ -223,13 +229,13 @@ async function apiVerify(verifyCode) {
     const res = await fetch(`${API_BASE}/certificates/verify/${verifyCode}`, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, valid: false, message: data.message || 'Verification failed.' }
-    
-    const valid = data.valid !== undefined ? data.valid : (data.data?.is_valid !== undefined ? data.data.is_valid : true)
+
+    const valid = resolveValidity(data)
     const certificate = data.certificate || data.data || data
-    
+
     return { success: true, valid, certificate }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -240,9 +246,15 @@ async function apiDownload(certificateNumber) {
     const blob = await res.blob()
     const url = URL.createObjectURL(blob)
     return { success: true, url, blob }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
+}
+
+function resolveTemplates(data) {
+  if (Array.isArray(data)) return data
+  if (data?.data) return Array.isArray(data.data) ? data.data : [data.data]
+  return []
 }
 
 async function apiFetchTemplates() {
@@ -250,10 +262,10 @@ async function apiFetchTemplates() {
     const res = await fetch(`${API_BASE}/certificates/templates`, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch templates.' }
-    const templates = Array.isArray(data) ? data : (data.data ? (Array.isArray(data.data) ? data.data : [data.data]) : [])
+    const templates = resolveTemplates(data)
     return { success: true, templates }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -267,8 +279,8 @@ async function apiSaveTemplate(templateData) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to save template.' }
     return { success: true, template: data.data || data }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -297,7 +309,7 @@ async function apiFetchMyPerformance() {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { success: false, data: null, message: data.message || 'Failed to fetch performance.' }
     return { success: true, data: data.data || data }
-  } catch (err) {
+  } catch {
     return { success: false, data: null, message: 'Server unreachable.' }
   }
 }
@@ -308,7 +320,7 @@ async function apiFetchUserPerformance(userId) {
     const data = await res.json().catch(() => ({}))
     if (!res.ok) return { success: false, data: null, message: data.message || 'Failed to fetch performance.' }
     return { success: true, data: data.data || data }
-  } catch (err) {
+  } catch {
     return { success: false, data: null, message: 'Server unreachable.' }
   }
 }

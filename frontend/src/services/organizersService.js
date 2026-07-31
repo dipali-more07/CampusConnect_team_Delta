@@ -5,14 +5,6 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 import defaultOrganizers from '../data/organizers.json'
 
-function authHeaders() {
-  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  }
-}
-
 function parseJSON(res) {
   return res.json().catch(() => ({}))
 }
@@ -25,7 +17,9 @@ function getMock() {
   if (local) {
     try {
       return JSON.parse(local)
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
   localStorage.setItem(MOCK_KEY, JSON.stringify(defaultOrganizers))
   return [...defaultOrganizers]
@@ -47,11 +41,16 @@ async function mockCreate(data) {
   const organizers = getMock()
   const id = `ORG${String(organizers.length + 1).padStart(3, '0')}`
   const COLORS = ['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#7c3aed', '#e11d48', '#16a34a']
+
+  const randomBuf = new Uint32Array(1)
+  crypto.getRandomValues(randomBuf)
+  const avatarColor = COLORS[randomBuf[0] % COLORS.length]
+
   const newOrg = {
     id,
     ...data,
     eventsManaged: 0,
-    avatarColor: COLORS[Math.floor(Math.random() * COLORS.length)],
+    avatarColor,
   }
   organizers.push(newOrg)
   saveMock(organizers)
@@ -100,17 +99,23 @@ function mapOrganizer(o) {
   }
 }
 
+function resolveOrganizersList(data) {
+  if (Array.isArray(data.data)) return data.data
+  if (Array.isArray(data.organizers)) return data.organizers
+  return []
+}
+
 /* ── REAL API HANDLERS ─────────────────────────────────────────── */
 async function apiFetchAll() {
   try {
     const res = await fetchWithAuth(`${API_BASE}/users/organizers`, { method: 'GET' })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch organizers.' }
-    const orgsArray = Array.isArray(data.data) ? data.data : Array.isArray(data.organizers) ? data.organizers : []
+    const orgsArray = resolveOrganizersList(data)
     const mapped = orgsArray.map(o => mapOrganizer(o))
     return { success: true, organizers: mapped }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -133,8 +138,8 @@ async function apiCreate(payload) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to create organizer.' }
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer) }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -156,8 +161,8 @@ async function apiUpdate(id, payload) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to update organizer.' }
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer) }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -169,8 +174,8 @@ async function apiDelete(id) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to delete organizer.' }
     return { success: true }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -182,7 +187,9 @@ async function mockGetProfile() {
     try {
       const s = JSON.parse(sessionRaw)
       if (s?.user?.email) email = s.user.email
-    } catch {}
+    } catch {
+      /* ignore */
+    }
   }
   const organizers = getMock()
   const currentOrg = organizers.find(o => o.email.toLowerCase() === email.toLowerCase()) || organizers[0]
@@ -199,7 +206,7 @@ async function apiGetProfile() {
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch organizer profile.' }
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer) }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -248,7 +255,7 @@ async function apiUpdateProfile(payload) {
     if (!res.ok) return { success: false, message: data.message || 'Failed to update profile.' }
     const rawOrganizer = data.data || data.organizer || data
     return { success: true, organizer: mapOrganizer(rawOrganizer), message: 'Profile updated successfully.' }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }

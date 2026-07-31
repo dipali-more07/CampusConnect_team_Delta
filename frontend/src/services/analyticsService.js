@@ -170,7 +170,7 @@ async function apiFetchStats() {
       minAttendance = 0
     }
 
-    const avgAttendance = attendanceEventsCount > 0 ? (totalAttendancePercentSum / attendanceEventsCount) : 85
+    const avgAttendance = attendanceEventsCount > 0 ? (totalAttendancePercentSum / attendanceEventsCount) : 0
     const engagementScore = Math.min(100, Math.round(avgAttendance))
     const totalRegs = eventStats.reduce((sum, es) => sum + es.regCount, 0)
     
