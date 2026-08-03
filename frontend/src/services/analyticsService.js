@@ -344,28 +344,45 @@ async function apiFetchRecentActivity() {
   }
 }
 
-async function mockFetchGrowth() {
+async function mockFetchGrowth(year = 2026) {
   await new Promise(r => setTimeout(r, 200))
   const mockData = []
+  
+  // Vary ranges based on the selected year so the graph visually changes
+  let regMin = 5, regMaxDiff = 15, attMin = 70, attMaxDiff = 20
+  if (year === 2025) {
+    regMin = 3
+    regMaxDiff = 10
+    attMin = 60
+    attMaxDiff = 20
+  } else if (year === 2024) {
+    regMin = 1
+    regMaxDiff = 6
+    attMin = 45
+    attMaxDiff = 25
+  }
+
   for (let i = 29; i >= 0; i--) {
     const d = new Date()
+    d.setFullYear(year)
     d.setDate(d.getDate() - i)
     const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     mockData.push({
       date: d.toISOString().split('T')[0],
       events_count: Math.floor(Math.random() * 2),
-      registrations_count: Math.floor(Math.random() * 15) + 5,
+      registrations_count: Math.floor(Math.random() * regMaxDiff) + regMin,
       month: dateStr,
-      registrations: Math.floor(Math.random() * 15) + 5,
-      attendance: Math.floor(Math.random() * 20) + 70
+      registrations: Math.floor(Math.random() * regMaxDiff) + regMin,
+      attendance: Math.floor(Math.random() * attMaxDiff) + attMin
     })
   }
   return { success: true, data: mockData }
 }
 
-async function apiFetchGrowth() {
+async function apiFetchGrowth(year) {
   try {
-    const res = await fetchWithAuth(`${API_BASE}/analytics/growth`)
+    const query = year ? `?year=${year}` : `?year=${new Date().getFullYear()}`
+    const res = await fetchWithAuth(`${API_BASE}/analytics/growth${query}`)
     const data = await parseJSON(res)
     if (!res.ok) {
       return { success: false, data: [], message: 'Failed to fetch growth data.' }
@@ -399,8 +416,8 @@ const analyticsService = {
   fetchEventAnalytics: (eventId) =>
     USE_MOCK ? mockFetchEventAnalytics(eventId) : apiFetchEventAnalytics(eventId),
 
-  fetchGrowth: () =>
-    USE_MOCK ? mockFetchGrowth() : apiFetchGrowth(),
+  fetchGrowth: (year) =>
+    USE_MOCK ? mockFetchGrowth(year) : apiFetchGrowth(year),
 }
 
 export default analyticsService

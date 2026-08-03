@@ -33,6 +33,8 @@ export default function EventsPage({ tokens: inputTokens }) {
   const [feedbackEvent, setFeedbackEvent] = useState(null)
   const [cancelConfirmEvent, setCancelConfirmEvent] = useState(null)
   const [cancellingEventId, setCancellingEventId] = useState(null)
+  // Event Full popup
+  const [eventFullPopup, setEventFullPopup] = useState(null)
   // Set of event IDs where this student has marked attendance (present)
   const [attendedEventIds, setAttendedEventIds] = useState(new Set())
   // Set of event IDs for which this student has already submitted feedback
@@ -291,8 +293,26 @@ export default function EventsPage({ tokens: inputTokens }) {
 
   const [initialRegType, setInitialRegType] = useState('individual')
 
+  // ── Check if event has reached capacity ──
+  const isEventFull = (event) => {
+    const capacity = Number(event.capacity || event.max_capacity || event.max_participants || 0)
+    if (!capacity) return false // no limit set
+    const filled = Number(
+      event.current_participants ??
+      event.registrations_count ??
+      event.registered_count ??
+      event.participants_count ??
+      0
+    )
+    return filled >= capacity
+  }
+
   const handleRegisterClick = (event, type = 'individual') => {
     if (isDeadlinePassed(event)) return
+    if (isEventFull(event)) {
+      setEventFullPopup(event)
+      return
+    }
     setSelectedEvent(event)
     setInitialRegType(type)
   }
@@ -575,6 +595,14 @@ export default function EventsPage({ tokens: inputTokens }) {
                       </button>
                     </div>
                   )
+                ) : isEventFull(event) ? (
+                  <button
+                    onClick={() => setEventFullPopup(event)}
+                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90"
+                    style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316', border: '1px solid rgba(249,115,22,0.25)' }}
+                  >
+                    <Users size={14} /> Event Full
+                  </button>
                 ) : (
                   <button
                     onClick={() => handleRegisterClick(event)}
@@ -598,6 +626,77 @@ export default function EventsPage({ tokens: inputTokens }) {
           onClose={() => { setSelectedEvent(null); setInitialRegType('individual') }}
           onSuccess={handleRegistrationSuccess}
         />
+      )}
+
+      {/* ── EVENT FULL POPUP ── */}
+      {eventFullPopup && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
+          style={{ animation: 'efp-fadeIn 0.2s ease' }}
+        >
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setEventFullPopup(null)}
+          />
+
+          {/* Modal card */}
+          <div
+            className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 text-center"
+            style={{ animation: 'efp-slideUp 0.25s cubic-bezier(0.16,1,0.3,1)' }}
+          >
+            {/* Icon */}
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+              style={{ background: 'rgba(249,115,22,0.12)' }}
+            >
+              <Users size={30} style={{ color: '#f97316' }} />
+            </div>
+
+            {/* Title */}
+            <h2 className="text-xl font-black text-slate-900 mb-2">
+              Event is Full!
+            </h2>
+
+            {/* Event name */}
+            <p className="text-sm font-bold text-slate-700 mb-1">
+              {eventFullPopup.title || eventFullPopup.name}
+            </p>
+
+            {/* Capacity info */}
+            <p className="text-sm text-slate-500 leading-relaxed mb-7">
+              This event has reached its maximum capacity of{' '}
+              <span className="font-bold text-slate-700">
+                {eventFullPopup.capacity || eventFullPopup.max_capacity || eventFullPopup.max_participants}
+              </span>{' '}
+              participants. Registration is no longer available.
+            </p>
+
+            {/* OK button */}
+            <button
+              onClick={() => setEventFullPopup(null)}
+              className="w-full py-3 rounded-xl text-sm font-bold text-white cursor-pointer transition-all hover:-translate-y-0.5 border-none"
+              style={{
+                background: 'linear-gradient(135deg, #f97316, #ea580c)',
+                boxShadow: '0 4px 18px rgba(249,115,22,0.35)',
+              }}
+            >
+              Got it
+            </button>
+          </div>
+
+          <style>{`
+            @keyframes efp-fadeIn {
+              from { opacity: 0; }
+              to   { opacity: 1; }
+            }
+            @keyframes efp-slideUp {
+              from { opacity: 0; transform: translateY(24px) scale(0.95); }
+              to   { opacity: 1; transform: translateY(0)    scale(1); }
+            }
+          `}</style>
+        </div>,
+        document.body
       )}
 
       {/* Event Details Modal */}

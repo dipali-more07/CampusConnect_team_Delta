@@ -146,6 +146,39 @@ async function mockForgotPassword(email) {
   return { success: true, message: `Password reset link sent to ${email}` }
 }
 
+/* ── MOCK RESET PASSWORD ─────────────────────────────────── */
+async function mockResetPassword(token, newPassword, confirmPassword) {
+  await new Promise(r => setTimeout(r, 900))
+  if (!token) return { success: false, message: 'Invalid or expired reset token.' }
+  if (newPassword !== confirmPassword) return { success: false, message: 'Passwords do not match.' }
+  return { success: true, message: 'Password reset successfully! You can now log in.' }
+}
+
+/* ── REAL API RESET PASSWORD ─────────────────────────────── */
+async function apiResetPassword(token, newPassword, confirmPassword) {
+  try {
+    const res = await fetch(`${API_BASE}/auth/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        new_password: newPassword,
+        confirm_password: confirmPassword,
+      }),
+    })
+
+    const data = await res.json()
+
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Password reset failed.' }
+    }
+
+    return { success: true, message: data.message || 'Password reset successfully!' }
+  } catch {
+    return { success: false, message: 'Unable to reach server. Check your connection.' }
+  }
+}
+
 function determineRole(rawRole, email) {
   const norm = (rawRole || '').toString().toLowerCase()
   if (['admin', 'superadmin', 'super_admin'].includes(norm)) return 'admin'
@@ -195,7 +228,31 @@ async function apiLogin(email, password) {
 
     const data = await res.json()
 
+    // ── Handle unverified email ──
+    // Check both: explicit requires_verification flag OR message keywords (backend fallback)
     if (!res.ok || data.success === false) {
+      const msg = (data.message || '').toLowerCase()
+
+      const requiresVerification =
+        data.data?.requires_verification === true ||
+        data.requires_verification === true ||
+        msg.includes('verify your email') ||
+        msg.includes('email not verified') ||
+        msg.includes('not verified') ||
+        msg.includes('verification code has been sent') ||
+        msg.includes('please verify')
+
+      if (requiresVerification) {
+        return {
+          success: false,
+          message: data.message || 'Email not verified. A verification code has been sent to your email.',
+          requires_verification: true,
+          data: {
+            requires_verification: true,
+            email: data.data?.email || email,
+          },
+        }
+      }
       return { success: false, message: data.message || 'Login failed.' }
     }
 
@@ -387,6 +444,11 @@ const authService = {
 
   forgotPassword: (email) =>
     USE_MOCK ? mockForgotPassword(email) : apiForgotPassword(email),
+
+  resetPassword: (token, newPassword, confirmPassword) =>
+    USE_MOCK
+      ? mockResetPassword(token, newPassword, confirmPassword)
+      : apiResetPassword(token, newPassword, confirmPassword),
 
   verifyEmail: (email, code) => apiVerifyEmail(email, code),
 

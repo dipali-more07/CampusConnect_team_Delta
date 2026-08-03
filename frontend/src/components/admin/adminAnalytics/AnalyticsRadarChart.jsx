@@ -54,7 +54,7 @@ export default function AnalyticsRadarChart({
               const outerPt = getRadarPoint(angle, 100)
               return (
                 <line
-                  key={i}
+                  key={d.axis || `axis-line-${i}`}
                   x1={cx}
                   y1={cy}
                   x2={outerPt.x}
@@ -88,7 +88,7 @@ export default function AnalyticsRadarChart({
               const angle = i * (Math.PI / 3)
               const textPt = getRadarPoint(angle, 112)
 
-              let textAnchor = 'middle'
+              let textAnchor
               let dy = '0.35em'
 
               if (i === 0) {
@@ -105,7 +105,7 @@ export default function AnalyticsRadarChart({
 
               return (
                 <text
-                  key={i}
+                  key={d.axis || `axis-text-${i}`}
                   x={textPt.x}
                   y={textPt.y}
                   textAnchor={textAnchor}
