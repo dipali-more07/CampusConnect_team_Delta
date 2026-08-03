@@ -235,9 +235,13 @@ class CertificateService:
         if not event:
             raise NotFoundException(f"Event {event_id} not found")
 
-        # Check event has completed
+        # Check event has completed or end_datetime has passed (with 6 hour buffer)
         from app.core.constants import EventStatus
-        if event.end_datetime and event.end_datetime > datetime.utcnow() and event.status != EventStatus.COMPLETED:
+        from datetime import timedelta
+        is_completed = (event.status == EventStatus.COMPLETED)
+        has_ended = bool(event.end_datetime and event.end_datetime <= (datetime.utcnow() + timedelta(hours=6)))
+
+        if not is_completed and not has_ended:
             raise BadRequestException("Certificates cannot be issued before the event has completed")
 
         # Check user attended
@@ -340,10 +344,6 @@ class CertificateService:
         if not event:
             raise NotFoundException(f"Event {event_id} not found")
 
-        # Check if certificates have already been generated for this event to prevent multiple runs
-        if self.cert_repo.count_by_event(event_id) > 0:
-            raise ConflictException("Certificates have already been generated for this event")
-
         # Get all attendees
         attendances = self.attendance_repo.get_by_event(event_id, skip=0, limit=10000)
 
@@ -355,8 +355,10 @@ class CertificateService:
                     try:
                         cert = await self.generate_certificate(event_id, registration.user_id)
                         generated.append(cert)
-                    except ConflictException:
-                        # Skip if certificate already exists
+                    except (ConflictException, BadRequestException):
+                        # Skip if certificate already exists or cannot be generated for this user
+                        pass
+                    except Exception:
                         pass
 
         return generated
