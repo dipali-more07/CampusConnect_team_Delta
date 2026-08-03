@@ -78,7 +78,8 @@ class AuthService:
           Using one transaction: either BOTH save or NEITHER saves
         """
         # Step 1: Check for duplicate email
-        if self.user_repo.email_exists(data.email):
+        existing_user = self.user_repo.get_by_email(data.email)
+        if existing_user:
             raise ConflictException(f"Email '{data.email}' is already registered")
 
         # Step 1.5: Validate college exists
@@ -115,7 +116,6 @@ class AuthService:
         # Step 2: Hash the password
         password_hash = hash_password(data.password)
 
-        # Step 3: Create the User object (not yet in DB)
         from app.core.constants import Gender
         gender_enum = None
         if data.gender:
@@ -127,6 +127,12 @@ class AuthService:
                 except ValueError:
                     gender_enum = None
 
+        import random
+        from datetime import datetime, timedelta
+        verification_otp = f"{random.randint(100000, 999999)}"
+        otp_expiry = datetime.utcnow() + timedelta(minutes=15)
+
+        # Step 3: Create new User object
         new_user = User(
             email=data.email,
             password_hash=password_hash,
@@ -139,51 +145,42 @@ class AuthService:
             department=data.department,
             college_name=college.college_name,
             gender=gender_enum.value if gender_enum else (str(data.gender) if data.gender else None),
+            verification_code=verification_otp,
+            verification_code_expires_at=otp_expiry,
         )
-
-        # Step 4: Save User to DB (flush sends SQL but doesn't commit yet)
         self.user_repo.create(new_user)
+        self.db.flush()
 
-        # Step 5: Create empty UserProfile linked to the User
-        new_profile = UserProfile(
+        # Step 4: Create UserProfile linked to this User
+        profile = UserProfile(
             user_id=new_user.user_id,
             college_id=college.college_id,
             full_name=data.full_name,
             phone=data.phone,
-            course=data.course,
             department=data.department,
+            course=data.course,
             gender=gender_enum,
             year_of_study=data.year_of_study,
         )
-        self.profile_repo.create(new_profile)
+        self.profile_repo.create(profile)
 
-        # Step 6: Commit both records at once
-        # If anything above failed, we'd never reach this line
-        # and SQLAlchemy would rollback automatically
-        import random
-        from datetime import datetime, timedelta
-        verification_otp = f"{random.randint(100000, 999999)}"
-        new_user.verification_code = verification_otp
-        new_user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
-
+        # Step 5: Save everything to DB
         self.db.commit()
+        self.db.refresh(new_user)
 
-        # Step 7: Send OTP email
-        await email_service.send_verification_otp(data.email, verification_otp)
+        # Step 6: Send verification OTP code via email
+        await email_service.send_verification_otp(new_user.email, verification_otp)
 
         return new_user
 
     def login(self, data: LoginRequest) -> dict:
         """
-        Log in a user and return JWT tokens.
-
-        Returns dict with: access_token, refresh_token, expires_in
+        Authenticate user and return access & refresh tokens.
+        If user's email is unverified, auto-resends a fresh 6-digit OTP code.
         """
         # Step 1: Find user by email
         user = self.user_repo.get_by_email(data.email)
         if user is None:
-            # Don't say 'email not found' - that leaks info to hackers
-            # Always say 'Invalid credentials'
             raise UnauthorizedException("Invalid email or password")
 
         # Step 2: Verify password
@@ -195,7 +192,26 @@ class AuthService:
             raise UnauthorizedException("Your account has been deactivated. Contact admin.")
 
         if not user.is_email_verified:
-            raise UnauthorizedException("Please verify your email before logging in.")
+            import random
+            from datetime import datetime, timedelta
+            verification_otp = f"{random.randint(100000, 999999)}"
+            user.verification_code = verification_otp
+            user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
+            self.db.commit()
+
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(email_service.send_verification_otp(user.email, verification_otp))
+                else:
+                    asyncio.run(email_service.send_verification_otp(user.email, verification_otp))
+            except Exception:
+                pass
+
+            raise UnauthorizedException(
+                f"Please verify your email before logging in. A new 6-digit verification code has been sent to {user.email}."
+            )
 
         # Step 4: Generate JWT access token
         # 'sub' (subject) is the standard JWT field for user identifier
