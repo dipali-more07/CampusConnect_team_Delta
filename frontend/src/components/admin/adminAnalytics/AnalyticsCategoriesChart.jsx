@@ -72,7 +72,7 @@ export default function AnalyticsCategoriesChart({
             const xLabel = item.name || item.month || ''
 
             return (
-              <div key={idx} className="flex-1 flex flex-col items-center h-full justify-end relative">
+              <div key={item.id || item.name || item.month || `cat-${idx}`} className="flex-1 flex flex-col items-center h-full justify-end relative">
                 {/* Double bars */}
                 <div className="flex items-end gap-1.5">
                   <div

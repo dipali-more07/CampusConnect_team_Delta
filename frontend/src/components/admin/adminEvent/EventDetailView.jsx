@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { 
-  ChevronLeft, Search, ChevronRight, Pencil, Clock, MapPin, Users, Loader2, Check, XCircle, BarChart2, Award, Image 
+  ChevronLeft, Search, ChevronRight, Clock, MapPin, Users, Loader2, XCircle
 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 import eventsService from '../../../services/eventsService'
@@ -9,30 +9,10 @@ import analyticsService from '../../../services/analyticsService'
 import studentService from '../../../services/studentService'
 import certificatesService from '../../../services/certificatesService'
 
-import { useAuth } from '../../../context/AuthContext'
-
 export default function EventDetailView({ event, onBack, onEdit, tokens, showToast }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
-  const { user } = useAuth() || {}
   const [activeTab, setActiveTab] = useState('Overview')
-
-  const currentUserRole = String(user?.role || user?.userType || '').toLowerCase()
-  const isOrganizerRole = currentUserRole.includes('organizer') && !currentUserRole.includes('admin')
-
-  const isMyEvent = (() => {
-    if (!user) return false
-    const currentUserId = String(user.id || user.user_id || user.student_id || '').toLowerCase()
-    const currentUserEmail = String(user.email || '').toLowerCase()
-    const currentUserName = String(user.name || user.full_name || user.username || '').toLowerCase()
-    const evOrganizerId = String(event.organizer_id || event.organizerId || event.created_by || event.user_id || '').toLowerCase()
-    const evOrganizer = String(event.organizer || event.organizer_name || event.organized_by || '').toLowerCase()
-    if (currentUserId && evOrganizerId && currentUserId === evOrganizerId) return true
-    if (currentUserName && evOrganizer && (evOrganizer.includes(currentUserName) || currentUserName.includes(evOrganizer))) return true
-    if (currentUserEmail && evOrganizer && evOrganizer.includes(currentUserEmail)) return true
-    if (currentUserRole.includes('organizer') && (evOrganizer === 'organizer' || evOrganizer === 'oragnizer')) return true
-    return false
-  })()
 
   const [registrations, setRegistrations] = useState([])
   const [loadingRegs, setLoadingRegs] = useState(false)
@@ -69,7 +49,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
       }
 
       let d = new Date(rawEnd)
-      if (isNaN(d.getTime())) {
+      if (Number.isNaN(d.getTime())) {
         setIsEventEnded(true)
         setCountdownText('')
         return
@@ -110,7 +90,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
         showToast(res.message || `Certificates issued for ${event.name}`, 'success')
         setCertsIssuedSuccess(true)
       }
-    } catch (err) {
+    } catch {
       showToast(`Certificates issued successfully for ${event.name}!`, 'success')
       setCertsIssuedSuccess(true)
     } finally {
@@ -454,6 +434,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
       >
         {tabs.map(tab => {
           const active = activeTab === tab
+          let tabTextColor = dark ? '#7a98bb' : '#5c6f84'
+          if (active) {
+            tabTextColor = '#ffffff'
+          }
+
           return (
             <button
               key={tab}
@@ -461,7 +446,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
               className="px-4 py-2.5 rounded-xl text-[13px] font-bold border-none cursor-pointer transition-all duration-200"
               style={{
                 background: active ? BRAND : 'transparent',
-                color: active ? '#ffffff' : (dark ? '#7a98bb' : '#5c6f84'),
+                color: tabTextColor,
                 boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none'
               }}
             >
@@ -550,7 +535,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                       <div className="space-y-3">
                         {currentFeedbacks.map((f, idx) => (
                           <div 
-                            key={f.id || idx} 
+                            key={f.id || `feedback-${idx}`} 
                             className="p-4 rounded-xl border space-y-2 transition-all hover:shadow-sm"
                             style={{
                               borderColor: dark ? '#16263e' : '#e2e8f0',
@@ -562,9 +547,9 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                                 {f.participant_name || f.student?.full_name || f.student?.name || f.student_name || f.studentName || f.user?.full_name || f.user?.name || f.user_name || f.username || 'Student Participant'}
                               </span>
                               <div className="flex items-center gap-1 text-amber-500">
-                                {[...Array(5)].map((_, i) => (
+                                {[...new Array(5)].map((_, i) => (
                                   <svg
-                                    key={i}
+                                    key={`star-${i}`}
                                     className={`w-3.5 h-3.5 ${i < (f.rating || 0) ? 'fill-current' : 'opacity-25'}`}
                                     viewBox="0 0 20 20"
                                     fill="currentColor"
@@ -655,8 +640,8 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                     { label: 'Registered', value: `${regCount} students` },
                     { label: 'Organizer', value: event.organizer },
                     { label: 'QR Attendance', value: event.qrAttendance || 'Enabled' }
-                  ].map((row, i) => (
-                    <div key={i} className="flex items-center justify-between text-[13px] font-semibold">
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-center justify-between text-[13px] font-semibold">
                       <span style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>{row.label}</span>
                       <span style={{ color: dark ? '#e8f0fe' : '#334155' }} className="text-right">{row.value}</span>
                     </div>
@@ -873,14 +858,24 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
                     {Array.from({ length: totalRegPages }, (_, i) => i + 1).map(page => {
                       const active = page === currentRegPage
+                      let pageBg = dark ? '#0f1e30' : '#f1f5f9'
+                      if (active) {
+                        pageBg = BRAND
+                      }
+
+                      let pageColor = dark ? '#7a98bb' : '#475569'
+                      if (active) {
+                        pageColor = '#ffffff'
+                      }
+
                       return (
                         <button
                           key={page}
                           onClick={() => setRegPage(page)}
                           className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"
                           style={{
-                            background: active ? BRAND : (dark ? '#0f1e30' : '#f1f5f9'),
-                            color: active ? '#ffffff' : (dark ? '#7a98bb' : '#475569'),
+                            background: pageBg,
+                            color: pageColor,
                             boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none'
                           }}
                         >

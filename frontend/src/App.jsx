@@ -7,6 +7,7 @@ import LoginPage from './pages/LoginPage'
 import AdminDashboard from './pages/Admin/AdminDashboard'
 import StudentDashboard from './pages/Student/StudentDashboard'
 import OrganizerDashboard from './pages/Organizer/OrganizerDashboard'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 
 function getEffectiveRole(user) {
   const r = (user?.role || user?.userType || user?.user_type || '').toLowerCase()
@@ -67,6 +68,9 @@ function AppRouter() {
 
   return (
     <Routes>
+      {/* Public: Reset Password (must be before login redirect) */}
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+
       <Route
         path="/login"
         element={

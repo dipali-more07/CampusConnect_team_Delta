@@ -3,9 +3,9 @@ import { User, Mail, Phone, GraduationCap, Lock, Eye, EyeOff } from 'lucide-reac
 import { useToast } from '../context/ToastContext'
 import authService from '../services/authService'
 
-export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
+export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOnlyEmail }) {
   const [name, setName] = useState('')
-  const [email, setEmail] = useState(() => localStorage.getItem('pendingVerificationEmail') || '')
+  const [email, setEmail] = useState(() => verifyOnlyEmail || localStorage.getItem('pendingVerificationEmail') || '')
   const [mobile, setMobile] = useState('')
   const [college, setCollege] = useState('')
   const [course, setCourse] = useState('')
@@ -19,7 +19,9 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
   const [errors, setErrors] = useState({})
 
   // Verification popup states
-  const [showVerifyModal, setShowVerifyModal] = useState(() => !!localStorage.getItem('pendingVerificationEmail'))
+  const [showVerifyModal, setShowVerifyModal] = useState(
+    () => !!verifyOnlyEmail || !!localStorage.getItem('pendingVerificationEmail')
+  )
   const [verificationCode, setVerificationCode] = useState('')
   const [registerLoading, setRegisterLoading] = useState(false)
   const [verifyLoading, setVerifyLoading] = useState(false)
@@ -27,6 +29,14 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
   const [resendLoading, setResendLoading] = useState(false)
 
   const showToast = useToast()
+
+  // When verifyOnlyEmail changes (e.g. triggered from login page), open OTP modal
+  useEffect(() => {
+    if (verifyOnlyEmail) {
+      setEmail(verifyOnlyEmail)
+      setShowVerifyModal(true)
+    }
+  }, [verifyOnlyEmail])
 
   // Countdown timer for resending OTP code
   useEffect(() => {
@@ -152,6 +162,117 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
     }
   }
 
+  // ── When triggered from login (unverified email), show ONLY the OTP modal — no form behind ──
+  if (verifyOnlyEmail) {
+    return (
+      <>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/45 backdrop-blur-sm" />
+
+          {/* Modal */}
+          <div
+            className="relative z-10 bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8"
+            style={{ animation: 'modalIn .25s ease-out', border: '1px solid #e2e8f0' }}
+          >
+            <h2 className="text-xl font-black text-slate-900 mb-2">Verify your email</h2>
+            <p className="text-sm text-slate-500 mb-6 leading-relaxed">
+              A new verification code has been sent to your email address.
+            </p>
+
+            <form onSubmit={handleVerifyEmail} className="flex flex-col gap-5">
+              {/* Email (read-only) */}
+              <div>
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  disabled
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 bg-slate-100/80 text-sm text-slate-500 font-semibold cursor-not-allowed"
+                />
+              </div>
+
+              {/* OTP Code */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                  Verification Code
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter code"
+                  value={verificationCode}
+                  onChange={e => setVerificationCode(e.target.value)}
+                  required
+                  autoFocus
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/15 transition font-semibold"
+                />
+              </div>
+
+              {/* Resend */}
+              <div className="flex justify-between items-center text-xs mt-1">
+                <span className="text-slate-500">Didn&apos;t receive the code?</span>
+                <button
+                  type="button"
+                  onClick={handleResendCode}
+                  disabled={resendCountdown > 0 || resendLoading}
+                  className={`font-bold transition-colors cursor-pointer border-none bg-transparent outline-none p-0 ${
+                    resendCountdown > 0 || resendLoading
+                      ? 'text-slate-400 cursor-not-allowed'
+                      : 'text-indigo-600 hover:text-indigo-800 hover:underline'
+                  }`}
+                >
+                  {resendLoading ? 'Sending…' : resendCountdown > 0 ? `Resend Code (${resendCountdown}s)` : 'Resend Code'}
+                </button>
+              </div>
+
+              {/* Submit */}
+              <button
+                type="submit"
+                disabled={verifyLoading}
+                className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+                style={{
+                  background: verifyLoading ? '#a5b4fc' : 'linear-gradient(90deg,#4f46e5,#6d28d9)',
+                  boxShadow: verifyLoading ? 'none' : '0 4px 14px rgba(99,102,241,0.35)',
+                }}
+              >
+                {verifyLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="white" strokeWidth="4" />
+                      <path className="opacity-75" fill="white" d="M4 12a8 8 0 018-8v8z" />
+                    </svg>
+                    Verifying…
+                  </>
+                ) : 'Verify Email'}
+              </button>
+
+              {/* Back to login */}
+              <button
+                type="button"
+                onClick={() => {
+                  localStorage.removeItem('pendingVerificationEmail')
+                  if (onSwitchToSignIn) onSwitchToSignIn()
+                }}
+                className="text-sm text-slate-500 hover:text-slate-700 text-center transition-colors border-none bg-transparent cursor-pointer font-bold"
+              >
+                ← Back to Sign In
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <style>{`
+          @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.92) translateY(16px); }
+            to   { opacity: 1; transform: scale(1)    translateY(0); }
+          }
+        `}</style>
+      </>
+    )
+  }
+
   return (
     <>
       {/* Heading */}
@@ -255,15 +376,25 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
             </label>
             <div className="relative">
               <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="e.g. B.Tech"
+              <select
                 value={course}
                 onChange={e => setCourse(e.target.value)}
                 required
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
-              />
+                className="w-full pl-10 pr-8 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
+              >
+                <option value="" disabled>Select Course</option>
+                <option value="B.TECH">B.TECH</option>
+                <option value="M.TECH">M.TECH</option>
+                <option value="BCA">BCA</option>
+                <option value="MCA">MCA</option>
+                <option value="B.SC">B.SC</option>
+                <option value="M.SC">M.SC</option>
+                <option value="BBA">BBA</option>
+                <option value="MBA">MBA</option>
+                <option value="PH.D">PH.D</option>
+              </select>
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
             </div>
           </div>
 
@@ -274,15 +405,26 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
             </label>
             <div className="relative">
               <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="e.g. CSE"
+              <select
                 value={department}
                 onChange={e => setDepartment(e.target.value)}
                 required
-                className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
-              />
+                className="w-full pl-10 pr-8 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
+              >
+                <option value="" disabled>Select Department</option>
+                <option value="CSE">CSE</option>
+                <option value="ECE">ECE</option>
+                <option value="IT">IT</option>
+                <option value="ME">ME</option>
+                <option value="CE">CE</option>
+                <option value="EE">EE</option>
+                <option value="AIDS">AIDS</option>
+                <option value="MCA">MCA</option>
+                <option value="MBA">MBA</option>
+                <option value="SCIENCE">SCIENCE</option>
+              </select>
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
             </div>
           </div>
         </div>
@@ -322,18 +464,23 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess }) {
             <label className="text-xs font-semibold text-slate-600 mb-1 block">
               Year of Study
             </label>
-            <input
-              type="number"
-              placeholder="e.g. 1"
-              value={yearOfStudy}
-              onChange={e => { const v = Math.max(1, Math.min(6, parseInt(e.target.value, 10) || 1)); setYearOfStudy(v) }}
-              required
-              min="1"
-              max="6"
-              className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 placeholder-slate-400
-              focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition"
-            />
+            <div className="relative">
+              <select
+                value={yearOfStudy}
+                onChange={e => setYearOfStudy(Number(e.target.value))}
+                required
+                className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white
+                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
+              >
+                {[1, 2, 3, 4, 5, 6].map(y => (
+                  <option key={y} value={y}>Year {y}</option>
+                ))}
+              </select>
+              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
+            </div>
           </div>
+
+
         </div>
 
         {/* Password */}

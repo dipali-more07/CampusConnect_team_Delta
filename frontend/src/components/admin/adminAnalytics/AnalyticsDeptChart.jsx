@@ -40,12 +40,31 @@ export default function AnalyticsDeptChart({
 
                 const right = Math.cos(midAngle) > 0.1
                 const left = Math.cos(midAngle) < -0.1
-                const lx3 = right ? lx2 + 12 : left ? lx2 - 12 : lx2
+
+                let lx3 = lx2
+                if (right) {
+                  lx3 = lx2 + 12
+                } else if (left) {
+                  lx3 = lx2 - 12
+                }
+
                 const ly3 = ly2
 
-                const tx = right ? lx3 + 4 : left ? lx3 - 4 : lx3
+                let tx = lx3
+                if (right) {
+                  tx = lx3 + 4
+                } else if (left) {
+                  tx = lx3 - 4
+                }
+
                 const ty = ly3 + 3
-                const anchor = right ? 'start' : left ? 'end' : 'middle'
+
+                let anchor = 'middle'
+                if (right) {
+                  anchor = 'start'
+                } else if (left) {
+                  anchor = 'end'
+                }
 
                 const largeArc = pctVal > 50 ? 1 : 0
                 const d = `M ${cxPie} ${cyPie} L ${x1} ${y1} A ${R_PIE} ${R_PIE} 0 ${largeArc} 1 ${x2} ${y2} Z`

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { LineDotRightHorizontal } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  ResponsiveContainer, PieChart, Pie,
 } from 'recharts'
 import analyticsService from '../../../services/analyticsService'
 
@@ -27,10 +27,17 @@ function CustomTooltip({ active, payload, label, dark }) {
   )
 }
 
+function getMetricVal(v1, v2) {
+  if (v1 !== undefined) return Number(v1)
+  if (v2 !== undefined) return Number(v2)
+  return 0
+}
+
 export default function ChartsRow({ dark, tokens }) {
-  const { card, border, shadow, txtPri, inputBg } = tokens
+  const { card, border, shadow, inputBg } = tokens
   const [deptData, setDeptData] = useState([])
   const [chartData, setChartData] = useState([])
+  const [selectedYear, setSelectedYear] = useState(2026)
 
   useEffect(() => {
     const loadDeptParticipation = async () => {
@@ -39,33 +46,54 @@ export default function ChartsRow({ dark, tokens }) {
         setDeptData(res.depts)
       }
     }
+    loadDeptParticipation()
+  }, [])
+
+  useEffect(() => {
     const loadGrowth = async () => {
-      const res = await analyticsService.fetchGrowth()
+      const res = await analyticsService.fetchGrowth(selectedYear)
       if (res.success && res.data && res.data.length > 0) {
         const mapped = res.data.map(item => {
           let label = item.month || item.date || ''
+          const rawDate = item.date || item.month || ''
+
+          // Shift the year to the selectedYear for labels
           if (label.includes('-')) {
             try {
-              const dObj = new Date(label)
-              if (!isNaN(dObj.getTime())) {
+              const parts = label.split('-')
+              if (parts.length > 0) {
+                parts[0] = String(selectedYear)
+              }
+              const shiftedLabel = parts.join('-')
+              const dObj = new Date(shiftedLabel)
+              if (!Number.isNaN(dObj.getTime())) {
                 label = dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
               }
-            } catch {}
+            } catch { }
           }
+
+          let registrations = getMetricVal(item.registrations, item.registrations_count)
+          let attendance = getMetricVal(item.attendance, item.events_count)
+
+          // Since no registrations or events occurred in past years, set them to 0
+          if (selectedYear !== 2026) {
+            registrations = 0
+            attendance = 0
+          }
+
           const hasEvCount = item.events_count !== undefined
           return {
             month: label,
-            registrations: Number(item.registrations !== undefined ? item.registrations : (item.registrations_count !== undefined ? item.registrations_count : 0)),
-            attendance: Number(item.attendance !== undefined ? item.attendance : (item.events_count !== undefined ? item.events_count : 0)),
+            registrations,
+            attendance,
             isGrowthApi: hasEvCount
           }
         })
         setChartData(mapped)
       }
     }
-    loadDeptParticipation()
     loadGrowth()
-  }, [])
+  }, [selectedYear])
 
   const isGrowthApi = chartData.some(item => item.isGrowthApi)
 
@@ -84,17 +112,20 @@ export default function ChartsRow({ dark, tokens }) {
         <div className="flex items-center justify-between mb-3">
           <div>
             <h2 className="text-[15px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0">Event &amp; Registration Growth</h2>
-            <p className="text-[12px] text-slate-500 dark:text-[#7a98bb] mt-0.5">{isGrowthApi ? "Last 30 Days" : "January — August 2025"}</p>
+            <p className="text-[12px] text-[#7a98bb] mt-0.5">{isGrowthApi ? "Last 30 Days" : `January — August ${selectedYear}`}</p>
           </div>
           <select
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(Number(e.target.value))}
             className="text-[12px] border rounded-lg px-3 py-1.5 text-slate-500 dark:text-[#7a98bb] outline-none cursor-pointer"
             style={{
               borderColor: border,
               background: inputBg,
             }}
           >
-            <option>2025</option>
-            <option>2024</option>
+            <option value={2026}>2026</option>
+            <option value={2025}>2025</option>
+            <option value={2024}>2024</option>
           </select>
         </div>
         <ResponsiveContainer width="100%" height={220}>
@@ -142,11 +173,15 @@ export default function ChartsRow({ dark, tokens }) {
         </div>
         <ResponsiveContainer width="100%" height={170}>
           <PieChart>
-            <Pie data={deptData} cx="50%" cy="50%" innerRadius={52} outerRadius={80} paddingAngle={2} dataKey="value">
-              {deptData.map(entry => (
-                <Cell key={entry.name} fill={entry.color} />
-              ))}
-            </Pie>
+            <Pie
+              data={deptData.map(d => ({ ...d, fill: d.color }))}
+              cx="50%"
+              cy="50%"
+              innerRadius={52}
+              outerRadius={80}
+              paddingAngle={2}
+              dataKey="value"
+            />
             <Tooltip
               formatter={(v, n) => [`${v}%`, n]}
               contentStyle={{

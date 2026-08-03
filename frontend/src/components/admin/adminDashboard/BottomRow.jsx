@@ -38,6 +38,20 @@ const formatTime = (ts) => {
   }
 }
 
+const formatTo12Hr = (timeStr) => {
+  if (!timeStr) return ''
+  if (/[a-zA-Z]/.test(timeStr)) return timeStr
+  const parts = timeStr.split(':')
+  if (parts.length < 2) return timeStr
+  let hours = parseInt(parts[0], 10)
+  const minutes = parts[1].trim()
+  if (isNaN(hours)) return timeStr
+  const ampm = hours >= 12 ? 'PM' : 'AM'
+  hours = hours % 12
+  hours = hours ? hours : 12
+  return `${hours}:${minutes} ${ampm}`
+}
+
 export default function BottomRow({ dark }) {
   const [activities, setActivities] = useState([])
   const [upcomingEvents, setUpcomingEvents] = useState([])
@@ -141,7 +155,7 @@ export default function BottomRow({ dark }) {
                         <MapPin size={10} /> {ev.venue}
                       </span>
                       <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
-                        <Clock size={10} /> {ev.time}
+                        <Clock size={10} /> {formatTo12Hr(ev.time)}
                       </span>
                     </div>
                   </div>

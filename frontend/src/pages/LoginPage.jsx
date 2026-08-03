@@ -185,6 +185,9 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(() => !!localStorage.getItem('pendingVerificationEmail'))
   const [logoHover, setLogoHover] = useState(false)
 
+  // Verification modal triggered from login (unverified email)
+  const [verifyModalEmail, setVerifyModalEmail] = useState('')
+
   // Forgot password modal
   const [forgotOpen, setForgotOpen] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
@@ -222,6 +225,18 @@ export default function LoginPage() {
         login(result.user, result.token, result.refreshToken)
         const userName = result.user?.name || result.user?.fullName || result.user?.email || 'User'
         showToast(`Logged in successfully! Welcome, ${userName}.`, 'success')
+      } else if (result.data?.requires_verification || result.requires_verification) {
+        // ── Backend returned: email not verified, fresh OTP sent ──
+        const unverifiedEmail = result.data?.email || result.email || email
+        // Set localStorage FIRST — SignUpForm's useState initializer will read it on mount
+        localStorage.setItem('pendingVerificationEmail', unverifiedEmail)
+        // Switch to SignUp view — SignUpForm mounts fresh and auto-opens OTP modal
+        setVerifyModalEmail(unverifiedEmail)
+        setIsSignUp(true)
+        showToast(
+          result.message || 'Email not verified. A verification code has been sent to your email.',
+          'warning'
+        )
       } else {
         showToast(result.message || 'Login failed. Please try again.', 'error')
       }
@@ -396,11 +411,14 @@ export default function LoginPage() {
               >
                 {isSignUp ? (
                   <SignUpForm
-                    onSwitchToSignIn={() => setIsSignUp(false)}
+                    key={`signup-${verifyModalEmail}`}
+                    onSwitchToSignIn={() => { setIsSignUp(false); setVerifyModalEmail('') }}
+                    verifyOnlyEmail={verifyModalEmail || undefined}
                     onSignUpSuccess={(newEmail) => {
                       setEmail(newEmail)
                       setPassword('')
                       setIsSignUp(false)
+                      setVerifyModalEmail('')
                     }}
                   />
                 ) : (
