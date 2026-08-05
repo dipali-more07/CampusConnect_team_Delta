@@ -1,0 +1,27 @@
+name: CampusConnect Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/github_actions_cc
+          chmod 600 ~/.ssh/github_actions_cc
+          ssh-keyscan -H ${{ secrets.JUMP_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy Application
+        run: |
+          ssh -i ~/.ssh/github_actions_cc \
+          ${{ secrets.JUMP_USER }}@${{ secrets.JUMP_HOST }} \
+          "bash ~/deploy-jump.sh"
