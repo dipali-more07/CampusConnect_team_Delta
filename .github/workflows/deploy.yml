@@ -1,4 +1,4 @@
-name: CampusConnect Deployment
+name: CampusConnect Deployment Script
 
 on:
   push:
