@@ -1,11 +1,34 @@
-"""
-app/schemas/auth.py
-Authentication request and response schemas.
-"""
 import re
+import base64
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.core.constants import UserRole, Gender
 from typing import Optional
+
+
+def decode_btoa_email(v: any) -> any:
+    """Decodes base64 (btoa) encoded email if sent from frontend."""
+    if isinstance(v, str):
+        if "@" in v:
+            return v
+        try:
+            decoded = base64.b64decode(v).decode("utf-8")
+            if "@" in decoded:
+                return decoded
+        except Exception:
+            pass
+    return v
+
+
+def decode_btoa_password(v: any) -> any:
+    """Decodes base64 (btoa) encoded password if sent from frontend."""
+    if isinstance(v, str):
+        try:
+            decoded = base64.b64decode(v).decode("utf-8")
+            if base64.b64encode(decoded.encode("utf-8")).decode("utf-8") == v.strip():
+                return decoded
+        except Exception:
+            pass
+    return v
 
 
 class RegisterRequest(BaseModel):
@@ -20,6 +43,16 @@ class RegisterRequest(BaseModel):
     college_id: str = Field(..., description="College identifier UUID")
     gender: Optional[Gender] = Field(None, description="Gender (male, female, other, prefer_not_to_say)")
     year_of_study: Optional[int] = Field(None, ge=1, le=5, description="Year of study (1-5)")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
+    @field_validator("password", "confirm_password", mode="before")
+    @classmethod
+    def validate_btoa_passwords(cls, v: any) -> any:
+        return decode_btoa_password(v)
 
     @field_validator("gender", mode="before")
     @classmethod
@@ -78,6 +111,16 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def validate_btoa_password(cls, v: any) -> any:
+        return decode_btoa_password(v)
+
 
 class TokenResponse(BaseModel):
     """Response after successful login."""
@@ -94,11 +137,21 @@ class RefreshTokenRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
     confirm_password: str
+
+    @field_validator("new_password", "confirm_password", mode="before")
+    @classmethod
+    def validate_btoa_passwords(cls, v: any) -> any:
+        return decode_btoa_password(v)
 
     @field_validator("new_password")
     @classmethod
@@ -124,6 +177,11 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
     confirm_password: str
 
+    @field_validator("current_password", "new_password", "confirm_password", mode="before")
+    @classmethod
+    def validate_btoa_passwords(cls, v: any) -> any:
+        return decode_btoa_password(v)
+
     @field_validator("new_password")
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
@@ -147,7 +205,17 @@ class VerifyEmailRequest(BaseModel):
     email: EmailStr
     code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
 
 class ResendCodeRequest(BaseModel):
     email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
 
