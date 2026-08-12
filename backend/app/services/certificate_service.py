@@ -163,7 +163,7 @@ class CertificateService:
         elements.append(Paragraph(user_name, name_style))
         elements.append(Spacer(1, 10))
 
-        # Participation text
+        # Achievement / Participation body text
         body_style = ParagraphStyle(
             name="Body",
             fontSize=body_font_size,
@@ -171,7 +171,18 @@ class CertificateService:
             alignment=TA_CENTER,
             spaceAfter=10,
         )
-        elements.append(Paragraph("has successfully participated in", body_style))
+        
+        achievement_text = "has successfully participated in"
+        if "Winner (1st Place)" in certificate_title or "winner_1st" in certificate_title:
+            achievement_text = "has achieved <b>1st Place (Winner)</b> in"
+        elif "Runner-Up (2nd Place)" in certificate_title or "runner_up_2nd" in certificate_title:
+            achievement_text = "has achieved <b>2nd Place (Runner-Up)</b> in"
+        elif "3rd Place" in certificate_title or "runner_up_3rd" in certificate_title:
+            achievement_text = "has achieved <b>3rd Place (Second Runner-Up)</b> in"
+        elif "Merit" in certificate_title:
+            achievement_text = "has achieved a position of <b>Merit</b> in"
+
+        elements.append(Paragraph(achievement_text, body_style))
         elements.append(Paragraph(f"<b>{event_title}</b>", name_style))
         elements.append(Paragraph(f"held on {event_date}", body_style))
         elements.append(Spacer(1, 20))

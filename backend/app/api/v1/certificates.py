@@ -14,17 +14,78 @@ from app.models.user import User
 router = APIRouter()
 
 
-def _cert_to_dict(cert) -> dict:
+def _cert_to_dict(cert, db: Session = None) -> dict:
+    cert_type = getattr(cert, "certificate_type", "participation") or "participation"
+    cert_title = "Certificate of Participation"
+    rank = None
+
+    if cert_type in ["winner_1st", "winner", "first_place"]:
+        cert_title = "Certificate of Winner (1st Place)"
+        rank = 1
+    elif cert_type in ["runner_up_2nd", "runner_up", "second_place"]:
+        cert_title = "Certificate of Runner-Up (2nd Place)"
+        rank = 2
+    elif cert_type in ["runner_up_3rd", "third_place"]:
+        cert_title = "Certificate of Second Runner-Up (3rd Place)"
+        rank = 3
+    elif cert_type.startswith("merit"):
+        cert_title = "Certificate of Merit"
+
+    # Query Result table dynamically if DB session is available
+    if db and cert.event_id and cert.user_id:
+        try:
+            from app.models.result import Result
+            from sqlalchemy import select
+            res = db.execute(
+                select(Result).where(
+                    Result.event_id == cert.event_id,
+                    Result.participant_id == cert.user_id
+                )
+            ).scalar_one_or_none()
+            if not res and getattr(cert, "registration", None) and cert.registration.team_id:
+                res = db.execute(
+                    select(Result).where(
+                        Result.event_id == cert.event_id,
+                        Result.team_id == cert.registration.team_id
+                    )
+                ).scalar_one_or_none()
+            if res and res.rank:
+                rank = res.rank
+                if res.rank == 1:
+                    cert_title = "Certificate of Winner (1st Place)"
+                    cert_type = "winner_1st"
+                elif res.rank == 2:
+                    cert_title = "Certificate of Runner-Up (2nd Place)"
+                    cert_type = "runner_up_2nd"
+                elif res.rank == 3:
+                    cert_title = "Certificate of Second Runner-Up (3rd Place)"
+                    cert_type = "runner_up_3rd"
+                else:
+                    cert_title = f"Certificate of Merit (Rank {res.rank})"
+                    cert_type = f"merit_{res.rank}"
+        except Exception:
+            pass
+
+    event_dt = None
+    if cert.event:
+        if getattr(cert.event, "event_date", None):
+            event_dt = cert.event.event_date.isoformat()
+        elif getattr(cert.event, "start_datetime", None):
+            event_dt = cert.event.start_datetime.date().isoformat()
+
     return {
         "certificate_id": cert.certificate_id,
         "event_id": cert.event_id,
         "user_id": cert.user_id,
         "certificate_number": cert.certificate_number,
         "pdf_path": cert.pdf_path,
-        "generated_at": cert.generated_at.isoformat(),
+        "generated_at": cert.generated_at.isoformat() if cert.generated_at else None,
         "event_name": cert.event.title if cert.event else None,
         "title": cert.event.title if cert.event else None,
-        "event_date": cert.event.event_date.isoformat() if cert.event and cert.event.event_date else (cert.event.start_datetime.date().isoformat() if cert.event else None),
+        "certificate_title": cert_title,
+        "certificate_type": cert_type,
+        "rank": rank,
+        "event_date": event_dt,
         "certificate_url": cert.certificate_url,
     }
 
@@ -66,7 +127,7 @@ def my_certificates(
     certs, total = service.get_user_certificates(current_user.user_id, page=page, size=size)
     return paginated_response(
         message="Your certificates",
-        data=[_cert_to_dict(c) for c in certs],
+        data=[_cert_to_dict(c, db=db) for c in certs],
         total=total, page=page, size=size
     )
 
