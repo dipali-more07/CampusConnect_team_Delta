@@ -8,27 +8,31 @@ FALLBACK PATTERN:
   the service falls back to console logging to facilitate local development.
 """
 import logging
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from typing import Optional, List
-# pyrefly: ignore [missing-import]
-from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Connection Configuration for fastapi-mail
-# fastapi-mail parses configurations automatically.
-# We build this configuration globally.
-mail_config = ConnectionConfig(
-    MAIL_USERNAME=settings.MAIL_USERNAME,
-    MAIL_PASSWORD=settings.MAIL_PASSWORD,
-    MAIL_FROM=settings.MAIL_FROM,
-    MAIL_PORT=settings.MAIL_PORT,
-    MAIL_SERVER=settings.MAIL_SERVER,
-    MAIL_STARTTLS=settings.MAIL_STARTTLS,
-    MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
-    USE_CREDENTIALS=False,
-    VALIDATE_CERTS=True,
-)
+try:
+    from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+    HAS_FASTAPI_MAIL = True
+    mail_config = ConnectionConfig(
+        MAIL_USERNAME=settings.MAIL_USERNAME,
+        MAIL_PASSWORD=settings.MAIL_PASSWORD,
+        MAIL_FROM=settings.MAIL_FROM,
+        MAIL_PORT=settings.MAIL_PORT,
+        MAIL_SERVER=settings.MAIL_SERVER,
+        MAIL_STARTTLS=settings.MAIL_STARTTLS,
+        MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
+        USE_CREDENTIALS=bool(settings.MAIL_USERNAME and settings.MAIL_PASSWORD),
+        VALIDATE_CERTS=True,
+    )
+except ImportError:
+    HAS_FASTAPI_MAIL = False
+    mail_config = None
 
 
 class EmailService:
@@ -153,16 +157,49 @@ class EmailService:
             )
             return True
 
+        if HAS_FASTAPI_MAIL and mail_config:
+            try:
+                message = MessageSchema(
+                    subject=subject,
+                    recipients=[email],
+                    body=html_body or body,
+                    subtype=MessageType.html if html_body else MessageType.plain,
+                )
+                fm = FastMail(mail_config)
+                await fm.send_message(message)
+                logger.info(f"✅ Email successfully sent to {email} with subject: '{subject}'")
+                return True
+            except Exception as e:
+                logger.warning(f"fastapi_mail failed, attempting standard smtplib fallback: {e}")
+
+        # Standard Library smtplib fallback (Built-in Python)
         try:
-            message = MessageSchema(
-                subject=subject,
-                recipients=[email],
-                body=html_body or body,
-                subtype=MessageType.html if html_body else MessageType.plain,
-            )
-            fm = FastMail(mail_config)
-            await fm.send_message(message)
-            logger.info(f"✅ Email successfully sent to {email} with subject: '{subject}'")
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
+            msg["To"] = email
+
+            msg.attach(MIMEText(body, "plain"))
+            if html_body:
+                msg.attach(MIMEText(html_body, "html"))
+
+            server_host = settings.MAIL_SERVER or "smtp.gmail.com"
+            server_port = settings.MAIL_PORT or 587
+
+            if settings.MAIL_SSL_TLS:
+                with smtplib.SMTP_SSL(server_host, server_port, timeout=10) as server:
+                    if settings.MAIL_USERNAME and settings.MAIL_PASSWORD:
+                        server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+                    server.sendmail(msg["From"], [email], msg.as_string())
+            else:
+                with smtplib.SMTP(server_host, server_port, timeout=10) as server:
+                    if settings.MAIL_STARTTLS:
+                        server.starttls()
+                    if settings.MAIL_USERNAME and settings.MAIL_PASSWORD:
+                        server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+                    server.sendmail(msg["From"], [email], msg.as_string())
+
+            logger.info(f"✅ Email successfully sent via smtplib to {email} with subject: '{subject}'")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to send email to {email} (Subject: '{subject}'): {e}", exc_info=True)

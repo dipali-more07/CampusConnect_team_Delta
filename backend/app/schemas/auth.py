@@ -254,3 +254,4 @@ class ResendCodeRequest(BaseModel):
     @classmethod
     def validate_btoa_email(cls, v: any) -> any:
         return decode_btoa_email(v)
+
