@@ -396,7 +396,7 @@ class CertificateService:
 
         # Count certificates by type (Participation, Merit/Winner, Excellence, etc.)
         participation_certs = sum(1 for c in certs if getattr(c, 'certificate_type', 'participation') == 'participation')
-        merit_certs = sum(1 for c in certs if getattr(c, 'certificate_type', 'participation') in ['merit', 'winner', 'first_place', 'second_place', 'third_place'])
+        merit_certs = sum(1 for c in certs if getattr(c, 'certificate_type', 'participation') in ['merit', 'winner', 'first_place', 'second_place', 'third_place', 'winner_1st', 'runner_up_2nd', 'runner_up_3rd'])
         excellence_certs = sum(1 for c in certs if getattr(c, 'certificate_type', 'participation') == 'excellence')
 
         # Total attendance count
