@@ -83,6 +83,7 @@ class EventCategory(str, Enum):
 class RegistrationStatus(str, Enum):
     """Status of a student's event registration."""
     CONFIRMED = "confirmed"   # Registration confirmed
+    PENDING = "pending"       # Registration pending (awaiting payment)
     CANCELLED = "cancelled"   # Student cancelled
     WAITLISTED = "waitlisted" # Event full, student on waiting list
     ATTENDED = "attended"     # Student actually showed up
@@ -120,6 +121,16 @@ class NotificationType(str, Enum):
     CERTIFICATE = "certificate"   # About certificate
     SYSTEM = "system"             # System announcements
     REMINDER = "reminder"         # Event reminders
+
+
+# ---------------------------------------------------------------
+# PARTICIPATION TYPE
+# ---------------------------------------------------------------
+class ParticipationType(str, Enum):
+    """How users can participate in the event."""
+    TEAM = "team"
+    INDIVIDUAL = "individual"
+    BOTH = "both"
 
 
 # ---------------------------------------------------------------

@@ -15,6 +15,19 @@ from app.models.user import User
 router = APIRouter()
 
 
+@router.get("/public-stats", summary="Public platform statistics for login/landing pages (Unauthenticated)")
+def public_platform_stats(
+    db: Session = Depends(get_db),
+):
+    """
+    Returns real-time public stats (events count, students count, certificates count)
+    for display on login/landing pages without requiring user authentication.
+    """
+    service = AnalyticsService(db)
+    stats = service.get_public_stats()
+    return success_response(message="Public platform statistics", data=stats)
+
+
 @router.get("/platform", summary="Platform-wide statistics (Admin only)")
 def platform_stats(
     admin: User = Depends(require_admin),
@@ -80,3 +93,106 @@ def popular_events(
         message="Popular events",
         data=[e.model_dump() for e in events]
     )
+
+
+@router.get("/department-participation", summary="Department participation stats")
+def department_participation(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_department_participation()
+    return success_response(message="Department participation stats", data=data)
+
+
+@router.get("/upcoming-events-chart", summary="Upcoming events chart stats")
+def upcoming_events_chart(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_upcoming_events_chart()
+    return success_response(message="Upcoming events chart stats", data=data)
+
+
+@router.get("/recent-activity", summary="Recent platform activity log")
+def recent_activity(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_recent_activity()
+    return success_response(message="Recent activity log", data=data)
+
+
+@router.get("/live-attendance", summary="Live attendance for ongoing events")
+def live_attendance(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_live_attendance()
+    return success_response(message="Live attendance stats", data=data)
+
+
+@router.get("/department-attendance", summary="Present check-ins by department")
+def department_attendance(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_department_attendance()
+    return success_response(message="Department attendance stats", data=data)
+
+
+@router.get("/hourly-attendance", summary="Peak check-in hour distribution")
+def hourly_attendance(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_hourly_attendance()
+    return success_response(message="Hourly attendance stats", data=data)
+
+
+@router.get("/engagement-radar", summary="Student engagement radar metrics")
+def engagement_radar(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_engagement_radar()
+    return success_response(message="Engagement radar stats", data=data)
+
+
+@router.get("/categories-breakdown", summary="Event counts by category")
+def categories_breakdown(
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_categories_breakdown()
+    return success_response(message="Event categories breakdown", data=data)
+
+
+@router.get("/department-distribution", summary="User department distribution")
+def department_distribution(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AnalyticsService(db)
+    data = service.get_department_distribution()
+    return success_response(message="Department user distribution", data=data)
+
+
+@router.get("/growth", summary="Event and Registration growth stats (last 30 days)")
+def growth_stats(
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    """
+    Returns daily count of events created and registrations made in the last 30 days.
+    Used for dashboard analytics (line charts/growth comparison).
+    """
+    service = AnalyticsService(db)
+    data = service.get_growth_stats()
+    return success_response(message="Growth statistics fetched", data=data)

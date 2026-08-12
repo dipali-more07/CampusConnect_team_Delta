@@ -27,6 +27,7 @@ AUTH FLOW:
     6. Update last_login timestamp
     7. Return tokens
 """
+from typing import Optional
 import secrets
 from datetime import datetime
 from sqlalchemy.orm import Session
@@ -77,52 +78,109 @@ class AuthService:
           Using one transaction: either BOTH save or NEITHER saves
         """
         # Step 1: Check for duplicate email
-        if self.user_repo.email_exists(data.email):
+        existing_user = self.user_repo.get_by_email(data.email)
+        if existing_user:
             raise ConflictException(f"Email '{data.email}' is already registered")
+
+        # Step 1.5: Validate college exists
+        from app.repositories.college_repository import CollegeRepository
+        import uuid
+        college_repo = CollegeRepository(self.db)
+        
+        college = None
+        is_uuid = False
+        try:
+            uuid.UUID(data.college_id)
+            is_uuid = True
+        except ValueError:
+            pass
+
+        if is_uuid:
+            college = college_repo.get_by_id(data.college_id)
+            
+        if not college:
+            college = college_repo.get_by_name(data.college_id)
+            
+        if not college:
+            if not is_uuid:
+                from app.models.college import College
+                college = College(
+                    college_name=data.college_id,
+                    is_verified=False
+                )
+                college_repo.create(college)
+                self.db.flush()
+            else:
+                raise NotFoundException(f"College with ID '{data.college_id}' not found")
 
         # Step 2: Hash the password
         password_hash = hash_password(data.password)
 
-        # Step 3: Create the User object (not yet in DB)
+        from app.core.constants import Gender
+        gender_enum = None
+        if data.gender:
+            if isinstance(data.gender, Gender):
+                gender_enum = data.gender
+            else:
+                try:
+                    gender_enum = Gender(str(data.gender).lower())
+                except ValueError:
+                    gender_enum = None
+
+        import random
+        from datetime import datetime, timedelta
+        verification_otp = f"{random.randint(100000, 999999)}"
+        otp_expiry = datetime.utcnow() + timedelta(minutes=15)
+
+        # Step 3: Create new User object
         new_user = User(
             email=data.email,
             password_hash=password_hash,
             role=UserRole.PARTICIPANT,
             is_active=True,
-            is_email_verified=False,  # Must verify email
+            is_email_verified=False,  # Set to False so user must verify via OTP
+            full_name=data.full_name,
+            mobile=data.phone,
+            course=data.course,
+            department=data.department,
+            college_name=college.college_name,
+            gender=gender_enum.value if gender_enum else (str(data.gender) if data.gender else None),
+            verification_code=verification_otp,
+            verification_code_expires_at=otp_expiry,
         )
-
-        # Step 4: Save User to DB (flush sends SQL but doesn't commit yet)
         self.user_repo.create(new_user)
+        self.db.flush()
 
-        # Step 5: Create empty UserProfile linked to the User
-        new_profile = UserProfile(
+        # Step 4: Create UserProfile linked to this User
+        profile = UserProfile(
             user_id=new_user.user_id,
+            college_id=college.college_id,
+            full_name=data.full_name,
+            phone=data.phone,
+            department=data.department,
+            course=data.course,
+            gender=gender_enum,
+            year_of_study=data.year_of_study,
         )
-        self.profile_repo.create(new_profile)
+        self.profile_repo.create(profile)
 
-        # Step 6: Commit both records at once
-        # If anything above failed, we'd never reach this line
-        # and SQLAlchemy would rollback automatically
+        # Step 5: Save everything to DB
         self.db.commit()
+        self.db.refresh(new_user)
 
-        # Step 7: Send verification email (outside transaction - email can be resent)
-        verification_token = secrets.token_urlsafe(32)
-        await email_service.send_verification_email(data.email, verification_token)
+        # Step 6: Send verification OTP code via email
+        await email_service.send_verification_otp(new_user.email, verification_otp)
 
         return new_user
 
     def login(self, data: LoginRequest) -> dict:
         """
-        Log in a user and return JWT tokens.
-
-        Returns dict with: access_token, refresh_token, expires_in
+        Authenticate user and return access & refresh tokens.
+        If user's email is unverified, auto-resends a fresh 6-digit OTP code.
         """
         # Step 1: Find user by email
         user = self.user_repo.get_by_email(data.email)
         if user is None:
-            # Don't say 'email not found' - that leaks info to hackers
-            # Always say 'Invalid credentials'
             raise UnauthorizedException("Invalid email or password")
 
         # Step 2: Verify password
@@ -132,6 +190,28 @@ class AuthService:
         # Step 3: Check account status
         if not user.is_active:
             raise UnauthorizedException("Your account has been deactivated. Contact admin.")
+
+        if not user.is_email_verified:
+            import random
+            from datetime import datetime, timedelta
+            verification_otp = f"{random.randint(100000, 999999)}"
+            user.verification_code = verification_otp
+            user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
+            self.db.commit()
+
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    loop.create_task(email_service.send_verification_otp(user.email, verification_otp))
+                else:
+                    asyncio.run(email_service.send_verification_otp(user.email, verification_otp))
+            except Exception:
+                pass
+
+            raise UnauthorizedException(
+                f"Please verify your email before logging in. A new 6-digit verification code has been sent to {user.email}."
+            )
 
         # Step 4: Generate JWT access token
         # 'sub' (subject) is the standard JWT field for user identifier
@@ -206,7 +286,7 @@ class AuthService:
             self.refresh_token_repo.revoke_token(db_token)
             self.db.commit()
 
-    async def forgot_password(self, email: str) -> None:
+    async def forgot_password(self, email: str, base_url: Optional[str] = None) -> None:
         """
         Initiate password reset flow.
 
@@ -233,7 +313,7 @@ class AuthService:
         self.db.commit()
 
         # Send reset email
-        await email_service.send_password_reset_email(email, token)
+        await email_service.send_password_reset_email(email, token, base_url)
 
     def reset_password(self, token: str, new_password: str) -> None:
         """Reset password using the token from the email."""
@@ -273,3 +353,42 @@ class AuthService:
         self.refresh_token_repo.revoke_all_for_user(user.user_id)
 
         self.db.commit()
+
+    def verify_email(self, email: str, code: str) -> None:
+        """Verify user email using a 6-digit OTP code."""
+        user = self.user_repo.get_by_email(email)
+        if not user:
+            raise NotFoundException(f"User with email '{email}' not found")
+
+        if user.is_email_verified:
+            return  # Already verified
+
+        if not user.verification_code or user.verification_code != code:
+            raise BadRequestException("Invalid verification code")
+
+        from datetime import datetime
+        if user.verification_code_expires_at and user.verification_code_expires_at < datetime.utcnow():
+            raise BadRequestException("Verification code has expired")
+
+        user.is_email_verified = True
+        user.verification_code = None
+        user.verification_code_expires_at = None
+        self.db.commit()
+
+    async def resend_verification_code(self, email: str) -> None:
+        """Resend a new 6-digit OTP code to the user's email."""
+        user = self.user_repo.get_by_email(email)
+        if not user:
+            raise NotFoundException(f"User with email '{email}' not found")
+
+        if user.is_email_verified:
+            raise BadRequestException("Email is already verified")
+
+        import random
+        from datetime import datetime, timedelta
+        verification_otp = f"{random.randint(100000, 999999)}"
+        user.verification_code = verification_otp
+        user.verification_code_expires_at = datetime.utcnow() + timedelta(minutes=15)
+        self.db.commit()
+
+        await email_service.send_verification_otp(email, verification_otp)

@@ -35,6 +35,30 @@ class NotificationService:
         self.db.refresh(notification)
         return notification
 
+    def broadcast_notification(
+        self,
+        title: str,
+        message: str,
+        notification_type: NotificationType = NotificationType.SYSTEM,
+    ) -> None:
+        """Send a notification to all active users in the database."""
+        from sqlalchemy import select
+        # Get all active user IDs
+        user_ids = self.db.execute(
+            select(User.user_id).where(User.is_active == True)
+        ).scalars().all()
+
+        for u_id in user_ids:
+            notification = Notification(
+                user_id=u_id,
+                title=title,
+                message=message,
+                notification_type=notification_type,
+            )
+            self.notif_repo.create(notification)
+        
+        self.db.commit()
+
     def get_user_notifications(
         self,
         user_id: str,

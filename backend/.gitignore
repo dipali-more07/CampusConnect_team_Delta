@@ -28,7 +28,6 @@ uploads/
 # Alembic
 # alembic/versions/*.py
 
-
 # OS Files
 .DS_Store
 Thumbs.db

@@ -1,7 +1,4 @@
-"""
-app/schemas/analytics.py
-Analytics response schemas.
-"""
+ 
 from pydantic import BaseModel
 from typing import List, Optional
 
@@ -17,7 +14,6 @@ class PlatformStats(BaseModel):
     total_attendance: int
     total_certificates: int
     total_colleges: int
-    total_clubs: int
 
 
 class EventStats(BaseModel):

@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     MAIL_SERVER: str = "smtp.gmail.com"
     MAIL_STARTTLS: bool = True
     MAIL_SSL_TLS: bool = False
+    MOCK_EMAIL: bool = False
+
+    # --- Razorpay ---
+    RAZORPAY_KEY_ID: str = ""
+    RAZORPAY_KEY_SECRET: str = ""
+    MOCK_PAYMENT: bool = True
 
     # --- File Storage ---
     UPLOAD_DIR: str = "uploads"
@@ -61,7 +67,8 @@ class Settings(BaseSettings):
     # This is a comma-separated string in .env, we parse it into a list below
     ALLOWED_ORIGINS: str = (
         "http://localhost:3000,http://localhost:3001,http://localhost:5173,http://localhost:8000,"
-        "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173,http://127.0.0.1:8000"
+        "http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173,http://127.0.0.1:8000,"
+        "https://campusconnectdelta.zapto.org,http://campusconnectdelta.zapto.org"
     )
 
     # --- First Admin ---

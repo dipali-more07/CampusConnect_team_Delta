@@ -4,12 +4,17 @@ Certificate database model.
 """
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import String, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
+
+if TYPE_CHECKING:
+    from app.models.event import Event
+    from app.models.registration import EventRegistration
+    from app.models.user import User
 
 
 class Certificate(Base):

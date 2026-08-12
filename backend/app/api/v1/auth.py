@@ -1,24 +1,5 @@
-"""
-app/api/v1/auth.py
-===================
-Authentication endpoints (router).
-
-ROUTER RULES:
-  - Routers are THIN. They only: 
-    1. Validate input (Pydantic does this automatically)
-    2. Call a service method
-    3. Return a response
-  - NO business logic here (that's in services)
-  - NO database queries here (that's in repositories)
-
-SWAGGER DOCUMENTATION:
-  Every endpoint has:
-  - summary: Short title shown in Swagger
-  - description: Detailed explanation
-  - response_model: What the response looks like
-  - status_code: HTTP status code for success
-"""
-from fastapi import APIRouter, Depends, status
+ 
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 
 from app.database.base import get_db
@@ -27,7 +8,8 @@ from app.services.auth_service import AuthService
 from app.schemas.auth import (
     RegisterRequest, LoginRequest, TokenResponse,
     RefreshTokenRequest, ForgotPasswordRequest,
-    ResetPasswordRequest, ChangePasswordRequest
+    ResetPasswordRequest, ChangePasswordRequest,
+    VerifyEmailRequest, ResendCodeRequest
 )
 from app.schemas.user import UserWithProfileResponse
 from app.core.responses import success_response
@@ -46,13 +28,7 @@ async def register(
     data: RegisterRequest,
     db: Session = Depends(get_db),
 ):
-    """
-    Register a new user.
-    - Validates email uniqueness
-    - Hashes password with bcrypt
-    - Creates user and profile
-    - Sends verification email
-    """
+    
     service = AuthService(db)
     user = await service.register(data)
     return success_response(
@@ -117,11 +93,34 @@ def refresh_token(
 )
 async def forgot_password(
     data: ForgotPasswordRequest,
+    request: Request,
     db: Session = Depends(get_db),
 ):
     service = AuthService(db)
-    await service.forgot_password(data.email)
-    # Always return success (don't reveal if email exists)
+
+    from app.utils.validators import validate_and_sanitize_frontend_url
+
+    # Detect frontend origin URL from Origin, Referer, or Host header
+    origin = request.headers.get("origin")
+    referer = request.headers.get("referer")
+
+    raw_url = None
+    if origin:
+        raw_url = origin.rstrip("/")
+    elif referer:
+        from urllib.parse import urlparse
+        parsed = urlparse(referer)
+        raw_url = f"{parsed.scheme}://{parsed.netloc}"
+
+    if not raw_url:
+        host = request.headers.get("host", "")
+        proto = request.headers.get("x-forwarded-proto", "https" if "zapto.org" in host else "http")
+        raw_url = f"{proto}://{host}".rstrip("/")
+
+    # Sanitize and validate against Host Header / URL Injection attacks
+    safe_frontend_url = validate_and_sanitize_frontend_url(raw_url)
+
+    await service.forgot_password(data.email, safe_frontend_url)
     return success_response(
         message="If an account with this email exists, a reset link has been sent."
     )
@@ -180,6 +179,7 @@ def get_me(
             "bio": current_user.profile.bio,
             "profile_picture": current_user.profile.profile_picture,
             "college_id": current_user.profile.college_id,
+            "gender": current_user.profile.gender.value if hasattr(current_user.profile.gender, "value") else current_user.profile.gender,
         }
     return success_response(
         message="User profile fetched successfully",
@@ -191,6 +191,46 @@ def get_me(
             "is_email_verified": current_user.is_email_verified,
             "created_at": current_user.created_at.isoformat(),
             "last_login": current_user.last_login.isoformat() if current_user.last_login else None,
+            "full_name": current_user.full_name,
+            "mobile": current_user.mobile,
+            "phone": current_user.mobile,
+            "college_name": current_user.college_name,
+            "department": current_user.department,
+            "course": current_user.course,
+            "gender": current_user.gender,
+            "profile_image": current_user.profile_image,
+            "profile_picture": current_user.profile_image,
+            "year_of_study": current_user.profile.year_of_study if current_user.profile else None,
+            "bio": current_user.profile.bio if current_user.profile else None,
+            "college_id": current_user.profile.college_id if current_user.profile else None,
             "profile": profile_data,
         },
     )
+
+
+@router.post(
+    "/verify-email",
+    summary="Verify email using code",
+    description="Verify a newly registered user's email using the 6-digit OTP code sent to their email.",
+)
+def verify_email(
+    data: VerifyEmailRequest,
+    db: Session = Depends(get_db)
+):
+    service = AuthService(db)
+    service.verify_email(data.email, data.code)
+    return success_response(message="Email verified successfully. You can now login.")
+
+
+@router.post(
+    "/resend-code",
+    summary="Resend verification code",
+    description="Resend a new 6-digit OTP code to the user's email.",
+)
+async def resend_code(
+    data: ResendCodeRequest,
+    db: Session = Depends(get_db)
+):
+    service = AuthService(db)
+    await service.resend_verification_code(data.email)
+    return success_response(message="Verification code resent successfully. Please check your email.")

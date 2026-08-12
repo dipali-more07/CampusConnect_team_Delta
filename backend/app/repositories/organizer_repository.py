@@ -25,17 +25,6 @@ class OrganizerRepository(BaseRepository[Organizer]):
             select(Organizer).where(Organizer.user_id == user_id)
         ).scalar_one_or_none()
 
-    def get_by_club(
-        self, club_id: str, skip: int = 0, limit: int = 10
-    ) -> List[Organizer]:
-        query = (
-            select(Organizer)
-            .where(Organizer.club_id == club_id)
-            .offset(skip)
-            .limit(limit)
-        )
-        return list(self.db.execute(query).scalars().all())
-
     def get_all_organizers(
         self, skip: int = 0, limit: int = 10
     ) -> List[Organizer]:

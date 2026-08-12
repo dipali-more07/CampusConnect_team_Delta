@@ -1,14 +1,11 @@
-"""
-app/api/v1/attendance.py
-Attendance management endpoints.
-"""
+ 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database.base import get_db
 from app.database.deps import get_current_user, require_organizer
 from app.services.attendance_service import AttendanceService
-from app.schemas.attendance import CheckInRequest, CheckOutRequest
+from app.schemas.attendance import CheckInRequest
 from app.core.responses import success_response, paginated_response
 from app.models.user import User
 
@@ -19,6 +16,9 @@ def _attendance_to_dict(att) -> dict:
     return {
         "attendance_id": att.attendance_id,
         "registration_id": att.registration_id,
+        "event_id": att.event_id,
+        "event_title": att.event.title if (hasattr(att, "event") and att.event) else None,
+        "venue": att.event.venue if (hasattr(att, "event") and att.event) else None,
         "check_in_time": att.check_in_time.isoformat() if att.check_in_time else None,
         "check_out_time": att.check_out_time.isoformat() if att.check_out_time else None,
         "attendance_status": att.attendance_status,
@@ -26,39 +26,21 @@ def _attendance_to_dict(att) -> dict:
     }
 
 
-@router.post("/check-in", summary="Check in a student (Organizer scans QR)")
+@router.post("/check-in", summary="Check in a student (Student scans Organizer's Event QR)")
 def check_in(
     data: CheckInRequest,
-    current_user: User = Depends(require_organizer),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """
-    Mark a student as present.
-    The organizer scans the student's QR code.
-    QR contains the registration_id.
-    Prevents duplicate scans.
-    """
+ 
     service = AttendanceService(db)
-    attendance = service.check_in(
-        registration_id=data.registration_id,
+    attendance = service.self_check_in(
         event_id=data.event_id,
-        scanned_by_user=current_user,
+        participant=current_user,
     )
-    return success_response(message="Student checked in successfully", data=_attendance_to_dict(attendance))
+    return success_response(message="Checked in successfully", data=_attendance_to_dict(attendance))
 
 
-@router.post("/check-out", summary="Check out a student")
-def check_out(
-    data: CheckOutRequest,
-    current_user: User = Depends(require_organizer),
-    db: Session = Depends(get_db),
-):
-    service = AttendanceService(db)
-    attendance = service.check_out(
-        registration_id=data.registration_id,
-        scanned_by_user=current_user,
-    )
-    return success_response(message="Student checked out", data=_attendance_to_dict(attendance))
 
 
 @router.get("/event/{event_id}", summary="Get attendance for an event")
@@ -76,4 +58,81 @@ def event_attendance(
         data=[_attendance_to_dict(r) for r in records],
         total=total, page=page, size=size
     )
+
+
+def _detailed_attendance_to_dict(att) -> dict:
+    return {
+        "attendance_id": att.attendance_id,
+        "registration_id": att.registration_id,
+        "event_id": att.event_id,
+        "event_title": att.event.title if (hasattr(att, "event") and att.event) else None,
+        "event_date": att.event.start_datetime.isoformat() if (hasattr(att, "event") and att.event and att.event.start_datetime) else None,
+        "venue": att.event.venue if (hasattr(att, "event") and att.event) else None,
+        "check_in_time": att.check_in_time.isoformat() if att.check_in_time else None,
+        "check_out_time": att.check_out_time.isoformat() if att.check_out_time else None,
+        "attendance_status": att.attendance_status,
+    }
+
+
+@router.get("/my", summary="Get current logged-in user's attendance records")
+def get_my_attendance(
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = AttendanceService(db)
+    records, total = service.get_user_attendance(current_user.user_id, page=page, size=size)
+    return paginated_response(
+        message="Attendance history fetched successfully",
+        data=[_detailed_attendance_to_dict(r) for r in records],
+        total=total, page=page, size=size
+    )
+
+
+@router.get("/my/analytics", summary="Get current logged-in user's attendance analytics")
+def get_my_attendance_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    service = AttendanceService(db)
+    analytics = service.get_user_attendance_analytics(current_user.user_id)
+    return success_response(
+        message="Attendance analytics fetched successfully",
+        data=analytics
+    )
+
+
+@router.get("/student/{student_id}", summary="Get student's attendance records (Organizer/Admin only)")
+def get_student_attendance(
+    student_id: str,
+    page: int = Query(default=1, ge=1),
+    size: int = Query(default=20, ge=1, le=100),
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AttendanceService(db)
+    records, total = service.get_user_attendance(student_id, page=page, size=size)
+    return paginated_response(
+        message="Student attendance history fetched successfully",
+        data=[_detailed_attendance_to_dict(r) for r in records],
+        total=total, page=page, size=size
+    )
+
+
+@router.get("/student/{student_id}/analytics", summary="Get student's attendance analytics (Organizer/Admin only)")
+def get_student_attendance_analytics(
+    student_id: str,
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    service = AttendanceService(db)
+    analytics = service.get_user_attendance_analytics(student_id)
+    return success_response(
+        message="Student attendance analytics fetched successfully",
+        data=analytics
+    )
+
+
+
 

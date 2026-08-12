@@ -11,12 +11,11 @@ EVENT LIFECYCLE:
   OR:
   Published -> Organizer CANCELS -> CANCELLED
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from app.repositories.event_repository import EventRepository
-from app.repositories.organizer_repository import OrganizerRepository
 from app.core.exceptions import NotFoundException, ForbiddenException, BadRequestException, ConflictException
 from app.core.constants import EventStatus, ApprovalStatus, UserRole
 from app.models.event import Event
@@ -29,16 +28,6 @@ class EventService:
     def __init__(self, db: Session):
         self.db = db
         self.event_repo = EventRepository(db)
-        self.organizer_repo = OrganizerRepository(db)
-
-    def _get_organizer_for_user(self, user: User):
-        """Get the organizer record for a user, raise error if not organizer."""
-        if user.role == UserRole.ADMIN:
-            return None  # Admins can do everything without being an organizer
-        organizer = self.organizer_repo.get_by_user_id(user.user_id)
-        if not organizer:
-            raise ForbiddenException("You must be an organizer to perform this action")
-        return organizer
 
     def _check_event_ownership(self, event: Event, user: User) -> None:
         """Verify the user owns this event (or is admin)."""
@@ -50,16 +39,29 @@ class EventService:
     def create_event(
         self, data: CreateEventRequest, current_user: User
     ) -> Event:
-        """Create a new event (organizer or admin)."""
-        organizer = self._get_organizer_for_user(current_user)
+        """
+        Create a new event.
 
-        # Validate dates
-        if data.start_datetime <= datetime.utcnow():
+        WHO CAN CREATE:
+          - Organizers and Admins (participants cannot create events)
+
+        APPROVAL STATUS LOGIC:
+          - Organizer creates event → approval_status = PENDING (needs admin approval)
+          - Admin creates event     → approval_status = APPROVED (auto-approved)
+
+        NOTE: All events start with status = DRAFT regardless of approval status.
+        To allow students to register, the organizer must call the /publish endpoint.
+        """
+        if current_user.role not in [UserRole.ORGANIZER, UserRole.ADMIN]:
+            raise ForbiddenException("You must be an organizer to perform this action")
+
+        # Validate dates (allow 6-hour timezone buffer for IST vs UTC server offsets)
+        if data.start_datetime < (datetime.utcnow() - timedelta(hours=6)):
             raise BadRequestException("Event start time must be in the future")
 
         event = Event(
+            organizer=current_user,
             organizer_id=current_user.user_id,
-            club_id=organizer.club_id if organizer else None,
             title=data.title,
             description=data.description,
             category=data.category,
@@ -69,8 +71,13 @@ class EventService:
             end_datetime=data.end_datetime,
             max_participants=data.max_participants,
             registration_deadline=data.registration_deadline,
-            status=EventStatus.DRAFT,
-            approval_status=ApprovalStatus.PENDING,
+            capacity=data.capacity,
+            participation_type=data.participation_type,
+            reg_date_time=data.reg_date_time,
+            fees=data.fees,
+            event_date=data.event_date,
+            status=EventStatus.PUBLISHED if current_user.role == UserRole.ADMIN else EventStatus.DRAFT,
+            approval_status=ApprovalStatus.APPROVED if current_user.role == UserRole.ADMIN else ApprovalStatus.PENDING,
         )
         self.event_repo.create(event)
         self.db.commit()
@@ -91,14 +98,34 @@ class EventService:
         category: Optional[str] = None,
         status: Optional[str] = None,
         organizer_id: Optional[str] = None,
+        current_user: Optional[User] = None,
     ) -> tuple[List[Event], int]:
         skip = (page - 1) * size
+
+        # Role-based visibility filter:
+        # - Participants and guests: only see APPROVED events
+        # - Organizers: see all their own events, but only approved events from others
+        # - Admins: see ALL events (no filter)
+        approval_status = ApprovalStatus.APPROVED.value  # Default: approved only
+
+        if current_user:
+            if current_user.role == UserRole.ADMIN:
+                # Admins can see all events (no approval status restriction)
+                approval_status = None
+            elif current_user.role == UserRole.ORGANIZER:
+                # Organizers can see all of their own events, but only approved events from others
+                if organizer_id and organizer_id == current_user.user_id:
+                    approval_status = None   # Viewing their own events: show all
+                else:
+                    approval_status = ApprovalStatus.APPROVED.value  # Others' events: approved only
+
         events = self.event_repo.get_all_events(
             skip=skip, limit=size, search=search, category=category,
-            status=status, organizer_id=organizer_id,
+            status=status, organizer_id=organizer_id, approval_status=approval_status
         )
         total = self.event_repo.count_events(
-            search=search, category=category, status=status, organizer_id=organizer_id
+            search=search, category=category, status=status, organizer_id=organizer_id,
+            approval_status=approval_status
         )
         return events, total
 
@@ -109,11 +136,11 @@ class EventService:
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
 
-        # Can only edit events in DRAFT status
-        if event.status == EventStatus.PUBLISHED:
-            raise BadRequestException("Cannot edit a published event. Cancel it first.")
-
         update_data = data.model_dump(exclude_none=True)
+        # Remove schema-only fields to avoid setting non-DB columns
+        update_data.pop("event_name", None)
+        update_data.pop("reg_deadline", None)
+
         for field, value in update_data.items():
             setattr(event, field, value)
 
@@ -122,23 +149,10 @@ class EventService:
         return event
 
     def publish_event(self, event_id: str, current_user: User) -> Event:
-        """Publish a draft event (must be admin-approved first)."""
+        """Publish a draft event so students can register."""
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
-
-        if event.approval_status != ApprovalStatus.APPROVED:
-            raise BadRequestException(
-                "Event must be approved by an admin before publishing"
-            )
-
-        if event.status != EventStatus.DRAFT:
-            raise BadRequestException(f"Cannot publish event with status '{event.status}'")
-
-        # Generate QR code for the event
-        qr_path = qr_service.generate_event_qr(event_id)
-
         event.status = EventStatus.PUBLISHED
-        event.qr_code = qr_path
         self.db.commit()
         self.db.refresh(event)
         return event
@@ -162,6 +176,8 @@ class EventService:
         """Admin approves or rejects an event."""
         event = self.get_event(event_id)
         event.approval_status = data.approval_status
+        if data.approval_status == ApprovalStatus.APPROVED:
+            event.status = EventStatus.PUBLISHED
         if data.rejection_reason:
             event.rejection_reason = data.rejection_reason
         self.db.commit()
@@ -169,12 +185,28 @@ class EventService:
         return event
 
     def delete_event(self, event_id: str, current_user: User) -> None:
-        """Delete a draft event."""
+        """Delete an event and clean up all dependent records."""
         event = self.get_event(event_id)
         self._check_event_ownership(event, current_user)
 
-        if event.status != EventStatus.DRAFT:
-            raise BadRequestException("Only draft events can be deleted")
+        now = datetime.utcnow()
+        status_val = str(event.status.value if hasattr(event.status, "value") else event.status).lower()
+        is_completed = (status_val == EventStatus.COMPLETED.value.lower()) or (now > event.end_datetime)
+        is_ongoing = (event.start_datetime <= now <= event.end_datetime)
+
+        if is_ongoing or is_completed:
+            raise BadRequestException("Cannot delete ongoing or completed events")
+
+        # Manually delete all child records to prevent foreign key violations
+        from sqlalchemy import text
+        self.db.execute(text("DELETE FROM feedback WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM results WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM certificates WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM attendance WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM payments WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM team_members WHERE team_id IN (SELECT team_id FROM teams WHERE event_id = :eid)"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM teams WHERE event_id = :eid"), {"eid": event_id})
+        self.db.execute(text("DELETE FROM registrations WHERE event_id = :eid"), {"eid": event_id})
 
         self.event_repo.delete(event)
         self.db.commit()

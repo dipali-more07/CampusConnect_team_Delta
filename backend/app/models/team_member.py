@@ -3,12 +3,16 @@ app/models/team_member.py
 TeamMember database model.
 """
 import uuid
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import Integer, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database.base import Base
+
+if TYPE_CHECKING:
+    from app.models.team import Team
+    from app.models.user import User
 
 
 class TeamMember(Base):

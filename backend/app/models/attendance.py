@@ -2,7 +2,7 @@
 app/models/attendance.py
 Attendance database model.
 """
-from anyio import Event
+from app.models.event import Event
 from app.models.user import User
 from app.models.registration import EventRegistration
 import uuid
