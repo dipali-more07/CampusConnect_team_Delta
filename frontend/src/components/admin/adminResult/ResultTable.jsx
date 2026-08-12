@@ -1,5 +1,101 @@
 import React from 'react'
-import { Trophy, Award, Trash2, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
+import { Trophy, Award, ChevronLeft, ChevronRight, FileText } from 'lucide-react'
+
+const getPageBg = (active, dark, BRAND) => {
+  if (active) return BRAND
+  return dark ? '#0f1e30' : '#f1f5f9'
+}
+
+const getPageColor = (active, dark) => {
+  if (active) return '#ffffff'
+  return dark ? '#7a98bb' : '#475569'
+}
+
+function ResultRows({ loading, filteredResults, paginatedResults, BRAND, renderRankBadge, dark }) {
+  if (loading) {
+    return [1, 2, 3, 4].map(i => (
+      <tr key={i}>
+        <td className="p-4"><div className="w-36 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
+        <td className="p-4"><div className="w-16 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
+        <td className="p-4"><div className="w-12 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
+        <td className="p-4"><div className="w-28 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
+        <td className="p-4"><div className="w-24 h-6 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
+        <td className="p-4"><div className="w-20 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
+      </tr>
+    ))
+  }
+
+  if (filteredResults.length === 0) {
+    return (
+      <tr>
+        <td colSpan="6" className="p-12 text-center">
+          <FileText size={40} className="block mx-auto mb-3 text-slate-400" />
+          <span className="text-[13px] font-semibold text-slate-500">No results found for current filters</span>
+        </td>
+      </tr>
+    )
+  }
+
+  return paginatedResults.map((row) => (
+    <tr
+      key={row.id}
+      className="transition-colors hover:bg-slate-50/30 dark:hover:bg-slate-850/10"
+    >
+      {/* Participant / Team */}
+      <td className="p-4">
+        <div className="flex flex-col gap-0.5 font-sans">
+          <span className="text-[13.5px] font-bold text-slate-900 dark:text-slate-100">{row.participantName}</span>
+          {row.type === 'Team' && row.members && row.members.length > 0 && (
+            <span className="text-[11px] text-slate-400 dark:text-[#7a98bb] font-semibold">
+              Members: {row.members.join(', ')}
+            </span>
+          )}
+          <span className="inline-block mt-0.5 w-max px-2 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500 dark:text-indigo-400">
+            {row.type}
+          </span>
+        </div>
+      </td>
+
+      {/* Department */}
+      <td className="p-4 text-[13.5px] font-semibold text-slate-700 dark:text-slate-300">{row.department}</td>
+
+      {/* Year */}
+      <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-400">{row.year}</td>
+
+      {/* Event */}
+      <td className="p-4 text-[13.5px] font-bold" style={{ color: BRAND }}>{row.eventName}</td>
+
+      {/* Rank with Icon */}
+      <td className="p-4">
+        {renderRankBadge(row.rank)}
+      </td>
+
+      {/* Date */}
+      <td className="p-4 text-[13px] font-medium text-slate-500 dark:text-slate-400">{row.date}</td>
+    </tr>
+  ))
+}
+
+function ResultPaginationPageButtons({ totalPages, currentPage, setCurrentPage, BRAND, dark }) {
+  return Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+    const active = page === currentPage
+    return (
+      <button
+        type="button"
+        key={page}
+        onClick={() => setCurrentPage(page)}
+        className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"
+        style={{
+          background: getPageBg(active, dark, BRAND),
+          color: getPageColor(active, dark),
+          boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none'
+        }}
+      >
+        {page}
+      </button>
+    )
+  })
+}
 
 export default function ResultTable({
   loading,
@@ -68,64 +164,14 @@ export default function ResultTable({
             </tr>
           </thead>
           <tbody className="divide-y" style={{ divideColor: dark ? '#1a3050' : '#e2e8f0' }}>
-            {loading ? (
-              [1, 2, 3, 4].map(i => (
-                <tr key={i}>
-                  <td className="p-4"><div className="w-36 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
-                  <td className="p-4"><div className="w-16 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
-                  <td className="p-4"><div className="w-12 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
-                  <td className="p-4"><div className="w-28 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
-                  <td className="p-4"><div className="w-24 h-6 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
-                  <td className="p-4"><div className="w-20 h-4 rounded bg-slate-200/50 dark:bg-slate-800 animate-pulse" /></td>
-                </tr>
-              ))
-            ) : filteredResults.length === 0 ? (
-              <tr>
-                <td colSpan="6" className="p-12 text-center">
-                  <FileText size={40} className="block mx-auto mb-3 text-slate-400" />
-                  <span className="text-[13px] font-semibold text-slate-500">No results found for current filters</span>
-                </td>
-              </tr>
-            ) : (
-              paginatedResults.map((row) => (
-                <tr
-                  key={row.id}
-                  className="transition-colors hover:bg-slate-50/30 dark:hover:bg-slate-850/10"
-                >
-                  {/* Participant / Team */}
-                  <td className="p-4">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-[13.5px] font-bold text-slate-900 dark:text-slate-100">{row.participantName}</span>
-                      {row.type === 'Team' && row.members && row.members.length > 0 && (
-                        <span className="text-[11px] text-slate-400 dark:text-[#7a98bb] font-semibold">
-                          Members: {row.members.join(', ')}
-                        </span>
-                      )}
-                      <span className="inline-block mt-0.5 w-max px-2 py-0.5 rounded text-[9.5px] font-bold uppercase tracking-wider bg-indigo-50 dark:bg-indigo-950/30 text-indigo-500 dark:text-indigo-400">
-                        {row.type}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Department */}
-                  <td className="p-4 text-[13.5px] font-semibold text-slate-700 dark:text-slate-300">{row.department}</td>
-
-                  {/* Year */}
-                  <td className="p-4 text-[13.5px] font-medium text-slate-600 dark:text-slate-400">{row.year}</td>
-
-                  {/* Event */}
-                  <td className="p-4 text-[13.5px] font-bold" style={{ color: BRAND }}>{row.eventName}</td>
-
-                  {/* Rank with Icon */}
-                  <td className="p-4">
-                    {renderRankBadge(row.rank)}
-                  </td>
-
-                  {/* Date */}
-                  <td className="p-4 text-[13px] font-medium text-slate-500 dark:text-slate-400">{row.date}</td>
-                </tr>
-              ))
-            )}
+            <ResultRows
+              loading={loading}
+              filteredResults={filteredResults}
+              paginatedResults={paginatedResults}
+              BRAND={BRAND}
+              renderRankBadge={renderRankBadge}
+              dark={dark}
+            />
           </tbody>
         </table>
       </div>
@@ -169,6 +215,7 @@ export default function ResultTable({
         {/* Pagination Page Controls */}
         <div className="flex items-center gap-1.5">
           <button
+            type="button"
             onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
             disabled={currentPage === 1}
             className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"
@@ -180,25 +227,16 @@ export default function ResultTable({
             <ChevronLeft size={16} />
           </button>
 
-          {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
-            const active = page === currentPage
-            return (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"
-                style={{
-                  background: active ? BRAND : (dark ? '#0f1e30' : '#f1f5f9'),
-                  color: active ? '#ffffff' : (dark ? '#7a98bb' : '#475569'),
-                  boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none'
-                }}
-              >
-                {page}
-              </button>
-            )
-          })}
+          <ResultPaginationPageButtons
+            totalPages={totalPages}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            BRAND={BRAND}
+            dark={dark}
+          />
 
           <button
+            type="button"
             onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
             disabled={currentPage === totalPages || totalPages === 0}
             className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"

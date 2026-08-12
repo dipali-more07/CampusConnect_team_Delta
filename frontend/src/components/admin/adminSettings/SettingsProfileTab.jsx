@@ -34,8 +34,9 @@ export default function SettingsProfileTab({
       {/* Profile Form fields */}
       <div className="space-y-4 max-w-[500px]">
         <div>
-          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Full Name</label>
+          <label htmlFor="profileName" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Full Name</label>
           <input
+            id="profileName"
             value={profileForm.name}
             onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
             className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
@@ -46,8 +47,9 @@ export default function SettingsProfileTab({
         </div>
 
         <div>
-          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Email</label>
+          <label htmlFor="profileEmail" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Email</label>
           <input
+            id="profileEmail"
             value={profileForm.email}
             onChange={e => setProfileForm(p => ({ ...p, email: e.target.value }))}
             className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
@@ -58,8 +60,9 @@ export default function SettingsProfileTab({
         </div>
 
         <div>
-          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Phone</label>
+          <label htmlFor="profilePhone" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Phone</label>
           <input
+            id="profilePhone"
             value={profileForm.phone || ''}
             onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value.replace(/\D/g, '').slice(0, 10) }))}
             className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
@@ -70,8 +73,9 @@ export default function SettingsProfileTab({
         </div>
 
         <div>
-          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Gender</label>
+          <label htmlFor="profileGender" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Gender</label>
           <select
+            id="profileGender"
             value={profileForm.gender || ''}
             onChange={e => setProfileForm(p => ({ ...p, gender: e.target.value }))}
             className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
@@ -87,8 +91,9 @@ export default function SettingsProfileTab({
         </div>
 
         <div>
-          <label className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Bio</label>
+          <label htmlFor="profileBio" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Bio</label>
           <textarea
+            id="profileBio"
             value={profileForm.bio || ''}
             onChange={e => setProfileForm(p => ({ ...p, bio: e.target.value }))}
             rows={3}
@@ -102,6 +107,7 @@ export default function SettingsProfileTab({
 
         <div className="pt-2">
           <button
+            type="button"
             onClick={handleSaveProfile}
             disabled={saving}
             className="px-5 py-3 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer flex items-center gap-2 hover:-translate-y-px transition-all"

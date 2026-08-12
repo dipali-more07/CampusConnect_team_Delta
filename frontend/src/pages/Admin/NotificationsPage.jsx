@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCheck, Send, Mail, MessageSquare, Smartphone, Megaphone } from 'lucide-react'
+import { CheckCheck, Send } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import { buildStatsDisplay } from '../../data/notificationsData'
 import notificationsService from '../../services/notificationsService'
@@ -9,14 +9,32 @@ import NotificationStats from '../../components/admin/adminNotification/Notifica
 import NotificationFeed from '../../components/admin/adminNotification/NotificationFeed'
 import NotificationFormModal from '../../components/admin/adminNotification/NotificationFormModal'
 
-const NOTIF_TYPES = [
-  { key: 'email',        label: 'Email',        Icon: Mail },
-  { key: 'sms',          label: 'SMS',          Icon: MessageSquare },
-  { key: 'push',         label: 'Push',         Icon: Smartphone },
-  { key: 'announcement', label: 'Announcement', Icon: Megaphone },
-]
+function getNotificationMessage(loading, unreadCount) {
+  if (loading) return 'Loading...'
+  if (unreadCount === 0) return '0 unread notifications'
+  const suffix = unreadCount > 1 ? 's' : ''
+  return `${unreadCount} unread notification${suffix}`
+}
 
-export default function NotificationsPage({ tokens, notifications = [], stats = {}, loading = false, onMarkRead, onDelete }) {
+function filterNotifications(notifications, activeCategory, filter) {
+  return notifications.filter(n => {
+    const catOk = activeCategory === 'All' || n.category === activeCategory
+    const readOk = filter === 'all' || (filter === 'unread' && n.unread)
+    return catOk && readOk
+  })
+}
+
+function broadcastRefresh() {
+  try {
+    const channel = new BroadcastChannel('cc_notifications_channel')
+    channel.postMessage('refresh_notifications')
+    channel.close()
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+export default function NotificationsPage({ tokens, notifications = [], stats = {}, loading = false, onMarkRead, onDelete, userRole }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
 
@@ -24,7 +42,7 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
   const [filter, setFilter] = useState('all')
   const [sendOpen, setSendOpen] = useState(false)
   const [sendForm, setSendForm] = useState({
-    notification_type: 'system',
+    notification_type: userRole === 'organizer' ? 'event' : 'system',
     user_id: 'all',
     title: '',
     message: '',
@@ -33,13 +51,9 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
   const [sent, setSent] = useState(false)
 
   const unreadCount = notifications.filter(n => n.unread).length
-  const statsDisplay = buildStatsDisplay(stats)
+  const statsDisplay = buildStatsDisplay(stats, notifications)
 
-  const filtered = notifications.filter(n => {
-    const catOk = activeCategory === 'All' || n.category === activeCategory
-    const readOk = filter === 'all' || (filter === 'unread' && n.unread)
-    return catOk && readOk
-  })
+  const filtered = filterNotifications(notifications, activeCategory, filter)
 
   const handleMarkAllRead = () => {
     const unreadIds = notifications.filter(n => n.unread).map(n => n.id)
@@ -48,7 +62,7 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
 
   const resetForm = () => {
     setSendForm({
-      notification_type: 'system',
+      notification_type: userRole === 'organizer' ? 'event' : 'system',
       user_id: 'all',
       title: '',
       message: '',
@@ -64,6 +78,7 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
     setSending(false)
     if (res.success) {
       setSent(true)
+      broadcastRefresh()
       setTimeout(() => { setSendOpen(false); resetForm() }, 1800)
     }
   }
@@ -90,11 +105,12 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
             Notifications
           </h1>
           <p className="text-[13px] mt-1" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-            {loading ? 'Loading...' : unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : '0 unread notifications'}
+            {getNotificationMessage(loading, unreadCount)}
           </p>
         </div>
         <div className="flex gap-2.5">
           <button
+            type="button"
             onClick={handleMarkAllRead}
             disabled={unreadCount === 0}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-transparent transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -105,6 +121,7 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
             <CheckCheck size={15} /> Mark all read
           </button>
           <button
+            type="button"
             onClick={() => setSendOpen(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px"
             style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
@@ -151,11 +168,10 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
         sent={sent}
         handleSend={handleSend}
         resetForm={resetForm}
-        NOTIF_TYPES={NOTIF_TYPES}
-        tokens={tokens}
         dark={dark}
         BRAND={BRAND}
         inputStyle={inputStyle}
+        userRole={userRole}
       />
     </div>
   )

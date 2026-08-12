@@ -102,8 +102,8 @@ export default function AnalyticsTrendChart({
                       strokeLinecap="round"
                     />
                     {/* Points dots */}
-                    {points.map((pt, i) => (
-                      <g key={i} className="group/dot cursor-pointer">
+                    {points.map((pt) => (
+                      <g key={`dot-${pt.x}-${pt.y}`} className="group/dot cursor-pointer">
                         <circle
                           cx={pt.x}
                           cy={pt.y}

@@ -1,5 +1,4 @@
-import React from 'react'
-import { RefreshCw, ScanLine, Camera, ZapOff, Play, Wifi, Loader2 } from 'lucide-react'
+import { RefreshCw, ScanLine, Camera, ZapOff, Play, Wifi } from 'lucide-react'
 
 export default function AttendanceTabScan({
   scannerActive,
@@ -16,6 +15,67 @@ export default function AttendanceTabScan({
   getInitials,
   badgeStyle
 }) {
+  const renderScansContent = () => {
+    if (scansLoading) {
+      return [1, 2, 3, 4].map(i => (
+        <div key={i} className="flex items-center gap-3 px-5 py-3 border-t" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
+          <div className="w-10 h-10 rounded-full animate-pulse" style={{ background: dark ? '#1a3050' : '#f1f5f9', flexShrink: 0 }} />
+          <div className="flex-1 space-y-2">
+            <div className="h-3 rounded animate-pulse w-28" style={{ background: dark ? '#1a3050' : '#f1f5f9' }} />
+            <div className="h-2.5 rounded animate-pulse w-20" style={{ background: dark ? '#1a3050' : '#f1f5f9' }} />
+          </div>
+        </div>
+      ))
+    }
+
+    if (recentScans.length === 0) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12 gap-2">
+          <ScanLine size={32} className="text-slate-400 opacity-40" />
+          <p className="text-[13px] font-semibold" style={label}>No scans yet</p>
+        </div>
+      )
+    }
+
+    return recentScans.map((scan, idx) => {
+      const badge = badgeStyle(scan.status)
+      const borderColor = dark ? '#1a3050' : '#f1f5f9'
+      const separatorBorder = idx === 0 ? 'none' : `1px solid ${borderColor}`
+      return (
+        <div
+          key={scan.id}
+          className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50/30"
+          style={{ borderTop: separatorBorder }}
+        >
+          {/* Avatar */}
+          <div
+            className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[13px] font-extrabold shrink-0"
+            style={{ background: scan.avatarColor }}
+          >
+            {getInitials(scan.studentName)}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[13.5px] font-bold m-0 truncate">{scan.studentName}</p>
+            <p className="text-[12px] font-semibold m-0 truncate" style={label}>{scan.rollNo}</p>
+          </div>
+
+          {/* Status + time */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span
+              className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
+              style={{ background: badge.bg, color: badge.text }}
+            >
+              {scan.status}
+            </span>
+            <span className="text-[11px] font-semibold" style={label}>{scan.time}</span>
+          </div>
+        </div>
+      )
+    })
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
       {/* Camera View */}
@@ -71,6 +131,7 @@ export default function AttendanceTabScan({
         {/* Start / Stop button */}
         <div className="p-5">
           <button
+            type="button"
             onClick={() => {
               setScannerActive(prev => {
                 if (!prev) showToast('Scanner started!', 'success')
@@ -95,6 +156,7 @@ export default function AttendanceTabScan({
         <div className="px-5 pt-5 pb-3 flex items-center justify-between">
           <h2 className="text-[17px] font-extrabold m-0">Recent Scans</h2>
           <button
+            type="button"
             onClick={loadRecentScans}
             className="w-8 h-8 rounded-lg flex items-center justify-center border cursor-pointer transition-all hover:opacity-70"
             style={inp}
@@ -105,56 +167,7 @@ export default function AttendanceTabScan({
         </div>
 
         <div className="overflow-y-auto flex-1" style={{ maxHeight: 360 }}>
-          {scansLoading ? (
-            [1, 2, 3, 4].map(i => (
-              <div key={i} className="flex items-center gap-3 px-5 py-3 border-t" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
-                <div className="w-10 h-10 rounded-full animate-pulse" style={{ background: dark ? '#1a3050' : '#f1f5f9', flexShrink: 0 }} />
-                <div className="flex-1 space-y-2">
-                  <div className="h-3 rounded animate-pulse w-28" style={{ background: dark ? '#1a3050' : '#f1f5f9' }} />
-                  <div className="h-2.5 rounded animate-pulse w-20" style={{ background: dark ? '#1a3050' : '#f1f5f9' }} />
-                </div>
-              </div>
-            ))
-          ) : recentScans.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <ScanLine size={32} className="text-slate-400 opacity-40" />
-              <p className="text-[13px] font-semibold" style={label}>No scans yet</p>
-            </div>
-          ) : recentScans.map((scan, idx) => {
-            const badge = badgeStyle(scan.status)
-            return (
-              <div
-                key={scan.id}
-                className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-slate-50/30"
-                style={{ borderTop: idx === 0 ? 'none' : `1px solid ${dark ? '#1a3050' : '#f1f5f9'}` }}
-              >
-                {/* Avatar */}
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-[13px] font-extrabold shrink-0"
-                  style={{ background: scan.avatarColor }}
-                >
-                  {getInitials(scan.studentName)}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-[13.5px] font-bold m-0 truncate">{scan.studentName}</p>
-                  <p className="text-[12px] font-semibold m-0 truncate" style={label}>{scan.rollNo}</p>
-                </div>
-
-                {/* Status + time */}
-                <div className="flex flex-col items-end gap-1 shrink-0">
-                  <span
-                    className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
-                    style={{ background: badge.bg, color: badge.text }}
-                  >
-                    {scan.status}
-                  </span>
-                  <span className="text-[11px] font-semibold" style={label}>{scan.time}</span>
-                </div>
-              </div>
-            )
-          })}
+          {renderScansContent()}
         </div>
 
         {/* footer count */}

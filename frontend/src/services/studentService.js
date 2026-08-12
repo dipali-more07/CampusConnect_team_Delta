@@ -4,14 +4,25 @@ import studentEventsData from '../data/student/studentEventsData.json'
 import studentCertificatesData from '../data/student/studentCertificatesData.json'
 import studentNotificationsData from '../data/student/studentNotificationsData.json'
 
+
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
+
+function getSecureRandomString() {
+  if (typeof window !== 'undefined' && window.crypto) {
+    const arr = new Uint32Array(1)
+    window.crypto.getRandomValues(arr)
+    return arr[0].toString(36)
+  }
+  return Date.now().toString(36)
+}
 
 function getStudentHeaders(extra = {}) {
   const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`,
+    'ngrok-skip-browser-warning': 'true',
     ...extra
   }
 }
@@ -144,20 +155,20 @@ async function mockRegisterEvent(eventId, payload) {
 
   // Check already registered
   const existing = getMockEventRegistrations()
-  if (existing.find(r => r.eventId === eventId)) {
+  if (existing.some(r => r.eventId === eventId)) {
     return { success: false, message: 'You are already registered for this event.' }
   }
 
   // Simulate payment check
   if (payload?.payment) {
     // Mock: always success for simulation
-    const txnId = 'TXN' + Math.random().toString(36).slice(2, 10).toUpperCase()
+    const txnId = 'TXN' + getSecureRandomString().toUpperCase()
     payload.payment.transactionId = txnId
     payload.payment.status = 'Success'
   }
 
   const reg = {
-    id: 'REG' + Math.random().toString(36).slice(2, 8).toUpperCase(),
+    id: 'REG' + getSecureRandomString().toUpperCase(),
     eventId,
     participationType: payload?.participationType || 'Solo',
     teamName: payload?.teamName || null,
@@ -186,7 +197,7 @@ async function mockScanAttendanceQR(qrCodeContent) {
   // Simulate marking attendance for a pending record or adding a new record
   const now = new Date()
   const scanTimeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-  
+
   if (attendanceStore.records && attendanceStore.records.length > 0) {
     const pendingItem = attendanceStore.records.find(r => r.status === 'Pending')
     if (pendingItem) {
@@ -221,13 +232,22 @@ async function apiFetchAttendanceData(explicitStudentId) {
     const data = await res.json()
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch attendance data.' }
 
-    const rawList = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : (data.data?.records || data.records || []))
-    
+    let rawList = []
+    if (Array.isArray(data.data)) {
+      rawList = data.data
+    } else if (Array.isArray(data)) {
+      rawList = data
+    } else if (data.data?.records) {
+      rawList = data.data.records
+    } else if (data.records) {
+      rawList = data.records
+    }
+
     const formatLocalTime = (isoStr) => {
       if (!isoStr) return 'N/A'
       try {
         const d = new Date(isoStr)
-        if (isNaN(d.getTime())) return isoStr
+        if (Number.isNaN(d.getTime())) return isoStr
         return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
       } catch {
         return isoStr
@@ -238,7 +258,7 @@ async function apiFetchAttendanceData(explicitStudentId) {
       if (!isoStr) return 'N/A'
       try {
         const d = new Date(isoStr)
-        if (isNaN(d.getTime())) return isoStr
+        if (Number.isNaN(d.getTime())) return isoStr
         return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
       } catch {
         return isoStr
@@ -249,10 +269,10 @@ async function apiFetchAttendanceData(explicitStudentId) {
       const eventObj = item.event || {}
       const rawStatus = (item.attendance_status || item.status || 'present').toLowerCase()
       const statusFormatted = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1)
-      
+
       const rawId = item.attendance_id || item.id || `ATT-${idx + 1}`
       const displayId = typeof rawId === 'string' && rawId.includes('-') ? `ATT-${rawId.slice(0, 8).toUpperCase()}` : rawId
-      
+
       const regId = item.registration_id || item.registrationId || item.reg_id || 'N/A'
       const displayReg = typeof regId === 'string' && regId.includes('-') ? `REG-${regId.slice(0, 8).toUpperCase()}` : regId
 
@@ -296,7 +316,7 @@ async function apiFetchAttendanceData(explicitStudentId) {
     }
 
     return { success: true, data: formattedData }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -332,33 +352,34 @@ async function apiFetchStudentAttendanceAnalytics(explicitStudentId) {
 
     const normalizeMonthly = (arr) =>
       arr.map(item => ({
-        month:    item.month || item.month_name || item.name || item.label || '',
-        total:    Number(item.total_events ?? item.total ?? item.count ?? totalRegistered),
+        month: item.month || item.month_name || item.name || item.label || '',
+        total: Number(item.total_events ?? item.total ?? item.count ?? totalRegistered),
         attended: Number(item.attended ?? item.present ?? item.attended_events ?? 0),
       }))
 
     const rawPercentage = payload.attendance_percentage ?? payload.percentage ?? payload.rate ?? null
-    const formattedPercentage = rawPercentage !== null && rawPercentage !== undefined 
-      ? `${Number(rawPercentage).toFixed(2)}%` 
+    const formattedPercentage = rawPercentage !== null && rawPercentage !== undefined
+      ? `${Number(rawPercentage).toFixed(2)}%`
       : null
 
     const data = {
-      monthly:       Array.isArray(monthly) && monthly.length > 0 ? normalizeMonthly(monthly) : undefined,
-      total:         totalRegistered,
-      attended:      Number(payload.total_present ?? payload.attended ?? payload.present ?? 0),
-      percentage:    formattedPercentage,
+      monthly: Array.isArray(monthly) && monthly.length > 0 ? normalizeMonthly(monthly) : undefined,
+      total: totalRegistered,
+      attended: Number(payload.total_present ?? payload.attended ?? payload.present ?? 0),
+      percentage: formattedPercentage,
       present_count: Number(payload.total_present ?? payload.present_count ?? payload.attended ?? 0),
-      absent_count:  Number(payload.total_absent ?? payload.absent_count ?? payload.absent ?? 0),
+      absent_count: Number(payload.total_absent ?? payload.absent_count ?? payload.absent ?? 0),
       categoryBreakdown: payload.category_breakdown || payload.categoryBreakdown || []
     }
 
     return { success: true, data }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiScanAttendanceQR(qrCodeContent) {
+  if (USE_MOCK) return mockScanAttendanceQR(qrCodeContent)
   try {
     const res = await safeFetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
@@ -381,10 +402,10 @@ function formatEventDate(dateTimeStr, fallbackDateStr) {
   if (!dateTimeStr && !fallbackDateStr) return 'TBD'
   try {
     const d = parseNaiveIsoAsUtc(dateTimeStr || fallbackDateStr)
-    if (d && !isNaN(d.getTime())) {
+    if (d && !Number.isNaN(d.getTime())) {
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
     }
-  } catch (err) {
+  } catch {
     // ignore
   }
   return fallbackDateStr || (dateTimeStr ? dateTimeStr.split('T')[0] : 'TBD')
@@ -394,10 +415,10 @@ function formatEventTime(dateTimeStr) {
   if (!dateTimeStr) return 'TBD'
   try {
     const d = parseNaiveIsoAsUtc(dateTimeStr)
-    if (d && !isNaN(d.getTime())) {
+    if (d && !Number.isNaN(d.getTime())) {
       return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
     }
-  } catch (err) {
+  } catch {
     // ignore
   }
   const parts = dateTimeStr.split('T')
@@ -444,35 +465,44 @@ function mapRegisteredEvent(r, matchedEvent) {
   if (!r) return null
   const e = matchedEvent || r.event || r.event_details || {}
   const eventId = r.event_id || r.eventId || e.id || e.event_id || r.id
-  
+
   const title = e.title || e.event_name || e.name || r.event_title || 'Untitled Event'
   const category = e.category || 'General'
   const code = title.split(' ').map(w => w[0]).join('').substring(0, 3).toUpperCase() || 'EV'
 
-  let avatarBg = '#615FFF'
+  let avatarBg
   const catLower = category.toLowerCase()
   if (catLower.includes('tech')) avatarBg = '#615FFF'
   else if (catLower.includes('cult')) avatarBg = '#a78bfa'
   else if (catLower.includes('sport')) avatarBg = '#f43f5e'
   else if (catLower.includes('seminar') || catLower.includes('work')) avatarBg = '#38bdf8'
   else if (catLower.includes('acad')) avatarBg = '#10b981'
+  else avatarBg = '#615FFF'
 
   const dateStr = matchedEvent ? (e.date || 'TBD') : formatEventDate(e.start_datetime || e.startDateTime || e.event_date || r.registeredAt || r.created_at)
   const location = e.venue || e.location || r.venue || 'TBD'
-  
+
+  let rawStatus = 'Registered'
+  if (r.registration_status) {
+    rawStatus = r.registration_status
+  } else if (r.status) {
+    rawStatus = r.status
+  }
+  const status = rawStatus.charAt(0).toUpperCase() + rawStatus.slice(1).toLowerCase()
+
   return {
     id: eventId,
     code,
     title,
     date: dateStr,
     location,
-    status: r.registration_status ? (r.registration_status.charAt(0).toUpperCase() + r.registration_status.slice(1).toLowerCase()) : 
-            r.status ? (r.status.charAt(0).toUpperCase() + r.status.slice(1).toLowerCase()) : 'Registered',
+    status,
     avatarBg
   }
 }
 
 async function apiFetchDashboardOverview() {
+  if (USE_MOCK) return mockFetchDashboardOverview()
   try {
     let attendancePercentage = '0%'
     try {
@@ -480,17 +510,19 @@ async function apiFetchDashboardOverview() {
       if (attRes.success && attRes.data) {
         attendancePercentage = attRes.data.summary?.percentage || attRes.data.percentage || '0%'
       }
-    } catch (e) {
+    } catch {
+      /* ignore */
     }
 
     let certificatesCount = 0
     try {
       const certRes = await apiFetchCertificatesData()
-            if (certRes.success && Array.isArray(certRes.data)) {
+      if (certRes.success && Array.isArray(certRes.data)) {
         certificatesCount = certRes.data.length
       }
-    } catch (e) {
-          }
+    } catch {
+      /* ignore */
+    }
 
     // Fetch all events to map registrations to their details
     let eventsList = []
@@ -499,22 +531,24 @@ async function apiFetchDashboardOverview() {
       if (evRes.success && Array.isArray(evRes.data)) {
         eventsList = evRes.data
       }
-    } catch (e) {
-          }
+    } catch {
+      /* ignore */
+    }
 
     let registeredEventsList = []
     let rawRegs = []
     try {
       const regRes = await apiFetchMyRegistrations()
-            if (regRes.success && Array.isArray(regRes.data)) {
+      if (regRes.success && Array.isArray(regRes.data)) {
         rawRegs = regRes.data
         registeredEventsList = regRes.data.map(r => {
           const matchedEvent = eventsList.find(ev => String(ev.id) === String(r.event_id))
           return mapRegisteredEvent(r, matchedEvent)
         }).filter(Boolean)
       }
-    } catch (e) {
-          }
+    } catch {
+      /* ignore */
+    }
 
     const data = {
       stats: {
@@ -541,18 +575,19 @@ async function apiFetchDashboardOverview() {
       rawRegistrations: rawRegs
     }
 
-        return { success: true, data }
-  } catch (err) {
-        return { success: false, message: err.message || 'Error fetching dashboard data' }
+    return { success: true, data }
+  } catch {
+    return { success: false, message: 'Error fetching dashboard data' }
   }
 }
 
 async function apiFetchEventsData() {
+  if (USE_MOCK) return mockFetchEventsData()
   try {
     let res = await fetch(`${API_BASE}/events`, {
       headers: getStudentHeaders()
     })
-    
+
     if (res.status === 307 || (!res.ok && res.status === 404)) {
       res = await fetch(`${API_BASE}/events/`, {
         headers: getStudentHeaders()
@@ -574,7 +609,7 @@ async function apiFetchEventsData() {
       ])
 
       const paidEventIds = new Set()
-      if (payRes && payRes.ok) {
+      if (payRes?.ok) {
         const payData = await payRes.json().catch(() => ({}))
         const payList = payData.data?.payments || payData.data || payData.payments || payData || []
         if (Array.isArray(payList)) {
@@ -589,7 +624,7 @@ async function apiFetchEventsData() {
         }
       }
 
-      if (regRes && regRes.ok) {
+      if (regRes?.ok) {
         const regData = await regRes.json().catch(() => ({}))
         const regs = regData.data?.registrations || regData.data || regData || []
         if (Array.isArray(regs)) {
@@ -610,14 +645,22 @@ async function apiFetchEventsData() {
             const regPaySt = String(r.payment_status || r.paymentStatus || '').toLowerCase()
             const isPaid = paidEventIds.has(eId) || regPaySt.includes('succ') || regPaySt.includes('comp') || regPaySt.includes('paid')
             const isFailed = regPaySt.includes('fail')
+            let paymentStatus = 'Pending'
+            if (isPaid) {
+              paymentStatus = 'Success'
+            } else if (isFailed) {
+              paymentStatus = 'Failed'
+            }
             registeredMap.set(eId, {
               registered: true,
-              paymentStatus: isPaid ? 'Success' : (isFailed ? 'Failed' : 'Pending')
+              paymentStatus
             })
           })
         }
       }
-    } catch (e) {}
+    } catch {
+      /* ignore */
+    }
 
     // Check locally cancelled events (via cancel button this session)
     const cancelledIds = getCancelledEventIds()
@@ -643,7 +686,7 @@ async function apiFetchEventsData() {
     })
 
     return { success: true, data: mapped }
-  } catch (err) {
+  } catch {
     return { success: false, data: [], message: 'Server unreachable.' }
   }
 }
@@ -651,18 +694,14 @@ async function apiFetchEventsData() {
 function mapStudentCertificate(item, idx) {
   const eventName = item.event_name || item.title || item.event_title || item.event || item.name || 'Campus Event'
   const certNumber = item.certificate_number || item.certificateNumber || item.verifyCode || item.verify_code || `CC-2026-${(idx + 1).toString().padStart(4, '0')}`
-  
+
   let formattedDate = 'N/A'
   const rawDate = item.generated_at || item.issueDate || item.event_date || item.created_at
   if (rawDate) {
-    try {
-      const d = new Date(rawDate)
-      if (!isNaN(d.getTime())) {
-        formattedDate = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-      } else {
-        formattedDate = String(rawDate)
-      }
-    } catch (_e) {
+    const d = new Date(rawDate)
+    if (!Number.isNaN(d.getTime())) {
+      formattedDate = d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
+    } else {
       formattedDate = String(rawDate)
     }
   }
@@ -684,13 +723,14 @@ function mapStudentCertificate(item, idx) {
 }
 
 async function apiFetchCertificatesData() {
+  if (USE_MOCK) return mockFetchCertificatesData()
   try {
     const res = await safeFetch(`${API_BASE}/certificates/my`)
     const data = await res.json()
     if (!res.ok) return { success: false, data: [], message: 'Failed to fetch certificates.' }
     const rawList = data.data || data
     const list = Array.isArray(rawList) ? rawList : []
-    const mapped = list.map(mapStudentCertificate)
+    const mapped = list.map((item, idx) => mapStudentCertificate(item, idx))
     return { success: true, data: mapped }
   } catch {
     return { success: false, data: [], message: 'Server unreachable.' }
@@ -700,22 +740,35 @@ async function apiFetchCertificatesData() {
 function formatStudentLocalTime(dateStr) {
   if (!dateStr) return ''
   try {
-    let cleanStr = dateStr
-    if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.includes('-')) {
+    let cleanStr = String(dateStr).trim()
+
+    // Replace space with 'T' for standard ISO parsing if needed
+    if (cleanStr.includes(' ') && !cleanStr.includes('T')) {
+      cleanStr = cleanStr.replace(' ', 'T')
+    }
+
+    // If it has no timezone indicator, append 'Z' to treat as UTC
+    if (!/(?:Z|[+-]\d{2}:?\d{2})$/.test(cleanStr)) {
       cleanStr += 'Z'
     }
+
     const date = new Date(cleanStr)
-    if (isNaN(date.getTime())) return dateStr
-    
-    return date.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    })
-  } catch (err) {
+    if (Number.isNaN(date.getTime())) return dateStr
+
+    const day = String(date.getDate()).padStart(2, '0')
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const month = months[date.getMonth()]
+    const year = date.getFullYear()
+
+    let hours = date.getHours()
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const ampm = hours >= 12 ? 'pm' : 'am'
+    hours = hours % 12
+    hours = hours || 12
+    const formattedHours = String(hours).padStart(2, '0')
+
+    return `${day} ${month} ${year}, ${formattedHours}:${minutes} ${ampm}`
+  } catch {
     return dateStr
   }
 }
@@ -733,6 +786,13 @@ function getStudentCategoryFromType(type) {
 function mapStudentNotification(n) {
   const type = n.notification_type || n.type || 'system'
   const category = n.category || getStudentCategoryFromType(type)
+  let unread = true
+  if (n.is_read !== undefined) {
+    unread = !n.is_read
+  } else if (n.unread !== undefined) {
+    unread = n.unread
+  }
+
   return {
     ...n,
     id: n.notification_id || n.id,
@@ -740,13 +800,14 @@ function mapStudentNotification(n) {
     category,
     title: n.title,
     message: n.message,
-    unread: n.is_read !== undefined ? !n.is_read : (n.unread !== undefined ? n.unread : true),
+    unread,
     time: n.created_at ? formatStudentLocalTime(n.created_at) : (n.time || ''),
     priority: n.priority || 'normal',
   }
 }
 
 async function apiFetchNotifications() {
+  if (USE_MOCK) return mockFetchNotifications()
   try {
     const res = await safeFetch(`${API_BASE}/notifications`)
     const data = await res.json()
@@ -755,12 +816,13 @@ async function apiFetchNotifications() {
     const rawList = rawData?.stats?.notifications ?? rawData?.notifications ?? (Array.isArray(rawData) ? rawData : [])
     const list = rawList.map(mapStudentNotification)
     return { success: true, data: list }
-  } catch (err) {
+  } catch {
     return { success: false, data: [], message: 'Server unreachable.' }
   }
 }
 
 async function apiMarkNotificationAsRead(id) {
+  if (USE_MOCK) return mockMarkNotificationAsRead(id)
   try {
     const res = await safeFetch(`${API_BASE}/notifications/${id}/read`, {
       method: 'PATCH'
@@ -771,12 +833,13 @@ async function apiMarkNotificationAsRead(id) {
     const rawList = rawData?.stats?.notifications ?? rawData?.notifications ?? (Array.isArray(rawData) ? rawData : [])
     const list = rawList.map(mapStudentNotification)
     return { success: true, data: list }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiMarkAllNotificationsAsRead() {
+  if (USE_MOCK) return mockMarkAllNotificationsAsRead()
   try {
     const res = await safeFetch(`${API_BASE}/notifications/read-all`, {
       method: 'PATCH'
@@ -787,12 +850,26 @@ async function apiMarkAllNotificationsAsRead() {
     const rawList = rawData?.stats?.notifications ?? rawData?.notifications ?? (Array.isArray(rawData) ? rawData : [])
     const list = rawList.map(mapStudentNotification)
     return { success: true, data: list }
-  } catch (err) {
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
+  }
+}
+
+async function apiDeleteNotification(id) {
+  if (USE_MOCK) return mockFetchNotifications() // Fallback to mock behavior internally or mock delete
+  try {
+    const res = await safeFetch(`${API_BASE}/notifications/${id}`, {
+      method: 'DELETE'
+    })
+    if (!res.ok) return { success: false, message: 'Failed to delete notification.' }
+    return { success: true }
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiUpdateStudentProfile(updatedData) {
+  if (USE_MOCK) return mockUpdateStudentProfile(updatedData)
   try {
     const backendPayload = {
       full_name: updatedData.name || updatedData.full_name || updatedData.fullName || '',
@@ -800,7 +877,7 @@ async function apiUpdateStudentProfile(updatedData) {
       gender: updatedData.gender || 'male',
       department: updatedData.department || 'N/A',
       course: updatedData.course || '',
-      year_of_study: parseInt(updatedData.yearOfStudy || updatedData.year_of_study || updatedData.year || '1', 10),
+      year_of_study: Number.parseInt(updatedData.yearOfStudy || updatedData.year_of_study || updatedData.year || '1', 10),
       bio: updatedData.bio || '',
       college_id: updatedData.college || updatedData.college_id || updatedData.collegeId || ''
     }
@@ -815,9 +892,9 @@ async function apiUpdateStudentProfile(updatedData) {
     })
     const data = await res.json()
     if (!res.ok) {
-            return { success: false, message: data.message || 'Failed to update profile.' }
+      return { success: false, message: data.message || 'Failed to update profile.' }
     }
-    
+
     // Map backend user object back to frontend naming convention
     const rawUser = data.data || data.user || data
     const avatarImg = rawUser.profile_image || rawUser.avatar_url || rawUser.avatarUrl || backendPayload.profile_image || updatedData.avatarUrl || updatedData.avatar
@@ -832,8 +909,8 @@ async function apiUpdateStudentProfile(updatedData) {
       avatar: avatarImg || (rawUser.full_name ? rawUser.full_name.substring(0, 2).toUpperCase() : 'AS')
     }
     return { success: true, message: data.message || 'Profile updated successfully!', data: mappedUser }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -843,6 +920,7 @@ async function mockFetchProfile() {
 }
 
 async function apiFetchProfile() {
+  if (USE_MOCK) return mockFetchProfile()
   try {
     const res = await safeFetch(`${API_BASE}/auth/me`, {
       method: 'GET'
@@ -869,12 +947,13 @@ async function apiFetchProfile() {
       avatar: avatarImg || (profile.full_name ? profile.full_name.substring(0, 2).toUpperCase() : 'AS')
     }
     return { success: true, data: mappedUser }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiChangeStudentPassword(payload) {
+  if (USE_MOCK) return mockChangeStudentPassword(payload)
   try {
     const res = await safeFetch(`${API_BASE}/auth/change-password`, {
       method: 'POST',
@@ -893,7 +972,18 @@ async function apiChangeStudentPassword(payload) {
 }
 
 /* ── PUBLIC STUDENT SERVICE API ── */
+function getRegisterEventErrorMessage(data) {
+  let errMsg = data.message || data.detail || 'Registration failed.'
+  if (Array.isArray(data.data) && data.data.length > 0) {
+    errMsg = data.data.map(e => e.message || e.detail || e).join(', ')
+  } else if (data.errors && typeof data.errors === 'object') {
+    errMsg = Object.values(data.errors).flat().join(', ')
+  }
+  return errMsg
+}
+
 async function apiRegisterEvent(eventId, payload) {
+  if (USE_MOCK) return mockRegisterEvent(eventId, payload)
   try {
     const regType = payload.registration_type || 'individual'
     const apiPayload = {
@@ -913,13 +1003,12 @@ async function apiRegisterEvent(eventId, payload) {
     let data = {}
     try {
       data = await res.json()
-    } catch (_jsonErr) {
+    } catch {
       const text = await res.text().catch(() => '')
       data = { detail: text }
     }
 
     if (!res.ok) {
-      // If 500 Internal Server Error (e.g. backend DB constraint / already registered)
       if (res.status === 500 || res.status === 409 || res.status === 400) {
         const msg = (data.detail || data.message || '').toString().toLowerCase()
         if (msg.includes('already') || msg.includes('duplicate') || msg.includes('exist') || res.status === 500) {
@@ -940,12 +1029,7 @@ async function apiRegisterEvent(eventId, payload) {
         }
       }
 
-      let errMsg = data.message || data.detail || 'Registration failed.'
-      if (Array.isArray(data.data) && data.data.length > 0) {
-        errMsg = data.data.map(e => e.message || e.detail || e).join(', ')
-      } else if (data.errors && typeof data.errors === 'object') {
-        errMsg = Object.values(data.errors).flat().join(', ')
-      }
+      const errMsg = getRegisterEventErrorMessage(data)
       return { success: false, message: errMsg }
     }
 
@@ -961,7 +1045,7 @@ async function apiRegisterEvent(eventId, payload) {
     }])
 
     return { success: true, message: data.message || 'Registered successfully!', data: createdData }
-  } catch (_err) {
+  } catch {
     const fallbackId = `reg-${Date.now()}`
     saveMockEventRegistrations([...getMockEventRegistrations(), {
       id: fallbackId,
@@ -987,7 +1071,9 @@ function addCancelledEventId(eventId) {
       existing.push(String(eventId))
       sessionStorage.setItem(CC_CANCELLED_KEY, JSON.stringify(existing))
     }
-  } catch (_) {}
+  } catch {
+    /* ignore */
+  }
 }
 function getCancelledEventIds() {
   try { return JSON.parse(sessionStorage.getItem(CC_CANCELLED_KEY) || '[]') } catch { return [] }
@@ -1009,7 +1095,7 @@ async function apiCancelEventRegistration(eventId) {
       method: 'DELETE',
     })
     let data = {}
-    try { data = await res.json() } catch (_) { }
+    try { data = await res.json() } catch { /* ignore */ }
 
     // Check the response message — "already cancelled" means goal is achieved
     const msg = String(data.message || data.detail || data || '').toLowerCase()
@@ -1029,12 +1115,13 @@ async function apiCancelEventRegistration(eventId) {
     saveMockEventRegistrations(regs.filter(r => String(r.event_id) !== String(eventId) && String(r.eventId) !== String(eventId)))
     addCancelledEventId(eventId)
     return { success: true, message: 'Registration cancelled successfully!' }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiFetchMyRegistrations() {
+  if (USE_MOCK) return mockFetchMyRegistrations()
   try {
     let res = await fetch(`${API_BASE}/registrations/my`, {
       headers: getStudentHeaders()
@@ -1047,7 +1134,7 @@ async function apiFetchMyRegistrations() {
     const data = await res.json()
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch registrations.' }
     return { success: true, data: data.data || data }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -1058,8 +1145,8 @@ async function mockInitiatePayment(registrationId) {
   return {
     success: true,
     data: {
-      payment_id: `pay-mock-${Math.random().toString(36).substr(2, 9)}`,
-      transaction_id: `order_mock_${Math.random().toString(36).substr(2, 9)}`,
+      payment_id: `pay-mock-${getSecureRandomString()}`,
+      transaction_id: `order_mock_${getSecureRandomString()}`,
       amount: 100,
       payment_status: 'pending'
     }
@@ -1077,8 +1164,8 @@ async function mockFailPayment(paymentId) {
 }
 
 async function apiInitiatePayment(registrationId, gateway = 'razorpay', method = 'upi') {
+  if (USE_MOCK) return mockInitiatePayment(registrationId)
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
     const regId = typeof registrationId === 'object' ? (registrationId.registration_id || registrationId.id) : registrationId
     const gWay = typeof registrationId === 'object' && registrationId.payment_gateway ? registrationId.payment_gateway : gateway
     const pMethod = typeof registrationId === 'object' && registrationId.payment_method ? registrationId.payment_method : method
@@ -1100,14 +1187,14 @@ async function apiInitiatePayment(registrationId, gateway = 'razorpay', method =
       return { success: false, message: errMsg }
     }
     return { success: true, data: data.data || data }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiConfirmPayment(paymentId, payload) {
+  if (USE_MOCK) return mockConfirmPayment(paymentId, payload)
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
     const res = await safeFetch(`${API_BASE}/payments/${paymentId}/confirm`, {
       method: 'POST',
       body: JSON.stringify(payload),
@@ -1117,14 +1204,14 @@ async function apiConfirmPayment(paymentId, payload) {
       return { success: false, message: data.message || 'Payment confirmation failed.' }
     }
     return { success: true, data: data.data || data }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiFailPayment(paymentId) {
+  if (USE_MOCK) return mockFailPayment(paymentId)
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
     const res = await safeFetch(`${API_BASE}/payments/${paymentId}/fail`, {
       method: 'POST'
     })
@@ -1133,8 +1220,8 @@ async function apiFailPayment(paymentId) {
       return { success: false, message: data.message || 'Failed to mark payment as failed.' }
     }
     return { success: true, data: data.data || data }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -1149,9 +1236,8 @@ async function mockSelfCheckIn(registrationId, eventId) {
 }
 
 async function apiSelfCheckIn(registrationId, eventId) {
+  if (USE_MOCK) return mockSelfCheckIn(registrationId, eventId)
   try {
-    const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token')
-
     // Swagger: Primary Flow — student scans event QR → send only event_id
     // Swagger: Ticket Flow  — organizer scans student QR → send event_id + registration_id
     const payload = { event_id: eventId }
@@ -1159,19 +1245,19 @@ async function apiSelfCheckIn(registrationId, eventId) {
       payload.registration_id = registrationId
     }
 
-    
+
     const res = await safeFetch(`${API_BASE}/attendance/check-in`, {
       method: 'POST',
       body: JSON.stringify(payload)
     })
     const data = await res.json()
-        if (!res.ok) {
+    if (!res.ok) {
       const errMsg = data.message || data.detail || 'Check-in failed.'
       return { success: false, message: errMsg }
     }
     return { success: true, data: data.data || data }
-  } catch (err) {
-        return { success: false, message: 'Server unreachable.' }
+  } catch {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -1181,7 +1267,7 @@ async function mockSubmitFeedback(eventId, rating, review) {
   await new Promise(r => setTimeout(r, 400));
   const feedbacks = JSON.parse(localStorage.getItem('cc_mock_feedbacks') || '[]');
   const newFeedback = {
-    id: `fb-mock-${Math.random().toString(36).substr(2, 9)}`,
+    id: `fb-mock-${getSecureRandomString()}`,
     event_id: String(eventId),
     rating: Number(rating),
     review: review,
@@ -1208,7 +1294,7 @@ async function apiSubmitFeedback(eventId, rating, review) {
       return { success: false, message: data.message || data.detail || 'Failed to submit feedback.' };
     }
     return { success: true, data: data.data || data, message: 'Feedback submitted successfully!' };
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' };
   }
 }
@@ -1231,7 +1317,7 @@ async function apiFetchMyFeedbacks() {
     }
     const list = data.data?.feedbacks || data.feedbacks || data.data || data || [];
     return { success: true, data: Array.isArray(list) ? list : [] };
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' };
   }
 }
@@ -1255,7 +1341,7 @@ async function apiFetchEventFeedbacks(eventId) {
     }
     const list = data.data?.feedbacks || data.feedbacks || data.data || data || [];
     return { success: true, data: Array.isArray(list) ? list : [] };
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' };
   }
 }
@@ -1279,7 +1365,7 @@ async function apiDeleteFeedback(feedbackId) {
       return { success: false, message: data.message || 'Failed to delete feedback.' };
     }
     return { success: true, message: 'Feedback deleted successfully!' };
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' };
   }
 }
@@ -1308,6 +1394,7 @@ const studentService = {
   fetchEventFeedbacks: (eventId) => apiFetchEventFeedbacks(eventId),
   deleteFeedback: (feedbackId) => apiDeleteFeedback(feedbackId),
   cancelEventRegistration: (eventId) => apiCancelEventRegistration(eventId),
+  deleteNotification: (id) => apiDeleteNotification(id),
 }
 
 export default studentService

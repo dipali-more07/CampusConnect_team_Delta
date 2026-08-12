@@ -1,17 +1,10 @@
 import { fetchWithAuth } from '../utils/apiClient'
 
+
 const USE_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const API_BASE = import.meta.env.VITE_API_BASE_URL
 
 import defaultSettings from '../data/settings.json'
-
-function authHeaders() {
-  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  }
-}
 
 function parseJSON(res) {
   return res.json().catch(() => ({}))
@@ -25,7 +18,7 @@ function getMock() {
   if (local) {
     try {
       return JSON.parse(local)
-    } catch {}
+    } catch { /* ignore */ }
   }
   localStorage.setItem(MOCK_KEY, JSON.stringify(defaultSettings))
   return { ...defaultSettings }
@@ -80,7 +73,7 @@ async function apiFetch() {
         const appData = await parseJSON(appRes)
         fetchedApp = appData.data || appData.settings || {}
       }
-    } catch (_e) {}
+    } catch { /* ignore */ }
 
     const settings = {
       profile: {
@@ -99,7 +92,7 @@ async function apiFetch() {
       }
     }
     return { success: true, settings }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -137,7 +130,7 @@ async function apiUpdateProfile(profileData) {
       }
     }
     return { success: true, message: data.message || 'Profile updated successfully.', settings }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -165,7 +158,7 @@ async function apiUpdateAppearance(appearanceData) {
       }
     }
     return { success: true, message: data.message || 'Appearance updated successfully.', settings }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -179,7 +172,7 @@ async function apiUpdatePassword(passwordData) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update password.' }
     return { success: true, message: data.message || 'Password updated.' }
-  } catch (err) {
+  } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }

@@ -1,5 +1,11 @@
 import React from 'react'
 
+const getRoleColor = (role) => {
+  if (role === 'Admin') return '#ef4444'
+  if (role === 'Organizer') return '#FE9A00'
+  return '#00BC7D'
+}
+
 export default function SettingsPermissionsTab({ permissions, tokens }) {
   return (
     <div className="space-y-6">
@@ -9,7 +15,7 @@ export default function SettingsPermissionsTab({ permissions, tokens }) {
 
       <div className="space-y-4 max-w-[600px]">
         {Object.entries(permissions).map(([role, list]) => {
-          const color = role === 'Admin' ? '#ef4444' : role === 'Organizer' ? '#FE9A00' : '#00BC7D'
+          const color = getRoleColor(role)
           return (
             <div key={role} className="border rounded-2xl p-5 space-y-3" style={{ borderColor: tokens.border }}>
               <div className="flex items-center gap-2">

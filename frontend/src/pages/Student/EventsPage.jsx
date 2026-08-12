@@ -40,14 +40,38 @@ export default function EventsPage({ tokens: inputTokens }) {
   // Set of event IDs for which this student has already submitted feedback
   const [feedbackedEventIds, setFeedbackedEventIds] = useState(new Set())
 
+  const broadcastSync = (type) => {
+    try {
+      const channel = new BroadcastChannel('cc_global_sync_channel')
+      channel.postMessage(type)
+      channel.close()
+    } catch {}
+  }
+
   useEffect(() => {
     let cancelled = false
-    studentService.fetchEventsData().then(res => {
-      if (cancelled) return
-      if (res.success) setEventsList(res.data)
-      setLoading(false)
-    })
-    return () => { cancelled = true }
+    const loadEventsData = () => {
+      studentService.fetchEventsData().then(res => {
+        if (cancelled) return
+        if (res.success) setEventsList(res.data)
+        setLoading(false)
+      })
+    }
+    loadEventsData()
+
+    const channel = new BroadcastChannel('cc_global_sync_channel')
+    const handleMessage = (e) => {
+      if (e.data === 'refresh_events') {
+        loadEventsData()
+      }
+    }
+    channel.addEventListener('message', handleMessage)
+
+    return () => {
+      cancelled = true
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
   }, [])
 
   // Fetch attendance records to know which events the student actually attended
@@ -322,6 +346,7 @@ export default function EventsPage({ tokens: inputTokens }) {
     showToast('Successfully registered for event! 🎉', 'success')
     setSelectedEvent(null)
     setInitialRegType('individual')
+    broadcastSync('refresh_events')
   }
 
   const handleCancelRegistration = async (event) => {
@@ -354,6 +379,7 @@ export default function EventsPage({ tokens: inputTokens }) {
         } else {
           showToast('Registration cancelled successfully!', 'success')
         }
+        broadcastSync('refresh_events')
       } else {
         // Revert if API failed
         setEventsList(prev => markRegistered(prev))

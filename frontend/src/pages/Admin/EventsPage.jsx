@@ -39,6 +39,66 @@ const formatNaiveDateTime = (dateTimeStr) => {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`
 }
 
+const getEventDynamicStatus = (event) => {
+  const st = String(event.status || '').toLowerCase()
+  if (st === 'draft') return 'draft'
+  if (st === 'cancelled') return 'cancelled'
+  if (st === 'completed' || st === 'finished') return 'completed'
+  if (st === 'ongoing' || st === 'running') return 'ongoing'
+
+  const now = new Date()
+  let eventStart = null
+  let eventEnd = null
+
+  const rawStart = event.start_datetime || event.startDateTime || event.date || event.event_date
+  const rawEnd = event.end_datetime || event.endDateTime
+
+  if (rawStart) {
+    try {
+      let cleanStart = String(rawStart).trim()
+      if (cleanStart.includes(' ') && !cleanStart.includes('T')) {
+        cleanStart = cleanStart.replace(' ', 'T')
+      }
+      if (!/Z|[+-]\d{2}:?\d{2}$/.test(cleanStart)) {
+        if (!cleanStart.includes('T')) {
+          const rawTime = event.time || '09:00'
+          cleanStart = `${cleanStart}T${rawTime}:00`
+        }
+        cleanStart += 'Z'
+      }
+      const d = new Date(cleanStart)
+      if (!Number.isNaN(d.getTime())) eventStart = d
+    } catch {}
+  }
+
+  if (rawEnd) {
+    try {
+      let cleanEnd = String(rawEnd).trim()
+      if (cleanEnd.includes(' ') && !cleanEnd.includes('T')) {
+        cleanEnd = cleanEnd.replace(' ', 'T')
+      }
+      if (!/Z|[+-]\d{2}:?\d{2}$/.test(cleanEnd)) {
+        if (!cleanEnd.includes('T')) {
+          cleanEnd = `${cleanEnd}T18:00:00`
+        }
+        cleanEnd += 'Z'
+      }
+      const d = new Date(cleanEnd)
+      if (!Number.isNaN(d.getTime())) eventEnd = d
+    } catch {}
+  } else if (eventStart) {
+    eventEnd = new Date(eventStart.getTime() + 3 * 60 * 60 * 1000)
+  }
+
+  if (eventEnd && now >= eventEnd) {
+    return 'completed'
+  }
+  if (eventStart && eventEnd && now >= eventStart && now < eventEnd) {
+    return 'ongoing'
+  }
+  return 'upcoming'
+}
+
 export default function EventsPage({ tokens }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
@@ -104,12 +164,23 @@ export default function EventsPage({ tokens }) {
   const [importText, setImportText] = useState('')
   const [importing, setImporting] = useState(false)
 
+  const broadcastSync = (type) => {
+    try {
+      const channel = new BroadcastChannel('cc_global_sync_channel')
+      channel.postMessage(type)
+      channel.close()
+    } catch {}
+  }
+
   // Fetch events
-  const loadEvents = async () => {
+  const loadEvents = async (triggerBroadcast = false) => {
     setLoading(true)
     const res = await eventsService.fetchAll()
     if (res.success) {
       setEvents(res.events)
+      if (triggerBroadcast) {
+        broadcastSync('refresh_events')
+      }
     } else {
       showToast(res.message || 'Failed to load events.', 'error')
     }
@@ -118,16 +189,34 @@ export default function EventsPage({ tokens }) {
 
   useEffect(() => {
     loadEvents()
+    const channel = new BroadcastChannel('cc_global_sync_channel')
+    const handleMessage = (e) => {
+      if (e.data === 'refresh_events') {
+        loadEvents(false)
+      }
+    }
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
   }, [])
 
   // Categories & Event Types
   const categories = ['All', 'Technical', 'Cultural', 'Seminar', 'Sports', 'Academic', 'Workshop', 'Other']
   const eventTypes = ['Individual', 'Team', 'Both']
-  const statuses = ['All', 'Upcoming', 'Draft', 'Ongoing', 'Completed', 'Cancelled']
+  const statuses = ['All', 'Upcoming', 'Draft', 'Ongoing', 'Completed', 'Approved']
 
   // Filter events
   const filteredEvents = events.filter(event => {
-    const statusMatch = activeStatus === 'All' || event.status === activeStatus
+    let statusMatch = false
+    if (activeStatus === 'All') {
+      statusMatch = true
+    } else if (activeStatus === 'Approved') {
+      statusMatch = (event.approvalStatus || 'Approved').toLowerCase() === 'approved'
+    } else {
+      statusMatch = getEventDynamicStatus(event) === activeStatus.toLowerCase()
+    }
     const categoryMatch = activeCategory === 'All' || event.category === activeCategory
     
     const searchLower = searchQuery.toLowerCase()
@@ -282,7 +371,7 @@ export default function EventsPage({ tokens }) {
     if (res.success) {
       showToast(`Event "${eventName}" deleted successfully.`, 'success')
       setDeleteConfirmOpen(false);
-      loadEvents()
+      loadEvents(true)
     } else {
       showToast(res.message || 'Failed to delete event.', 'error')
     }
@@ -315,7 +404,7 @@ export default function EventsPage({ tokens }) {
       }
       showToast(toastMsg, 'success')
       setApprovalConfirmModal({ open: false, event: null, targetStatus: 'Approved' })
-      loadEvents()
+      loadEvents(true)
     } else {
       showToast(res.message || 'Failed to update approval status.', 'error')
     }
@@ -408,7 +497,7 @@ export default function EventsPage({ tokens }) {
       if (selectedEvent && viewingDetailEvent && viewingDetailEvent.id === selectedEvent.id) {
         setViewingDetailEvent(res.event)
       }
-      loadEvents()
+      loadEvents(true)
     } else {
       showToast(res.message || 'Failed to save event.', 'error')
     }
@@ -444,7 +533,7 @@ export default function EventsPage({ tokens }) {
     if (res.success) {
       showToast(`Imported ${res.count} demo events successfully.`, 'success')
       setImportOpen(false)
-      loadEvents()
+      loadEvents(true)
     } else {
       showToast('Failed to import events.', 'error')
     }
@@ -462,7 +551,7 @@ export default function EventsPage({ tokens }) {
         showToast(`Imported ${res.count} events successfully.`, 'success')
         setImportText('')
         setImportOpen(false)
-        loadEvents()
+        loadEvents(true)
       } else {
         showToast(res.message || 'Import failed.', 'error')
       }
@@ -475,28 +564,29 @@ export default function EventsPage({ tokens }) {
 
   // Style helper based on status badge
   const getStatusBadgeStyles = (status) => {
-    switch (status) {
-      case 'Upcoming':
+    const s = String(status || '').toLowerCase()
+    switch (s) {
+      case 'upcoming':
         return {
           bg: dark ? 'rgba(97, 95, 255, 0.15)' : 'rgba(97, 95, 255, 0.1)',
           text: BRAND,
         }
-      case 'Draft':
+      case 'draft':
         return {
           bg: dark ? 'rgba(100, 116, 139, 0.15)' : 'rgba(100, 116, 139, 0.1)',
           text: dark ? '#94a3b8' : '#475569',
         }
-      case 'Ongoing':
+      case 'ongoing':
         return {
           bg: dark ? 'rgba(0, 188, 125, 0.15)' : 'rgba(0, 188, 125, 0.1)',
           text: '#00BC7D',
         }
-      case 'Completed':
+      case 'completed':
         return {
           bg: dark ? 'rgba(122, 152, 187, 0.15)' : 'rgba(100, 116, 139, 0.1)',
           text: dark ? '#7a98bb' : '#64748b',
         }
-      case 'Cancelled':
+      case 'cancelled':
         return {
           bg: dark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.1)',
           text: '#ef4444',

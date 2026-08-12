@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { ToastProvider } from './context/ToastContext'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -8,6 +8,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard'
 import StudentDashboard from './pages/Student/StudentDashboard'
 import OrganizerDashboard from './pages/Organizer/OrganizerDashboard'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import SplashLoader from './components/common/SplashLoader'
 
 function getEffectiveRole(user) {
   const r = (user?.role || user?.userType || user?.user_type || '').toLowerCase()
@@ -66,10 +67,21 @@ function AppRouter() {
   const { isLoggedIn, user } = useAuth()
   const role = getEffectiveRole(user) || 'student'
 
+  const [showSplash, setShowSplash] = useState(false)
+  const prevLoggedIn = useRef(isLoggedIn)
+
+  useEffect(() => {
+    if (isLoggedIn && !prevLoggedIn.current) {
+      setShowSplash(true)
+    }
+    prevLoggedIn.current = isLoggedIn
+  }, [isLoggedIn])
+
   return (
-    <Routes>
-      {/* Public: Reset Password (must be before login redirect) */}
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <>
+      <Routes>
+        {/* Public: Reset Password (must be before login redirect) */}
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route
         path="/login"
@@ -147,8 +159,10 @@ function AppRouter() {
       />
 
       {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      {showSplash && <SplashLoader onDone={() => setShowSplash(false)} />}
+    </>
   )
 }
 

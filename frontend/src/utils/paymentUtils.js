@@ -17,6 +17,15 @@ export function loadRazorpayScript() {
   })
 }
 
+function getSecureRandomString() {
+  if (typeof window !== 'undefined' && window.crypto) {
+    const arr = new Uint32Array(1)
+    window.crypto.getRandomValues(arr)
+    return arr[0].toString(36)
+  }
+  return Date.now().toString(36)
+}
+
 /**
  * Handles end-to-end Razorpay / Mock Payment flow
  */
@@ -37,17 +46,17 @@ export async function processRazorpayPayment({
   const isMockOrder = !transaction_id || transaction_id.startsWith('order_mock') || USE_MOCK || !hasValidKey
 
   if (isMockOrder) {
-    const mockOrder = transaction_id || `order_mock_${Math.random().toString(36).substring(2, 9)}`
+    const mockOrder = transaction_id || `order_mock_${getSecureRandomString()}`
     const confirmRes = await studentService.confirmPayment(payment_id, {
       transaction_id: mockOrder,
-      razorpay_payment_id: `pay_mock_${Math.random().toString(36).substring(2, 9)}`,
+      razorpay_payment_id: `pay_mock_${getSecureRandomString()}`,
       razorpay_order_id: mockOrder,
-      razorpay_signature: `sig_mock_${Math.random().toString(36).substring(2, 9)}`
+      razorpay_signature: `sig_mock_${getSecureRandomString()}`
     })
     if (confirmRes.success) {
-      onSuccess && onSuccess(confirmRes)
+      onSuccess?.(confirmRes)
     } else {
-      onError && onError(confirmRes.message || 'Mock payment confirmation failed.')
+      onError?.(confirmRes.message || 'Mock payment confirmation failed.')
     }
     return
   }
@@ -55,7 +64,7 @@ export async function processRazorpayPayment({
   // Real Razorpay Flow
   const loaded = await loadRazorpayScript()
   if (!loaded) {
-    onError && onError('Razorpay SDK failed to load. Please check internet connection.')
+    onError?.('Razorpay SDK failed to load. Please check internet connection.')
     return
   }
 
@@ -82,17 +91,17 @@ export async function processRazorpayPayment({
         razorpay_signature: response.razorpay_signature
       })
       if (confirmRes.success) {
-        onSuccess && onSuccess(confirmRes)
+        onSuccess?.(confirmRes)
       } else {
-        onError && onError(confirmRes.message || 'Payment verification failed.')
+        onError?.(confirmRes.message || 'Payment verification failed.')
       }
     },
     modal: {
       ondismiss: async function () {
         try {
           if (payment_id) await studentService.failPayment(payment_id)
-        } catch (_e) {}
-        onError && onError('Payment was cancelled by user.')
+        } catch { /* ignore */ }
+        onError?.('Payment was cancelled by user.')
       }
     }
   }
@@ -102,11 +111,11 @@ export async function processRazorpayPayment({
     rzp.on('payment.failed', async function (response) {
       try {
         if (payment_id) await studentService.failPayment(payment_id)
-      } catch (_e) {}
-      onError && onError(response.error?.description || 'Payment failed.')
+      } catch { /* ignore */ }
+      onError?.(response.error?.description || 'Payment failed.')
     })
     rzp.open()
-  } catch (err) {
-    onError && onError('Failed to open Razorpay payment modal.')
+  } catch {
+    onError?.('Failed to open Razorpay payment modal.')
   }
 }

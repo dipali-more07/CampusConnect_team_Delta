@@ -26,6 +26,44 @@ import SettingsPage from '../Admin/SettingsPage'
 import NotificationPanel from '../../components/admin/adminDashboard/NotificationPanel'
 import PageTransition from '../../components/common/PageTransition'
 
+const playNotificationSound = () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+    const ctx = new AudioContext()
+    
+    // First chime (ding)
+    const osc1 = ctx.createOscillator()
+    const gain1 = ctx.createGain()
+    osc1.connect(gain1)
+    gain1.connect(ctx.destination)
+    
+    osc1.type = 'sine'
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime) // D5 note
+    gain1.gain.setValueAtTime(0.15, ctx.currentTime)
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+    
+    osc1.start(ctx.currentTime)
+    osc1.stop(ctx.currentTime + 0.4)
+    
+    // Second chime (higher ding, slightly offset)
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    
+    osc2.type = 'sine'
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.08) // A5 note
+    gain2.gain.setValueAtTime(0.15, ctx.currentTime + 0.08)
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.48)
+    
+    osc2.start(ctx.currentTime + 0.08)
+    osc2.stop(ctx.currentTime + 0.48)
+  } catch {
+    /* ignore */
+  }
+}
+
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const showToast = useToast()
@@ -124,6 +162,13 @@ export default function AdminDashboard() {
         fingerprint(prev) !== fingerprint(incoming)
 
       if (hasChanged) {
+        if (prevNotifsRef.current !== null && prev.length > 0) {
+          const prevIds = new Set(prev.map(n => n.id))
+          const hasNewUnread = incoming.some(n => n.unread && !prevIds.has(n.id))
+          if (hasNewUnread) {
+            playNotificationSound()
+          }
+        }
         prevNotifsRef.current = incoming
         setRawNotifications(incoming)
         setNotifStats(res.stats || {})
@@ -137,22 +182,49 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     fetchNotifs(true)
+    const channel = new BroadcastChannel('cc_notifications_channel')
+    const handleMessage = (e) => {
+      if (e.data === 'refresh_notifications') {
+        fetchNotifs(false)
+      }
+    }
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
   }, [fetchNotifs])
 
   // ── Load dashboard stats from service
   useEffect(() => {
     let cancelled = false
-    setStatsLoading(true)
-    dashboardService.fetchStats().then(res => {
-      if (cancelled) return
-      if (res?.success && Array.isArray(res?.stats)) {
-        setDashboardStats(enrichStats(res.stats))
+    const loadStats = () => {
+      setStatsLoading(true)
+      dashboardService.fetchStats().then(res => {
+        if (cancelled) return
+        if (res?.success && Array.isArray(res?.stats)) {
+          setDashboardStats(enrichStats(res.stats))
+        }
+        setStatsLoading(false)
+      }).catch(() => {
+        if (!cancelled) setStatsLoading(false)
+      })
+    }
+    loadStats()
+
+    const channel = new BroadcastChannel('cc_global_sync_channel')
+    const handleMessage = (e) => {
+      if (['refresh_events', 'refresh_students', 'refresh_organizers'].includes(e.data)) {
+        loadStats()
       }
-      setStatsLoading(false)
-    }).catch(() => {
-      if (!cancelled) setStatsLoading(false)
-    })
-    return () => { cancelled = true }
+    }
+    channel.addEventListener('message', handleMessage)
+
+    return () => {
+      cancelled = true
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
   }, [])
 
   // ── Optimistic mark-read (updates UI instantly, syncs to API)
@@ -310,6 +382,7 @@ export default function AdminDashboard() {
                 loading={notifLoading}
                 onMarkRead={handleMarkRead}
                 onDelete={handleDelete}
+                userRole="admin"
               />
             ) : (
               /* ─── Default Dashboard ─── */
