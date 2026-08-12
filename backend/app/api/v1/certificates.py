@@ -1,4 +1,3 @@
- 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
@@ -301,4 +300,3 @@ def design_template(
         
     _write_templates(templates)
     return success_response(message="Template designed/saved successfully", data={"template_id": t_id})
-
