@@ -32,10 +32,30 @@ class ResultService:
             raise NotFoundException(f"Event with ID '{data.event_id}' not found")
 
         # Check event has completed
-        from datetime import datetime
+        from datetime import datetime, timedelta
         from app.core.constants import EventStatus
-        if event.end_datetime and event.end_datetime > datetime.utcnow() and event.status != EventStatus.COMPLETED:
+
+        status_val = str(event.status.value if hasattr(event.status, "value") else event.status).upper()
+        now = datetime.now()
+        now_utc = datetime.utcnow()
+
+        is_ended = False
+        if not event.end_datetime:
+            is_ended = True
+        else:
+            is_ended = (
+                event.end_datetime <= now or
+                event.end_datetime <= now_utc or
+                event.end_datetime <= (now_utc + timedelta(hours=6))
+            )
+
+        if status_val != EventStatus.COMPLETED.value.upper() and not is_ended:
             raise BadRequestException("Results can only be declared after the event has completed")
+
+        if status_val != EventStatus.COMPLETED.value.upper():
+            event.status = EventStatus.COMPLETED
+            self.db.commit()
+            self.db.refresh(event)
 
         # 2. Check if user is organizer of the event or admin
         if current_user.role != UserRole.ADMIN and event.organizer_id != current_user.user_id:
