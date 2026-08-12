@@ -82,6 +82,38 @@ def delete_notification(
     return success_response(message="Notification deleted")
 
 
+from app.database.deps import get_current_user, require_admin, require_organizer
+from app.services.notification_service import NotificationService
+from app.schemas.notification import CreateNotificationRequest, CreateEventNotificationRequest
+
+
+@router.post("/events/{event_id}", status_code=201, summary="Send notification to registered participants of a specific event")
+def send_event_notification(
+    event_id: str,
+    data: CreateEventNotificationRequest,
+    current_user: User = Depends(require_organizer),
+    db: Session = Depends(get_db),
+):
+    """
+    Sends notification ONLY to participants registered for this specific event.
+    - Organizer: Allowed ONLY for events created by them.
+    - Admin: Full access for all events.
+    """
+    service = NotificationService(db)
+    count = service.send_event_notification(
+        event_id=event_id,
+        title=data.title,
+        message=data.message,
+        notification_type=data.notification_type,
+        sender_user=current_user,
+    )
+    return success_response(
+        message=f"Notification sent to {count} registered participants of this event",
+        data={"recipients_count": count, "event_id": event_id},
+        status_code=201
+    )
+
+
 @router.post("/broadcast", status_code=201, summary="Send notification to user or broadcast to everyone (Admin only)")
 def broadcast_notification(
     data: CreateNotificationRequest,

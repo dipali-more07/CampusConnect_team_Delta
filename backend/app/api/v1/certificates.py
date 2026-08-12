@@ -225,9 +225,9 @@ def list_all_certificates(
     )
 
 
-@router.get("/templates", summary="Get certificate design templates (Admin/Organizer only)")
+@router.get("/templates", summary="Get certificate design templates")
 def get_templates(
-    current_user: User = Depends(require_organizer),
+    current_user: User = Depends(get_current_user),
 ):
     templates = _read_templates()
     return success_response(message="Certificate templates fetched", data=templates)

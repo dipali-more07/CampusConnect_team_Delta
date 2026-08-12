@@ -37,19 +37,34 @@ import base64
 
 def decode_prehashed_or_base64_password(password: str) -> str:
     """
-    If password is base64 encoded (e.g. btoa from frontend), decode it.
+    If password is base64 encoded (e.g. btoa from frontend), dynamically decode it.
     Otherwise return the password as-is.
     """
-    if not password:
+    if not isinstance(password, str):
         return password
+
+    v_clean = password.strip()
+    if not v_clean:
+        return v_clean
+
     try:
-        decoded_bytes = base64.b64decode(password)
-        decoded_str = decoded_bytes.decode("utf-8")
-        if base64.b64encode(decoded_str.encode("utf-8")).decode("utf-8") == password.strip():
-            return decoded_str
+        padding_needed = (4 - len(v_clean) % 4) % 4
+        padded_v = v_clean + ("=" * padding_needed)
+
+        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                decoded_bytes = decoder(padded_v)
+                decoded_str = decoded_bytes.decode("utf-8").strip()
+                if decoded_str and all(ord(c) >= 32 for c in decoded_str):
+                    encoded_again = base64.b64encode(decoded_str.encode("utf-8")).decode("utf-8").rstrip("=")
+                    if encoded_again == v_clean.rstrip("="):
+                        return decoded_str
+            except Exception:
+                pass
     except Exception:
         pass
-    return password
+
+    return v_clean
 
 
 def hash_password(plain_password: str) -> str:

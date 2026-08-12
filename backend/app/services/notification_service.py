@@ -59,6 +59,59 @@ class NotificationService:
         
         self.db.commit()
 
+    def send_event_notification(
+        self,
+        event_id: str,
+        title: str,
+        message: str,
+        notification_type: NotificationType = NotificationType.EVENT,
+        sender_user: Optional[User] = None,
+    ) -> int:
+        """
+        Send notification to all registered participants of a specific event.
+        - ORGANIZER: Can ONLY send to participants of their OWN event.
+        - ADMIN: Full access to send to any event's participants.
+        """
+        from app.models.event import Event
+        from app.models.registration import EventRegistration
+        from app.core.constants import RegistrationStatus
+        from sqlalchemy import select
+
+        event = self.db.execute(
+            select(Event).where(Event.event_id == event_id)
+        ).scalar_one_or_none()
+
+        if not event:
+            raise NotFoundException(f"Event {event_id} not found")
+
+        # Access Control Check:
+        # If user is ORGANIZER, they MUST be the owner of this event
+        if sender_user and sender_user.role == UserRole.ORGANIZER:
+            if event.organizer_id != sender_user.user_id:
+                raise ForbiddenException("You can only send notifications for your own events")
+
+        # Get all registered user IDs for this specific event
+        registered_user_ids = self.db.execute(
+            select(EventRegistration.participant_id).where(
+                EventRegistration.event_id == event_id,
+                EventRegistration.registration_status == RegistrationStatus.CONFIRMED
+            )
+        ).scalars().all()
+
+        unique_user_ids = list(set(registered_user_ids))
+
+        for u_id in unique_user_ids:
+            notification = Notification(
+                user_id=u_id,
+                title=title,
+                message=message,
+                notification_type=notification_type,
+            )
+            self.notif_repo.create(notification)
+
+        self.db.commit()
+        return len(unique_user_ids)
+
     def get_user_notifications(
         self,
         user_id: str,

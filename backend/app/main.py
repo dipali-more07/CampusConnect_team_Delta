@@ -36,6 +36,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.api.v1.router import api_router
 from app.middleware.logging_middleware import LoggingMiddleware
+from app.middleware.payload_obfuscation_middleware import PayloadObfuscationMiddleware
 from app.middleware.rate_limit_middleware import limiter, rate_limit_exceeded_handler
 # pyrefly: ignore [missing-import]
 from slowapi.errors import RateLimitExceeded
@@ -178,6 +179,9 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 
 # 1. Request/Response Logging
 app.add_middleware(LoggingMiddleware)
+
+# 2. Payload Obfuscation & Decryption
+app.add_middleware(PayloadObfuscationMiddleware)
 
 # 2. CORS - Allow frontend to call our API
 cors_args = {

@@ -6,29 +6,59 @@ from typing import Optional
 
 
 def decode_btoa_email(v: any) -> any:
-    """Decodes base64 (btoa) encoded email if sent from frontend."""
-    if isinstance(v, str):
-        if "@" in v:
-            return v
-        try:
-            decoded = base64.b64decode(v).decode("utf-8")
-            if "@" in decoded:
-                return decoded
-        except Exception:
-            pass
-    return v
+    """Dynamically decodes plain text or base64 (btoa) encoded email."""
+    if not isinstance(v, str):
+        return v
+
+    v_clean = v.strip()
+    if "@" in v_clean:
+        return v_clean
+
+    try:
+        padding_needed = (4 - len(v_clean) % 4) % 4
+        padded_v = v_clean + ("=" * padding_needed)
+
+        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                decoded_bytes = decoder(padded_v)
+                decoded_str = decoded_bytes.decode("utf-8", errors="ignore").strip()
+                if "@" in decoded_str:
+                    return decoded_str
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return v_clean
 
 
 def decode_btoa_password(v: any) -> any:
-    """Decodes base64 (btoa) encoded password if sent from frontend."""
-    if isinstance(v, str):
-        try:
-            decoded = base64.b64decode(v).decode("utf-8")
-            if base64.b64encode(decoded.encode("utf-8")).decode("utf-8") == v.strip():
-                return decoded
-        except Exception:
-            pass
-    return v
+    """Dynamically decodes plain text or base64 (btoa) encoded password."""
+    if not isinstance(v, str):
+        return v
+
+    v_clean = v.strip()
+    if not v_clean:
+        return v_clean
+
+    try:
+        padding_needed = (4 - len(v_clean) % 4) % 4
+        padded_v = v_clean + ("=" * padding_needed)
+
+        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                decoded_bytes = decoder(padded_v)
+                decoded_str = decoded_bytes.decode("utf-8").strip()
+                if decoded_str and all(ord(c) >= 32 for c in decoded_str):
+                    encoded_again = base64.b64encode(decoded_str.encode("utf-8")).decode("utf-8").rstrip("=")
+                    if encoded_again == v_clean.rstrip("="):
+                        return decoded_str
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return v_clean
 
 
 class RegisterRequest(BaseModel):
@@ -89,6 +119,8 @@ class RegisterRequest(BaseModel):
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
         """Enforce strong password rules."""
+        if isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdefABCDEF" for c in v):
+            return v
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must contain at least one uppercase letter")
         if not re.search(r"[a-z]", v):
@@ -156,6 +188,8 @@ class ResetPasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
+        if isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdefABCDEF" for c in v):
+            return v
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must contain at least one uppercase letter")
         if not re.search(r"[a-z]", v):
@@ -185,6 +219,8 @@ class ChangePasswordRequest(BaseModel):
     @field_validator("new_password")
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
+        if isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdefABCDEF" for c in v):
+            return v
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must have uppercase")
         if not re.search(r"[a-z]", v):
