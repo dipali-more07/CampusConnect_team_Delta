@@ -785,77 +785,14 @@ class AIService:
             return reply, []
 
         # -------------------------------------------------------------
-        # D. EVENT DRAFTING & ORGANIZER GUIDANCE
-        # -------------------------------------------------------------
-        if any(w in query for w in ["description", "draft", "organize", "template"]):
-            reply = (
-                f"### ✍️ High-Converting Event Description Template\n\n"
-                f"**Title:** Annual Innovation Hackathon 2026\n\n"
-                f"**About the Event:**\n"
-                f"Join us for an exciting 24-hour hands-on hackathon where student teams collaborate to solve real-world industry challenges! "
-                f"Gain mentorship from industry experts, win cash prizes, and earn verified certificates of merit.\n\n"
-                f"**Highlights:**\n"
-                f"- 💡 Real-world Problem Statements\n"
-                f"- 🏆 Cash Prizes & Verified Winner Certificates\n"
-                f"- 🍕 Complimentary Refreshments & Mentorship"
-            )
-            return reply, []
-
-        # -------------------------------------------------------------
-        # E. CERTIFICATES, BADGES & QR VERIFICATION
-        # -------------------------------------------------------------
-        if any(w in query for w in ["certificate", "download", "verify", "badge", "score", "points"]):
-            reply = (
-                f"### 📜 Certificate & Achievement Overview\n\n"
-                f"- 🏆 **Badge Level:** `{context['badge']}` ({context['performance_score']} Pts)\n"
-                f"- 📄 **Verified Certificates:** `{context['certificates_count']}` Earned\n\n"
-                f"**Step-by-Step Management:**\n"
-                f"1. Visit the **My Certificates** tab in your dashboard to download PDF copies.\n"
-                f"2. Every certificate includes a unique **Verification QR Code**.\n"
-                f"3. Anyone can scan the QR code to verify authenticity instantly at `/api/v1/certificates/verify/<cert_no>`."
-            )
-            return reply, []
-
-        # -------------------------------------------------------------
-        # F. EVENT RECOMMENDATIONS & REGISTRATION
-        # -------------------------------------------------------------
-        if any(w in query for w in ["recommend", "suggest", "hackathon", "event", "upcoming", "show events"]):
-            if not events:
-                return "Currently, there are no published upcoming events.", []
-            
-            event_items = []
-            for e in events[:4]:
-                price_str = "Free" if not e.get("is_paid") else f"Rs {e.get('price', 0)}"
-                loc_str = e.get("location") or "Campus Hall"
-                title_str = e.get("title")
-                cat_str = e.get("category")
-                event_items.append(f"- 🚀 **{title_str}** ({cat_str}) - Location: {loc_str} | Price: {price_str}")
-            event_list_str = "\n".join(event_items)
-
-            reply = f"### 🎓 Recommended Events for {context['course']}:\n\n{event_list_str}"
-            return reply, rec_events
-
-        # -------------------------------------------------------------
-        # G. PLATFORM OVERVIEW & ADMIN STATS
-        # -------------------------------------------------------------
-        if any(w in query for w in ["overview", "platform", "stats", "admin", "system"]):
-            reply = (
-                f"### 🛡️ Live Platform Overview\n\n"
-                f"- 📅 **Active Published Events:** `{len(events)}` Events\n"
-                f"- 👤 **Account Role:** `{role.upper()}`\n"
-                f"- ⚡ **System Status:** All Services Operational (JWT Auth, QR Scanner, PDF Generator, SMTP Engine)"
-            )
-            return reply, []
-
-        # -------------------------------------------------------------
-        # H. OUT-OF-PROJECT GENERAL KNOWLEDGE SEARCH (DUCKDUCKGO API)
+        # D. OUT-OF-PROJECT GENERAL KNOWLEDGE SEARCH (DUCKDUCKGO API)
         # -------------------------------------------------------------
         ddg_answer = await self._query_duckduckgo_knowledge(raw_query)
         if ddg_answer:
             return ddg_answer, []
 
         # -------------------------------------------------------------
-        # I. GENERAL HELPFUL RESPONSE FOR CUSTOM USER QUESTIONS
+        # E. GENERAL HELPFUL RESPONSE FOR CUSTOM USER QUESTIONS
         # -------------------------------------------------------------
         reply = (
             f"Here is what I can share regarding **'{raw_query}'**:\n\n"
