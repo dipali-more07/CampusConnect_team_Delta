@@ -17,8 +17,6 @@ from app.core.config import settings
 logger = logging.getLogger(__name__)
 
 try:
-    
-     
     from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
     HAS_FASTAPI_MAIL = True
     mail_config = ConnectionConfig(
@@ -36,12 +34,6 @@ except ImportError:
     HAS_FASTAPI_MAIL = False
     mail_config = None
 
-
-class EmailService:
-    """
-    Handles all email sending in the application.
-    Integrates with fastapi-mail for real SMTP sending when configured.
-    """
 
 def build_email_template(
     title: str,
