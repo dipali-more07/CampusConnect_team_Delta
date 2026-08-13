@@ -129,14 +129,15 @@ def build_email_template(
 class EmailService:
     """
     Handles all email sending in the application.
-    Integrates with fastapi-mail for real SMTP sending when configured.
+    Supports authenticated SMTP (Gmail/SendGrid/SES) and unauthenticated Jump Server relays.
     """
 
     def _should_mock(self) -> bool:
         """
-        Check if SMTP credentials are missing or if MOCK_EMAIL is configured to True.
+        Check if MOCK_EMAIL is set to True or if MAIL_SERVER is unconfigured.
+        Allows unauthenticated Jump Server Relays when MAIL_USERNAME/PASSWORD are empty.
         """
-        return settings.MOCK_EMAIL or not settings.MAIL_USERNAME or not settings.MAIL_PASSWORD
+        return settings.MOCK_EMAIL or not settings.MAIL_SERVER or len(settings.MAIL_SERVER.strip()) == 0
 
     async def _send(self, email: str, subject: str, body: str, html_body: Optional[str] = None) -> bool:
         """
@@ -151,46 +152,69 @@ class EmailService:
             )
             return True
 
-        if HAS_FASTAPI_MAIL and mail_config:
+        # 1. Primary Dispatch: Try fastapi_mail with dynamic ConnectionConfig
+        if HAS_FASTAPI_MAIL:
             try:
+                dynamic_config = ConnectionConfig(
+                    MAIL_USERNAME=settings.MAIL_USERNAME or "",
+                    MAIL_PASSWORD=settings.MAIL_PASSWORD or "",
+                    MAIL_FROM=settings.MAIL_FROM or settings.MAIL_USERNAME or "noreply@campusconnect.com",
+                    MAIL_PORT=settings.MAIL_PORT or 587,
+                    MAIL_SERVER=settings.MAIL_SERVER,
+                    MAIL_STARTTLS=settings.MAIL_STARTTLS,
+                    MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
+                    USE_CREDENTIALS=bool(settings.MAIL_USERNAME and settings.MAIL_PASSWORD),
+                    VALIDATE_CERTS=False,
+                )
                 message = MessageSchema(
                     subject=subject,
                     recipients=[email],
                     body=html_body or body,
                     subtype=MessageType.html if html_body else MessageType.plain,
                 )
-                fm = FastMail(mail_config)
+                fm = FastMail(dynamic_config)
                 await fm.send_message(message)
                 logger.info(f"✅ Email successfully sent to {email} with subject: '{subject}'")
                 return True
             except Exception as e:
-                logger.warning(f"fastapi_mail failed, attempting standard smtplib fallback: {e}")
+                logger.warning(f"fastapi_mail failed: {e}. Attempting robust smtplib fallback...")
 
-        # Standard Library smtplib fallback (Built-in Python)
+        # 2. Robust Fallback: Built-in Python smtplib (Supports SSL/TLS/Plain Relay)
+        import ssl
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
-            msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME
+            msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME or "noreply@campusconnect.com"
             msg["To"] = email
 
             msg.attach(MIMEText(body, "plain"))
             if html_body:
                 msg.attach(MIMEText(html_body, "html"))
 
-            server_host = settings.MAIL_SERVER or "smtp.gmail.com"
-            server_port = settings.MAIL_PORT or 587
+            server_host = settings.MAIL_SERVER
+            server_port = settings.MAIL_PORT or (465 if settings.MAIL_SSL_TLS else 587)
+
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
 
             if settings.MAIL_SSL_TLS:
-                with smtplib.SMTP_SSL(server_host, server_port, timeout=10) as server:
+                with smtplib.SMTP_SSL(server_host, server_port, context=ssl_context, timeout=15) as server:
                     if settings.MAIL_USERNAME and settings.MAIL_PASSWORD:
                         server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
                     server.sendmail(msg["From"], [email], msg.as_string())
             else:
-                with smtplib.SMTP(server_host, server_port, timeout=10) as server:
+                with smtplib.SMTP(server_host, server_port, timeout=15) as server:
                     if settings.MAIL_STARTTLS:
-                        server.starttls()
+                        try:
+                            server.starttls(context=ssl_context)
+                        except Exception as tls_err:
+                            logger.debug(f"STARTTLS skipped/unsupported on relay: {tls_err}")
                     if settings.MAIL_USERNAME and settings.MAIL_PASSWORD:
-                        server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+                        try:
+                            server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
+                        except Exception as auth_err:
+                            logger.warning(f"SMTP Login skipped/failed: {auth_err}")
                     server.sendmail(msg["From"], [email], msg.as_string())
 
             logger.info(f"✅ Email successfully sent via smtplib to {email} with subject: '{subject}'")
