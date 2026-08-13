@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
 from app.core.config import settings
-from app.core.constants import UserRole, EventStatus, AttendanceStatus
+from app.core.constants import UserRole, EventStatus, AttendanceStatus, EventCategory, EventType
 from app.models.user import User, UserProfile
 from app.models.event import Event
 from app.models.registration import EventRegistration
