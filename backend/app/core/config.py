@@ -58,6 +58,8 @@ class Settings(BaseSettings):
 
     # --- AI Chatbot ---
     GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    HUGGINGFACE_API_KEY: str = ""
 
     # --- File Storage ---
     UPLOAD_DIR: str = "uploads"
