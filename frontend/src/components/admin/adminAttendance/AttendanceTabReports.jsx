@@ -53,6 +53,7 @@ export default function AttendanceTabReports({
           <h2 className="text-[20px] font-extrabold m-0">Event Attendance Analytics</h2>
         </div>
         <button
+          type="button"
           onClick={handleExport}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold border cursor-pointer transition-all hover:bg-slate-50 dark:hover:bg-slate-800"
           style={{ ...inp, color: BRAND, borderColor: BRAND }}
@@ -131,7 +132,7 @@ export default function AttendanceTabReports({
                           const x = (i / (chartData.length - 1)) * 800
                           const y = 240 - (d.count / MAX) * 240
                           return (
-                            <g key={i} className="group/dot cursor-pointer">
+                            <g key={`dot-${d.time || i}-${d.count}`} className="group/dot cursor-pointer">
                               <circle
                                 cx={x}
                                 cy={y}

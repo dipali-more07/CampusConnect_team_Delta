@@ -104,6 +104,7 @@ export default function OrganizerGrid({
             {/* Bottom Row Actions */}
             <div className="mt-5 pt-4 border-t flex gap-2" style={{ borderColor: tokens.border }}>
               <button
+                type="button"
                 onClick={() => setViewOrg(org)}
                 className="flex-1 py-2 rounded-xl text-[12px] font-bold border cursor-pointer bg-transparent transition-all duration-150"
                 style={{ borderColor: tokens.border, color: tokens.txtPri }}
@@ -113,6 +114,7 @@ export default function OrganizerGrid({
                 View Profile
               </button>
               <button
+                type="button"
                 onClick={() => openEdit(org)}
                 title="Edit Profile"
                 className="w-9 h-9 rounded-xl border bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150 shrink-0"
@@ -123,6 +125,7 @@ export default function OrganizerGrid({
                 <Pencil size={13} />
               </button>
               <button
+                type="button"
                 onClick={() => setDeleteTarget(org)}
                 title="Delete Account"
                 className="w-9 h-9 rounded-xl border bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150 shrink-0"

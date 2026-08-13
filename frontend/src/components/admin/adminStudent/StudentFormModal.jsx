@@ -2,6 +2,40 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Loader2, Eye, EyeOff, User, Mail, Phone, Building, BookOpen, GraduationCap, Lock } from 'lucide-react'
 
+const evaluatePasswordStrength = (pass) => {
+  if (!pass) return { label: '', colorClass: '', barColor: '', width: '0%' }
+  
+  let score = 0
+  if (pass.length >= 6) score++
+  if (pass.length >= 8) score++
+  if (/[a-z]/.test(pass) && /[A-Z]/.test(pass)) score++
+  if (/\d/.test(pass)) score++
+  if (/[^A-Za-z0-9]/.test(pass)) score++
+
+  if (score <= 2) {
+    return {
+      label: 'Weak',
+      colorClass: 'text-red-500',
+      barColor: 'bg-red-500',
+      width: '33.33%'
+    }
+  } else if (score <= 4) {
+    return {
+      label: 'Medium',
+      colorClass: 'text-amber-500',
+      barColor: 'bg-amber-500',
+      width: '66.66%'
+    }
+  } else {
+    return {
+      label: 'Strong',
+      colorClass: 'text-emerald-500',
+      barColor: 'bg-emerald-500',
+      width: '100%'
+    }
+  }
+}
+
 export default function StudentFormModal({
   modalOpen,
   setModalOpen,
@@ -20,6 +54,10 @@ export default function StudentFormModal({
 }) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const password = form.password || ''
+  const confirmPassword = form.confirmPassword || ''
+  const strength = evaluatePasswordStrength(password)
 
   if (!modalOpen) return null
 
@@ -256,6 +294,27 @@ export default function StudentFormModal({
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
+                <div 
+                  className="overflow-hidden transition-all duration-500 ease-in-out"
+                  style={{
+                    maxHeight: password ? '80px' : '0px',
+                    opacity: password ? 1 : 0,
+                    marginTop: password ? '8px' : '0px',
+                  }}
+                >
+                  <div className="flex justify-between items-center mb-1 text-[11px] font-semibold">
+                    <span className="text-slate-500">Password Strength:</span>
+                    <span className={`${strength.colorClass} tracking-wide uppercase transition-colors duration-300`}>
+                      {strength.label}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${strength.barColor} transition-all duration-500 ease-out`}
+                      style={{ width: strength.width }}
+                    />
+                  </div>
+                </div>
                 {errors.password && <span className="text-[11px] text-red-500 mt-1 block">{errors.password}</span>}
               </div>
 
@@ -280,6 +339,38 @@ export default function StudentFormModal({
                   >
                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
+                </div>
+                <div 
+                  className="overflow-hidden transition-all duration-500 ease-in-out"
+                  style={{
+                    maxHeight: confirmPassword ? '80px' : '0px',
+                    opacity: confirmPassword ? 1 : 0,
+                    marginTop: confirmPassword ? '8px' : '0px',
+                  }}
+                >
+                  <div 
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all duration-300 ${
+                      password === confirmPassword 
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' 
+                        : 'bg-red-500/10 border-red-500/20 text-red-600'
+                    }`}
+                  >
+                    {password === confirmPassword ? (
+                      <>
+                        <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        <span>Passwords match</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>Passwords do not match</span>
+                      </>
+                    )}
+                  </div>
                 </div>
                 {errors.confirmPassword && <span className="text-[11px] text-red-500 mt-1 block">{errors.confirmPassword}</span>}
               </div>

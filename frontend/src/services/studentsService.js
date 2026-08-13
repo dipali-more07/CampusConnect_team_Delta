@@ -21,7 +21,7 @@ const MOCK_KEY = 'campus_connect_mock_students'
 
 function getMock() {
   const local = localStorage.getItem(MOCK_KEY)
-  if (local) { try { return JSON.parse(local) } catch {} }
+  if (local) { try { return JSON.parse(local) } catch { /* ignore */ } }
   localStorage.setItem(MOCK_KEY, JSON.stringify(defaultStudents))
   return [...defaultStudents]
 }
@@ -40,11 +40,21 @@ async function mockFetchAll() {
   return { success: true, students, stats: { total, active, suspended } }
 }
 
+function getAvatarColor(name) {
+  const COLORS = ['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#7c3aed', '#e11d48', '#16a34a', '#d97706']
+  if (!name) return COLORS[0]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) {
+    hash = name.codePointAt(i) + ((hash << 5) - hash)
+  }
+  const idx = Math.abs(hash) % COLORS.length
+  return COLORS[idx]
+}
+
 async function mockCreate(data) {
   await new Promise(r => setTimeout(r, 400))
   const students = getMock()
   const id = `STU${String(students.length + 1).padStart(3, '0')}`
-  const COLORS = ['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#7c3aed', '#e11d48', '#16a34a', '#d97706']
   const newStudent = {
     id,
     ...data,
@@ -53,7 +63,7 @@ async function mockCreate(data) {
     certificatesCount: 0,
     status: 'Active',
     joinedDate: new Date().toISOString().split('T')[0],
-    avatarColor: COLORS[Math.floor(Math.random() * COLORS.length)],
+    avatarColor: getAvatarColor(data.name || data.email),
   }
   students.push(newStudent)
   saveMock(students)
@@ -92,10 +102,9 @@ async function mockDelete(id) {
 
 function mapStudent(s) {
   if (!s) return null
-  const COLORS = ['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#7c3aed', '#e11d48', '#16a34a', '#d97706']
   
   const rawAtt = s.attendance_percentage ?? s.attendance_percent ?? s.attendancePercent ?? s.attendance_rate ?? 0
-  const attPct = typeof rawAtt === 'number' ? Math.round(rawAtt * 10) / 10 : (parseFloat(rawAtt) || 0)
+  const attPct = typeof rawAtt === 'number' ? Math.round(rawAtt * 10) / 10 : (Number.parseFloat(rawAtt) || 0)
 
   return {
     id: s.user_id || s.id || '',
@@ -112,7 +121,7 @@ function mapStudent(s) {
       ? 'Suspended'
       : 'Active',
     joinedDate: s.created_at ? new Date(s.created_at).toISOString().split('T')[0] : (s.joined_date || s.joinedDate || new Date().toISOString().split('T')[0]),
-    avatarColor: s.avatarColor || COLORS[Math.floor(Math.random() * COLORS.length)]
+    avatarColor: s.avatarColor || getAvatarColor(s.full_name || s.name || s.email)
   }
 }
 
@@ -123,9 +132,14 @@ async function apiFetchAll() {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch students.' }
     
-    const rawStudents = Array.isArray(data.data) ? data.data : 
-                        Array.isArray(data.students) ? data.students : 
-                        Array.isArray(data) ? data : []
+    let rawStudents = []
+    if (Array.isArray(data.data)) {
+      rawStudents = data.data
+    } else if (Array.isArray(data.students)) {
+      rawStudents = data.students
+    } else if (Array.isArray(data)) {
+      rawStudents = data
+    }
                         
     const mapped = rawStudents.map(s => mapStudent(s))
     
@@ -139,7 +153,7 @@ async function apiFetchAll() {
     }
     
     return { success: true, students: mapped, stats }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -163,7 +177,7 @@ async function apiCreate(payload) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to create student.' }
     return { success: true, student: mapStudent(data.data || data.student || data) }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -186,7 +200,7 @@ async function apiUpdate(id, payload) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update student.' }
     return { success: true, student: mapStudent(data.data || data.student || data) }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -204,7 +218,7 @@ async function apiUpdateStatus(id, status) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to update status.' }
     return { success: true, student: mapStudent(data.data || data.student || data) }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -218,7 +232,7 @@ async function apiDelete(id) {
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to delete student.' }
     return { success: true }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }

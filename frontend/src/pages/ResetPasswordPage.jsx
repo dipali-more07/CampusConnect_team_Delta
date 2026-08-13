@@ -4,6 +4,12 @@ import { Lock, Eye, EyeOff, CheckCircle2, XCircle, ShieldCheck, ArrowRight } fro
 import authService from '../services/authService'
 import { useToast } from '../context/ToastContext'
 
+const getRandom = () => {
+  const array = new Uint32Array(1)
+  window.crypto.getRandomValues(array)
+  return array[0] / 4294967296
+}
+
 /* ── Animated constellation background ── */
 function AnimatedBackground() {
   const canvasRef = useRef(null)
@@ -23,11 +29,11 @@ function AnimatedBackground() {
     window.addEventListener('resize', resize)
 
     const pts = Array.from({ length: 30 }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 0.45,
-      vy: (Math.random() - 0.5) * 0.45,
-      r: Math.random() * 2 + 1,
+      x: getRandom() * canvas.width,
+      y: getRandom() * canvas.height,
+      vx: (getRandom() - 0.5) * 0.45,
+      vy: (getRandom() - 0.5) * 0.45,
+      r: getRandom() * 2 + 1,
     }))
 
     const tick = () => {
@@ -71,7 +77,7 @@ function PasswordStrength({ password }) {
   const checks = [
     { label: 'At least 8 characters', ok: password.length >= 8 },
     { label: 'Uppercase letter', ok: /[A-Z]/.test(password) },
-    { label: 'Number', ok: /[0-9]/.test(password) },
+    { label: 'Number', ok: /\d/.test(password) },
     { label: 'Special character', ok: /[^A-Za-z0-9]/.test(password) },
   ]
   const score = checks.filter(c => c.ok).length
@@ -126,6 +132,16 @@ export default function ResetPasswordPage() {
   const [done, setDone] = useState(false)
   const [countdown, setCountdown] = useState(5)
 
+  const [isNarrow, setIsNarrow] = useState(window.innerWidth < 1024)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsNarrow(window.innerWidth < 1024)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   /* Auto-redirect after success */
   useEffect(() => {
     if (!done) return
@@ -138,6 +154,11 @@ export default function ResetPasswordPage() {
   }, [done, countdown, navigate])
 
   const invalidToken = !token
+
+  let confirmBorderColor
+  if (confirmPassword) {
+    confirmBorderColor = newPassword === confirmPassword ? '#22c55e' : '#ef4444'
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -230,17 +251,26 @@ export default function ResetPasswordPage() {
         </div>
 
         {/* ── RIGHT: Form panel ── */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 px-6 py-12">
+        <div
+          className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative overflow-hidden transition-all duration-300"
+          style={{
+            background: isNarrow
+              ? 'linear-gradient(145deg, #4f46e5 0%, #7c3aed 55%, #9d174d 100%)'
+              : '#f8fafc',
+          }}
+        >
+          {/* Render constellation particles only when narrow view is active */}
+          {isNarrow && <AnimatedBackground />}
 
           {/* Mobile logo */}
-          <div className="lg:hidden flex items-center gap-2 mb-10">
+          <div className="lg:hidden flex items-center gap-2 mb-10 relative z-10">
             <div
               className="w-9 h-9 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
             >
               <ShieldCheck size={18} className="text-white" />
             </div>
-            <span className="font-black text-slate-900 text-lg">CampusConnect</span>
+            <span className={`font-black text-lg ${isNarrow ? 'text-white' : 'text-slate-900'}`}>CampusConnect</span>
           </div>
 
           <div
@@ -384,12 +414,7 @@ export default function ResetPasswordPage() {
                         required
                         autoComplete="new-password"
                         style={{
-                          borderColor:
-                            confirmPassword && newPassword !== confirmPassword
-                              ? '#ef4444'
-                              : confirmPassword && newPassword === confirmPassword
-                              ? '#22c55e'
-                              : undefined,
+                          borderColor: confirmBorderColor,
                         }}
                         className="w-full pl-11 pr-11 py-3 rounded-2xl border border-slate-200 bg-slate-50/50 text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white focus:border-indigo-600 focus:ring-4 focus:ring-indigo-600/15 transition-all duration-200 font-medium"
                       />
@@ -405,18 +430,30 @@ export default function ResetPasswordPage() {
 
                     {/* Match indicator */}
                     {confirmPassword && (
-                      <div className="flex items-center gap-1.5 mt-2">
-                        {newPassword === confirmPassword ? (
-                          <>
-                            <CheckCircle2 size={12} className="text-green-500" />
-                            <span className="text-xs text-green-600 font-semibold">Passwords match</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle size={12} className="text-red-400" />
-                            <span className="text-xs text-red-500 font-semibold">Passwords do not match</span>
-                          </>
-                        )}
+                      <div className="mt-2 transition-all duration-300 animate-fadeIn">
+                        <div 
+                          className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-[11px] font-semibold transition-all duration-300 ${
+                            newPassword === confirmPassword 
+                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' 
+                              : 'bg-red-500/10 border-red-500/20 text-red-600'
+                          }`}
+                        >
+                          {newPassword === confirmPassword ? (
+                            <>
+                              <svg className="w-3.5 h-3.5 text-emerald-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                              </svg>
+                              <span>Passwords match</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-3.5 h-3.5 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.5">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                              <span>Passwords do not match</span>
+                            </>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

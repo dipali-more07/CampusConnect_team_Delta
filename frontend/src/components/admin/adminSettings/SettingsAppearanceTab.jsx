@@ -1,4 +1,4 @@
-import React from 'react'
+  import React from 'react'
 import { Check, Loader2 } from 'lucide-react'
 
 export default function SettingsAppearanceTab({
@@ -21,7 +21,7 @@ export default function SettingsAppearanceTab({
       <div className="space-y-5 max-w-[500px]">
         {/* Theme Mode Toggle */}
         <div>
-          <label className="text-[11.5px] font-bold block mb-2" style={{ color: tokens.txtSec }}>Theme Mode</label>
+          <label htmlFor="themeMode" className="text-[11.5px] font-bold block mb-2" style={{ color: tokens.txtSec }}>Theme Mode</label>
           <div className="flex gap-3">
             {['Light', 'Dark'].map(mode => {
               const active = appearanceForm.themeMode === mode
@@ -50,7 +50,7 @@ export default function SettingsAppearanceTab({
 
         {/* Accent Color Swatches */}
         <div>
-          <label className="text-[11.5px] font-bold block mb-2" style={{ color: tokens.txtSec }}>Accent Color</label>
+          <label htmlFor="accentColor" className="text-[11.5px] font-bold block mb-2" style={{ color: tokens.txtSec }}>Accent Color</label>
           <div className="flex gap-2.5">
             {['#615FFF', '#00BC7D', '#FE9A00', '#0284c7', '#e11d48', '#7c3aed'].map(c => {
               const active = appearanceForm.accentColor === c
@@ -79,21 +79,23 @@ export default function SettingsAppearanceTab({
         {/* Font Size slider */}
         <div>
           <div className="flex justify-between items-center mb-2">
-            <label className="text-[11.5px] font-bold" style={{ color: tokens.txtSec }}>Font Size</label>
+            <label htmlFor="fontSizeRange" className="text-[11.5px] font-bold" style={{ color: tokens.txtSec }}>Font Size</label>
             <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: BRAND }}>{appearanceForm.fontSize}</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-[10px] font-bold" style={{ color: tokens.txtMuted }}>Sm</span>
             <input
+              id="fontSizeRange"
               type="range"
               min="0"
               max="2"
-              value={appearanceForm.fontSize === 'small' ? 0 : appearanceForm.fontSize === 'medium' ? 1 : 2}
+              value={{ small: 0, medium: 1, large: 2 }[appearanceForm.fontSize] ?? 2}
               onChange={e => {
-                const val = parseInt(e.target.value)
-                const label = val === 0 ? 'small' : val === 1 ? 'medium' : 'large'
-                setAppearanceForm(p => ({ ...p, fontSize: label }))
-                setFontSize(label)
+                const val = Number.parseInt(e.target.value, 10)
+                const sizeMap = { 0: 'small', 1: 'medium', 2: 'large' }
+                const sizeLabel = sizeMap[val]
+                setAppearanceForm(p => ({ ...p, fontSize: sizeLabel }))
+                setFontSize(sizeLabel)
               }}
               className="flex-1 h-1.5 rounded-lg appearance-none cursor-pointer"
               style={{ accentColor: BRAND }}

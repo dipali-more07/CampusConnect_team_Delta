@@ -42,14 +42,42 @@ export default function StudentsPage({ tokens }) {
   const inp = { background: tokens.inputBg, borderColor: tokens.border, color: tokens.txtPri }
   const skBg = dark ? '#162640' : '#e2e8f0'
 
-  const load = async () => {
+  const broadcastSync = (type) => {
+    try {
+      const channel = new BroadcastChannel('cc_global_sync_channel')
+      channel.postMessage(type)
+      channel.close()
+    } catch {}
+  }
+
+  const load = async (triggerBroadcast = false) => {
     setLoading(true)
     const res = await studentsService.fetchAll()
-    if (res.success) { setStudents(res.students); setStats(res.stats) }
+    if (res.success) { 
+      setStudents(res.students)
+      setStats(res.stats)
+      if (triggerBroadcast) {
+        broadcastSync('refresh_students')
+      }
+    }
     else showToast(res.message || 'Failed to load.', 'error')
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    load()
+    const channel = new BroadcastChannel('cc_global_sync_channel')
+    const handleMessage = (e) => {
+      if (e.data === 'refresh_students') {
+        load(false)
+      }
+    }
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
+  }, [])
 
   const filtered = students.filter(s => {
     const q = search.toLowerCase()
@@ -74,20 +102,20 @@ export default function StudentsPage({ tokens }) {
     setSaving(true)
     const res = editing ? await studentsService.update(editing.id, form) : await studentsService.create(form)
     setSaving(false)
-    if (res.success) { showToast(editing ? 'Student updated.' : 'Student added.', 'success'); setModalOpen(false); load() }
+    if (res.success) { showToast(editing ? 'Student updated.' : 'Student added.', 'success'); setModalOpen(false); load(true) }
     else showToast(res.message, 'error')
   }
 
   const handleDelete = async () => {
     const res = await studentsService.delete(deleteTarget.id)
-    if (res.success) { showToast('Student deleted.', 'success'); setDeleteTarget(null); load() }
+    if (res.success) { showToast('Student deleted.', 'success'); setDeleteTarget(null); load(true) }
     else showToast(res.message, 'error')
   }
 
   const handleToggleStatus = async (s) => {
     const next = s.status === 'Active' ? 'Suspended' : 'Active'
     const res = await studentsService.updateStatus(s.id, next)
-    if (res.success) { showToast(`Student ${next.toLowerCase()}.`, 'success'); load() }
+    if (res.success) { showToast(`Student ${next.toLowerCase()}.`, 'success'); load(true) }
     else showToast(res.message, 'error')
   }
 

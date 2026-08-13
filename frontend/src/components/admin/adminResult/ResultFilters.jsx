@@ -48,14 +48,16 @@ export default function ResultFilters({
       >
         {['All', 'Solo', 'Team'].map(tab => {
           const active = activeTab === tab
+          const inactiveColor = dark ? '#7a98bb' : '#5c6f84'
           return (
             <button
+              type="button"
               key={tab}
               onClick={() => setActiveTab(tab)}
               className="px-4 h-[32px] rounded-xl text-[12px] border-none cursor-pointer flex items-center justify-center transition-all duration-200 font-bold"
               style={{
                 background: active ? BRAND : 'transparent',
-                color: active ? '#ffffff' : (dark ? '#7a98bb' : '#5c6f84'),
+                color: active ? '#ffffff' : inactiveColor,
                 boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none',
               }}
             >

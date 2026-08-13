@@ -107,21 +107,34 @@ async function mockSend(payload) {
 function formatLocalTime(dateStr) {
   if (!dateStr) return ''
   try {
-    let cleanStr = dateStr
-    if (!cleanStr.endsWith('Z') && !cleanStr.includes('+') && !cleanStr.includes('-')) {
+    let cleanStr = String(dateStr).trim()
+    
+    // Replace space with 'T' for standard ISO parsing if needed
+    if (cleanStr.includes(' ') && !cleanStr.includes('T')) {
+      cleanStr = cleanStr.replace(' ', 'T')
+    }
+    
+    // If it has no timezone indicator, append 'Z' to treat as UTC
+    if (!/Z|[+-]\d{2}:?\d{2}$/.test(cleanStr)) {
       cleanStr += 'Z'
     }
+    
     const date = new Date(cleanStr)
     if (Number.isNaN(date.getTime())) return dateStr
 
-    return date.toLocaleString('en-IN', {
-      day: '2-digit',
-      month: 'short',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    })
+    const day = String(date.getDate()).padStart(2, '0')
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    const month = months[date.getMonth()]
+    const year = date.getFullYear()
+
+    let hours = date.getHours()
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const ampm = hours >= 12 ? 'pm' : 'am'
+    hours = hours % 12
+    hours = hours ? hours : 12
+    const formattedHours = String(hours).padStart(2, '0')
+
+    return `${day} ${month} ${year}, ${formattedHours}:${minutes} ${ampm}`
   } catch {
     return dateStr
   }

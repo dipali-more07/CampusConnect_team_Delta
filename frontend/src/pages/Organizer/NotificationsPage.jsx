@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CheckCheck, Send, Mail, MessageSquare, Smartphone, Megaphone } from 'lucide-react'
+import { CheckCheck, Send } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import { buildStatsDisplay } from '../../data/notificationsData'
 import notificationsService from '../../services/notificationsService'
@@ -9,14 +9,7 @@ import NotificationStats from '../../components/admin/adminNotification/Notifica
 import NotificationFeed from '../../components/admin/adminNotification/NotificationFeed'
 import NotificationFormModal from '../../components/admin/adminNotification/NotificationFormModal'
 
-const NOTIF_TYPES = [
-  { key: 'email',        label: 'Email',        Icon: Mail },
-  { key: 'sms',          label: 'SMS',          Icon: MessageSquare },
-  { key: 'push',         label: 'Push',         Icon: Smartphone },
-  { key: 'announcement', label: 'Announcement', Icon: Megaphone },
-]
-
-export default function NotificationsPage({ tokens, notifications = [], stats = {}, loading = false, onMarkRead, onDelete }) {
+export default function NotificationsPage({ tokens, notifications = [], stats = {}, loading = false, onMarkRead, onDelete, userRole }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
 
@@ -24,7 +17,7 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
   const [filter, setFilter] = useState('all')
   const [sendOpen, setSendOpen] = useState(false)
   const [sendForm, setSendForm] = useState({
-    notification_type: 'system',
+    notification_type: userRole === 'organizer' ? 'event' : 'system',
     user_id: 'all',
     title: '',
     message: '',
@@ -33,7 +26,7 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
   const [sent, setSent] = useState(false)
 
   const unreadCount = notifications.filter(n => n.unread).length
-  const statsDisplay = buildStatsDisplay(stats)
+  const statsDisplay = buildStatsDisplay(stats, notifications)
 
   const filtered = notifications.filter(n => {
     const catOk = activeCategory === 'All' || n.category === activeCategory
@@ -48,7 +41,7 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
 
   const resetForm = () => {
     setSendForm({
-      notification_type: 'system',
+      notification_type: userRole === 'organizer' ? 'event' : 'system',
       user_id: 'all',
       title: '',
       message: '',
@@ -64,6 +57,13 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
     setSending(false)
     if (res.success) {
       setSent(true)
+      try {
+        const channel = new BroadcastChannel('cc_notifications_channel')
+        channel.postMessage('refresh_notifications')
+        channel.close()
+      } catch (err) {
+        console.error(err)
+      }
       setTimeout(() => { setSendOpen(false); resetForm() }, 1800)
     }
   }
@@ -151,11 +151,10 @@ export default function NotificationsPage({ tokens, notifications = [], stats = 
         sent={sent}
         handleSend={handleSend}
         resetForm={resetForm}
-        NOTIF_TYPES={NOTIF_TYPES}
-        tokens={tokens}
         dark={dark}
         BRAND={BRAND}
         inputStyle={inputStyle}
+        userRole={userRole}
       />
     </div>
   )

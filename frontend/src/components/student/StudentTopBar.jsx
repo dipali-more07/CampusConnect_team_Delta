@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Sun, Moon, Bell, Menu, LogOut, Pencil, Lock, ChevronDown, ChevronUp, CheckCheck} from 'lucide-react'
+import { Sun, Moon, Bell, Menu, LogOut, Pencil, Lock, ChevronDown, ChevronUp, CheckCheck, Trash2 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
 import studentService from '../../services/studentService'
@@ -33,7 +33,45 @@ function getMarkAllStyle(unreadCount, dark) {
   }
 }
 
-function NotificationDropdown({ notifications, unreadCount, dark, brandColor, setNotifDropdown, handleMarkAllAsRead, handleMarkAsRead }) {
+const playNotificationSound = () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext
+    if (!AudioContext) return
+    const ctx = new AudioContext()
+    
+    // First chime (ding)
+    const osc1 = ctx.createOscillator()
+    const gain1 = ctx.createGain()
+    osc1.connect(gain1)
+    gain1.connect(ctx.destination)
+    
+    osc1.type = 'sine'
+    osc1.frequency.setValueAtTime(587.33, ctx.currentTime) // D5 note
+    gain1.gain.setValueAtTime(0.15, ctx.currentTime)
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
+    
+    osc1.start(ctx.currentTime)
+    osc1.stop(ctx.currentTime + 0.4)
+    
+    // Second chime (higher ding, slightly offset)
+    const osc2 = ctx.createOscillator()
+    const gain2 = ctx.createGain()
+    osc2.connect(gain2)
+    gain2.connect(ctx.destination)
+    
+    osc2.type = 'sine'
+    osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.08) // A5 note
+    gain2.gain.setValueAtTime(0.15, ctx.currentTime + 0.08)
+    gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.48)
+    
+    osc2.start(ctx.currentTime + 0.08)
+    osc2.stop(ctx.currentTime + 0.48)
+  } catch {
+    /* ignore */
+  }
+}
+
+function NotificationDropdown({ notifications, unreadCount, dark, brandColor, handleMarkAllAsRead, handleMarkAsRead, handleDeleteNotification, isClosing, onClose }) {
   const markAllStyle = getMarkAllStyle(unreadCount, dark)
 
   return (
@@ -42,10 +80,12 @@ function NotificationDropdown({ notifications, unreadCount, dark, brandColor, se
         type="button"
         aria-label="Close notifications"
         className="fixed inset-0 z-40 bg-transparent border-none p-0 cursor-default"
-        onClick={() => setNotifDropdown(false)}
+        onClick={onClose}
       />
       <div
-        className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl bg-white dark:bg-[#0b1424] border border-slate-200 dark:border-[#182842] shadow-2xl z-50 overflow-hidden text-slate-700 dark:text-slate-200 animate-fadeIn"
+        className={`absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl bg-white dark:bg-[#0b1424] border border-slate-200 dark:border-[#182842] shadow-2xl z-50 overflow-hidden text-slate-700 dark:text-slate-200 ${
+          isClosing ? 'animate-dropdown-out' : 'animate-dropdown-in'
+        }`}
         style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}
       >
         {/* Header */}
@@ -82,52 +122,65 @@ function NotificationDropdown({ notifications, unreadCount, dark, brandColor, se
             </div>
           ) : (
             notifications.map((item) => (
-              <button
-                type="button"
+              <div
                 key={item.id}
                 onClick={(e) => item.unread && handleMarkAsRead(item.id, e)}
-                className={`w-full text-left p-4 flex items-start gap-3 transition-colors cursor-pointer border-none ${
+                className={`group w-full text-left p-4 flex items-start justify-between gap-3 transition-colors border-b border-slate-100 dark:border-[#16263e]/50 cursor-pointer ${
                   item.unread
                     ? 'bg-indigo-500/5 dark:bg-[#121f36]/80 hover:bg-indigo-500/10 dark:hover:bg-[#162846]'
                     : 'hover:bg-slate-50 dark:hover:bg-[#0e192c] bg-transparent'
                 }`}
               >
-                {/* Indicator Dot */}
-                <div className="mt-1 shrink-0">
-                  {item.unread ? (
-                    <span className="block w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-xs shadow-indigo-500" />
-                  ) : (
-                    <span className="block w-2.5 h-2.5 rounded-full bg-transparent" />
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <h4 className="text-xs font-bold text-slate-900 dark:text-[#e8f0fe] m-0 truncate">
-                      {item.title}
-                    </h4>
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  {/* Indicator Dot */}
+                  <div className="mt-1 shrink-0">
+                    {item.unread ? (
+                      <span className="block w-2.5 h-2.5 rounded-full bg-indigo-500 shadow-xs shadow-indigo-500" />
+                    ) : (
+                      <span className="block w-2.5 h-2.5 rounded-full bg-transparent" />
+                    )}
                   </div>
 
-                  <p className="text-[11.5px] text-slate-600 dark:text-[#7a98bb] m-0 mt-0.5 leading-relaxed">
-                    {item.message}
-                  </p>
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-[#e8f0fe] m-0 truncate">
+                        {item.title}
+                      </h4>
+                    </div>
 
-                  <p className="text-[10.5px] text-slate-400 dark:text-[#4d6a8f] m-0 mt-1 font-medium">
-                    {item.time}
-                  </p>
+                    <p className="text-[11.5px] text-slate-600 dark:text-[#7a98bb] m-0 mt-0.5 leading-relaxed">
+                      {item.message}
+                    </p>
+
+                    <p className="text-[10.5px] text-slate-400 dark:text-[#4d6a8f] m-0 mt-1 font-medium">
+                      {item.time}
+                    </p>
+                  </div>
                 </div>
-              </button>
+
+                {/* Delete Button */}
+                <button
+                  type="button"
+                  title="Delete"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleDeleteNotification(item.id)
+                  }}
+                  className="shrink-0 p-1.5 rounded-lg border border-slate-200 dark:border-[#1e2d45] text-slate-400 dark:text-[#4a6a8a] bg-slate-50 dark:bg-[#162640] hover:border-red-500 hover:text-red-500 dark:hover:border-red-500/50 dark:hover:text-red-400 transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 cursor-pointer flex items-center justify-center"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             ))
           )}
         </div>
 
-        {/* Footer Action */}
         <div className="px-4 py-3 border-t border-slate-100 dark:border-[#16263e] bg-slate-50/50 dark:bg-[#0f1b30] text-center">
           <button
             id="notif-view-all-btn"
             type="button"
-            onClick={() => setNotifDropdown(false)}
+            onClick={onClose}
             className="text-xs font-extrabold bg-transparent border-none cursor-pointer transition-colors"
             style={{ color: brandColor }}
           >
@@ -135,11 +188,41 @@ function NotificationDropdown({ notifications, unreadCount, dark, brandColor, se
           </button>
         </div>
       </div>
+      <style>{`
+        @keyframes dropdownIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95) translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        @keyframes dropdownOut {
+          from {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: scale(0.95) translateY(-8px);
+          }
+        }
+        .animate-dropdown-in {
+          transform-origin: top right;
+          animation: dropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-dropdown-out {
+          transform-origin: top right;
+          animation: dropdownOut 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
     </>
   )
 }
 
-function UserMenuDropdown({ profileData, brandColor, setUserDropdown, setEditProfileOpen, setChangePasswordOpen, onLogout }) {
+function UserMenuDropdown({ profileData, brandColor, isClosing, onClose, setEditProfileOpen, setChangePasswordOpen, onLogout }) {
   const avatarSrc = profileData.avatarUrl || profileData.profile_image || (typeof profileData.avatar === 'string' && (profileData.avatar.startsWith('data:') || profileData.avatar.startsWith('http')) ? profileData.avatar : null)
 
   return (
@@ -148,10 +231,12 @@ function UserMenuDropdown({ profileData, brandColor, setUserDropdown, setEditPro
         type="button"
         aria-label="Close user menu"
         className="fixed inset-0 z-40 bg-transparent border-none p-0 cursor-default"
-        onClick={() => setUserDropdown(false)}
+        onClick={onClose}
       />
       <div
-        className="absolute right-0 mt-3 w-64 rounded-3xl bg-white dark:bg-[#0d1627] border border-slate-200 dark:border-[#182842] shadow-2xl z-50 p-3 text-slate-700 dark:text-slate-200 animate-fadeIn"
+        className={`absolute right-0 mt-3 w-64 rounded-3xl bg-white dark:bg-[#0d1627] border border-slate-200 dark:border-[#182842] shadow-2xl z-50 p-3 text-slate-700 dark:text-slate-200 ${
+          isClosing ? 'animate-dropdown-out' : 'animate-dropdown-in'
+        }`}
         style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}
       >
         {/* User Profile Header Card */}
@@ -183,7 +268,7 @@ function UserMenuDropdown({ profileData, brandColor, setUserDropdown, setEditPro
           <button
             type="button"
             onClick={() => {
-              setUserDropdown(false)
+              onClose()
               setEditProfileOpen(true)
             }}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-[#e8f0fe] hover:bg-slate-100 dark:hover:bg-[#15243e] border-none bg-transparent cursor-pointer transition-colors"
@@ -195,7 +280,7 @@ function UserMenuDropdown({ profileData, brandColor, setUserDropdown, setEditPro
           <button
             type="button"
             onClick={() => {
-              setUserDropdown(false)
+              onClose()
               setChangePasswordOpen(true)
             }}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-[#e8f0fe] hover:bg-slate-100 dark:hover:bg-[#15243e] border-none bg-transparent cursor-pointer transition-colors"
@@ -209,7 +294,7 @@ function UserMenuDropdown({ profileData, brandColor, setUserDropdown, setEditPro
           <button
             type="button"
             onClick={() => {
-              setUserDropdown(false)
+              onClose()
               onLogout()
             }}
             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 border-none bg-transparent cursor-pointer transition-colors"
@@ -219,6 +304,36 @@ function UserMenuDropdown({ profileData, brandColor, setUserDropdown, setEditPro
           </button>
         </div>
       </div>
+      <style>{`
+        @keyframes dropdownIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95) translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+        }
+        @keyframes dropdownOut {
+          from {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: scale(0.95) translateY(-8px);
+          }
+        }
+        .animate-dropdown-in {
+          transform-origin: top right;
+          animation: dropdownIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-dropdown-out {
+          transform-origin: top right;
+          animation: dropdownOut 0.12s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}</style>
     </>
   )
 }
@@ -239,6 +354,20 @@ export default function StudentTopBar({
   const [userDropdown, setUserDropdown] = useState(false)
   const [notifDropdown, setNotifDropdown] = useState(false)
   const [notifications, setNotifications] = useState([])
+
+  const triggerNotifClose = () => {
+    setNotifDropdown('closing')
+    setTimeout(() => {
+      setNotifDropdown(false)
+    }, 120)
+  }
+
+  const triggerUserClose = () => {
+    setUserDropdown('closing')
+    setTimeout(() => {
+      setUserDropdown(false)
+    }, 120)
+  }
 
   // Modal states
   const [editProfileOpen, setEditProfileOpen] = useState(false)
@@ -298,11 +427,36 @@ export default function StudentTopBar({
   }, [])
 
   useEffect(() => {
-    studentService.fetchNotifications().then(res => {
-      if (res.success) {
-        setNotifications(res.data)
+    const getNotifs = () => {
+      studentService.fetchNotifications().then(res => {
+        if (res.success) {
+          setNotifications(prev => {
+            if (prev.length > 0) {
+              const prevIds = new Set(prev.map(n => n.id))
+              const hasNewUnread = res.data.some(n => n.unread && !prevIds.has(n.id))
+              if (hasNewUnread) {
+                playNotificationSound()
+              }
+            }
+            return res.data
+          })
+        }
+      })
+    }
+    getNotifs()
+
+    // Listen to BroadcastChannel for real-time notification changes
+    const channel = new BroadcastChannel('cc_notifications_channel')
+    const handleMessage = (e) => {
+      if (e.data === 'refresh_notifications') {
+        getNotifs()
       }
-    })
+    }
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
   }, [])
 
   const unreadCount = notifications.filter(n => n.unread).length
@@ -313,6 +467,11 @@ export default function StudentTopBar({
       prev.map(n => n.id === id ? { ...n, unread: false } : n)
     )
     studentService.markNotificationAsRead(id)
+    try {
+      const channel = new BroadcastChannel('cc_notifications_channel')
+      channel.postMessage('refresh_notifications')
+      channel.close()
+    } catch { /* ignore */ }
   }
 
   const handleMarkAllAsRead = () => {
@@ -320,6 +479,21 @@ export default function StudentTopBar({
       prev.map(n => ({ ...n, unread: false }))
     )
     studentService.markAllNotificationsAsRead()
+    try {
+      const channel = new BroadcastChannel('cc_notifications_channel')
+      channel.postMessage('refresh_notifications')
+      channel.close()
+    } catch { /* ignore */ }
+  }
+
+  const handleDeleteNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id))
+    studentService.deleteNotification(id)
+    try {
+      const channel = new BroadcastChannel('cc_notifications_channel')
+      channel.postMessage('refresh_notifications')
+      channel.close()
+    } catch { /* ignore */ }
   }
 
   const handleProfileUpdated = (updatedUser) => {
@@ -369,8 +543,12 @@ export default function StudentTopBar({
           <button
             type="button"
             onClick={() => {
-              setNotifDropdown(!notifDropdown)
-              setUserDropdown(false)
+              if (notifDropdown === true) {
+                triggerNotifClose()
+              } else if (!notifDropdown) {
+                setNotifDropdown(true)
+                setUserDropdown(false)
+              }
             }}
             title="Notifications"
             className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center border border-slate-200 dark:border-[#1e2d45] text-slate-600 dark:text-[#7a98bb] bg-slate-50 dark:bg-[#162640] hover:bg-slate-100 dark:hover:bg-[#1e2d45] cursor-pointer transition-all duration-150"
@@ -387,9 +565,11 @@ export default function StudentTopBar({
               unreadCount={unreadCount}
               dark={dark}
               brandColor={BRAND}
-              setNotifDropdown={setNotifDropdown}
               handleMarkAllAsRead={handleMarkAllAsRead}
               handleMarkAsRead={handleMarkAsRead}
+              handleDeleteNotification={handleDeleteNotification}
+              isClosing={notifDropdown === 'closing'}
+              onClose={triggerNotifClose}
             />
           )}
         </div>
@@ -399,8 +579,12 @@ export default function StudentTopBar({
           <button
             type="button"
             onClick={() => {
-              setUserDropdown(!userDropdown)
-              setNotifDropdown(false)
+              if (userDropdown === true) {
+                triggerUserClose()
+              } else if (!userDropdown) {
+                setUserDropdown(true)
+                setNotifDropdown(false)
+              }
             }}
             className="flex items-center gap-2.5 p-1 sm:px-2.5 sm:py-1.5 rounded-xl border border-slate-200 dark:border-[#1e2d45] bg-slate-50 dark:bg-[#162640] hover:bg-slate-100 dark:hover:bg-[#1e2d45] cursor-pointer transition-all duration-150"
           >
@@ -417,7 +601,7 @@ export default function StudentTopBar({
             <span className="hidden sm:inline-block text-[13px] font-bold text-slate-800 dark:text-[#e8f0fe]">
               {profileData.name}
             </span>
-            {userDropdown ? (
+            {userDropdown && userDropdown !== 'closing' ? (
               <ChevronUp size={15} className="text-slate-400 dark:text-[#7a98bb] transition-transform" />
             ) : (
               <ChevronDown size={15} className="text-slate-400 dark:text-[#7a98bb] transition-transform" />
@@ -428,7 +612,8 @@ export default function StudentTopBar({
             <UserMenuDropdown
               profileData={profileData}
               brandColor={BRAND}
-              setUserDropdown={setUserDropdown}
+              isClosing={userDropdown === 'closing'}
+              onClose={triggerUserClose}
               setEditProfileOpen={setEditProfileOpen}
               setChangePasswordOpen={setChangePasswordOpen}
               onLogout={onLogout}

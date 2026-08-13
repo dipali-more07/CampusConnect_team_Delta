@@ -45,7 +45,7 @@ const formatTo12Hr = (timeStr) => {
   if (parts.length < 2) return timeStr
   let hours = parseInt(parts[0], 10)
   const minutes = parts[1].trim()
-  if (isNaN(hours)) return timeStr
+  if (Number.isNaN(hours)) return timeStr
   const ampm = hours >= 12 ? 'PM' : 'AM'
   hours = hours % 12
   hours = hours ? hours : 12
@@ -117,7 +117,7 @@ export default function BottomRow({ dark }) {
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-[15px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0">Upcoming Events</h2>
-          <button className="flex items-center gap-1 text-[12px] font-semibold bg-transparent border-none cursor-pointer" style={{ color: BRAND }}>
+          <button type='button' className="flex items-center gap-1 text-[12px] font-semibold bg-transparent border-none cursor-pointer" style={{ color: BRAND }}>
             View all <ExternalLink size={12} />
           </button>
         </div>
@@ -257,6 +257,7 @@ export default function BottomRow({ dark }) {
 
                 <div className="flex items-center gap-1">
                   <button
+                  type='button'
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
                     className="w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-[#7a98bb] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#162640] transition-colors cursor-pointer"
@@ -267,6 +268,7 @@ export default function BottomRow({ dark }) {
 
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
                     <button
+                      type='button'
                       key={page}
                       onClick={() => setCurrentPage(page)}
                       className={`w-7 h-7 rounded-lg text-[11.5px] font-extrabold transition-colors cursor-pointer ${
@@ -280,6 +282,7 @@ export default function BottomRow({ dark }) {
                   ))}
 
                   <button
+                    type='button'
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
                     className="w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-[#7a98bb] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#162640] transition-colors cursor-pointer"

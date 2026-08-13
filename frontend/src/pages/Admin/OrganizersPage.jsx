@@ -46,11 +46,22 @@ export default function OrganizersPage({ tokens }) {
   }
   const skBg = dark ? '#162640' : '#e2e8f0'
 
-  const load = async () => {
+  const broadcastSync = (type) => {
+    try {
+      const channel = new BroadcastChannel('cc_global_sync_channel')
+      channel.postMessage(type)
+      channel.close()
+    } catch {}
+  }
+
+  const load = async (triggerBroadcast = false) => {
     setLoading(true)
     const res = await organizersService.fetchAll()
     if (res.success) {
       setOrganizers(res.organizers)
+      if (triggerBroadcast) {
+        broadcastSync('refresh_organizers')
+      }
     } else {
       showToast(res.message || 'Failed to load organizers.', 'error')
     }
@@ -59,6 +70,17 @@ export default function OrganizersPage({ tokens }) {
 
   useEffect(() => {
     load()
+    const channel = new BroadcastChannel('cc_global_sync_channel')
+    const handleMessage = (e) => {
+      if (e.data === 'refresh_organizers') {
+        load(false)
+      }
+    }
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
   }, [])
 
   const filtered = organizers.filter(o => {
@@ -121,7 +143,7 @@ export default function OrganizersPage({ tokens }) {
     if (res.success) {
       showToast(editing ? 'Organizer updated.' : 'Organizer added.', 'success')
       setModalOpen(false)
-      load()
+      load(true)
     } else {
       showToast(res.message || 'Failed to save organizer.', 'error')
     }
@@ -132,7 +154,7 @@ export default function OrganizersPage({ tokens }) {
     if (res.success) {
       showToast('Organizer deleted.', 'success')
       setDeleteTarget(null)
-      load()
+      load(true)
     } else {
       showToast(res.message, 'error')
     }

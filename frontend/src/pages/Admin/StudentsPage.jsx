@@ -45,14 +45,42 @@ export default function StudentsPage({ tokens }) {
   const inp = { background: tokens.inputBg, borderColor: tokens.border, color: tokens.txtPri }
   const skBg = dark ? '#162640' : '#e2e8f0'
 
-  const load = async () => {
+  const broadcastSync = (type) => {
+    try {
+      const channel = new BroadcastChannel('cc_global_sync_channel')
+      channel.postMessage(type)
+      channel.close()
+    } catch {}
+  }
+
+  const load = async (triggerBroadcast = false) => {
     setLoading(true)
     const res = await studentsService.fetchAll()
-    if (res.success) { setStudents(res.students); setStats(res.stats) }
+    if (res.success) { 
+      setStudents(res.students)
+      setStats(res.stats)
+      if (triggerBroadcast) {
+        broadcastSync('refresh_students')
+      }
+    }
     else showToast(res.message || 'Failed to load.', 'error')
     setLoading(false)
   }
-  useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    load()
+    const channel = new BroadcastChannel('cc_global_sync_channel')
+    const handleMessage = (e) => {
+      if (e.data === 'refresh_students') {
+        load(false)
+      }
+    }
+    channel.addEventListener('message', handleMessage)
+    return () => {
+      channel.removeEventListener('message', handleMessage)
+      channel.close()
+    }
+  }, [])
 
   const filtered = students.filter(s => {
     const q = search.toLowerCase()
@@ -99,13 +127,13 @@ export default function StudentsPage({ tokens }) {
     setSaving(true)
     const res = editing ? await studentsService.update(editing.id, form) : await studentsService.create(form)
     setSaving(false)
-    if (res.success) { showToast(editing ? 'Student updated.' : 'Student added.', 'success'); setModalOpen(false); load() }
+    if (res.success) { showToast(editing ? 'Student updated.' : 'Student added.', 'success'); setModalOpen(false); load(true) }
     else showToast(res.message, 'error')
   }
 
   const handleDelete = async () => {
     const res = await studentsService.delete(deleteTarget.id)
-    if (res.success) { showToast('Student deleted.', 'success'); setDeleteTarget(null); load() }
+    if (res.success) { showToast('Student deleted.', 'success'); setDeleteTarget(null); load(true) }
     else showToast(res.message, 'error')
   }
 
@@ -137,6 +165,7 @@ export default function StudentsPage({ tokens }) {
         active: next === 'Active' ? prev.active + 1 : Math.max(0, prev.active - 1),
         suspended: next === 'Suspended' ? prev.suspended + 1 : Math.max(0, prev.suspended - 1)
       }))
+      broadcastSync('refresh_students')
     } else {
       showToast(res.message || 'Failed to update status.', 'error')
     }

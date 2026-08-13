@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { 
-  ChevronLeft, Search, ChevronRight, Clock, MapPin, Users, Loader2, XCircle
+  ChevronLeft, Search, ChevronRight, Clock, MapPin, Users, Loader2, XCircle, Award
 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 import eventsService from '../../../services/eventsService'
@@ -582,6 +582,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                           </span>
                           <div className="flex items-center gap-1.5">
                             <button
+                              type='button'
                               onClick={() => setFeedbackPage(p => Math.max(1, p - 1))}
                               disabled={feedbackPage === 1}
                               className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed border bg-transparent cursor-pointer"
@@ -845,6 +846,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   {/* Pagination Page Controls */}
                   <div className="flex items-center gap-1.5">
                     <button
+                      type='button'
                       onClick={() => setRegPage(prev => Math.max(prev - 1, 1))}
                       disabled={currentRegPage === 1}
                       className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"
@@ -1028,6 +1030,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                         />
                         {attSearch && (
                           <button
+                            type='button'
                             onClick={() => {
                               setAttSearch('')
                               setAttPage(1)
@@ -1166,6 +1169,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                         const active = page === currentAttPage
                         return (
                           <button
+                          type='button'
                             key={page}
                             onClick={() => setAttPage(page)}
                             className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"

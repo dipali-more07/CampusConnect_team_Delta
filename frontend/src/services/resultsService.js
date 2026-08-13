@@ -23,7 +23,7 @@ const MOCK_RESULTS_KEY = 'campus_connect_mock_results'
 function getMockResults() {
   const local = localStorage.getItem(MOCK_RESULTS_KEY)
   if (local) {
-    try { return JSON.parse(local) } catch { }
+    try { return JSON.parse(local) } catch { /* ignore */ }
   }
   localStorage.setItem(MOCK_RESULTS_KEY, JSON.stringify(defaultResults))
   return defaultResults
@@ -37,7 +37,7 @@ const MOCK_EVENTS_KEY = 'campus_connect_mock_events'
 function getMockEvents() {
   const local = localStorage.getItem(MOCK_EVENTS_KEY)
   if (local) {
-    try { return JSON.parse(local) } catch { }
+    try { return JSON.parse(local) } catch { /* ignore */ }
   }
   return defaultEvents
 }
@@ -119,7 +119,7 @@ async function apiFetchResults() {
       return { success: false, message: data.message || 'Failed to fetch results.' }
     }
     return { success: true, results: data.results || [] }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -136,7 +136,7 @@ async function apiCreateResult(payload) {
       return { success: false, message: data.message || 'Failed to create result.' }
     }
     return { success: true, result: data.result }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -153,7 +153,7 @@ async function apiUpdateResult(id, payload) {
       return { success: false, message: data.message || 'Failed to update result.' }
     }
     return { success: true, result: data.result }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -169,7 +169,7 @@ async function apiDeleteResult(id) {
       return { success: false, message: data.message || 'Failed to delete result.' }
     }
     return { success: true }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -182,7 +182,7 @@ async function apiFetchResultsByEvent(eventId) {
       return { success: false, message: data.message || 'Failed to fetch event results.' }
     }
     return { success: true, results: data.results || data.data || data || [] }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -199,7 +199,7 @@ async function apiDeclareResult(payload) {
       return { success: false, message: data.message || data.detail || 'Failed to declare result.' }
     }
     return { success: true, result: data.data || data.result || data }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -207,6 +207,14 @@ async function apiDeclareResult(payload) {
 async function mockDeclareResult(payload) {
   await new Promise(r => setTimeout(r, 300))
   const results = getMockResults()
+  let rankStr = `${payload.rank}th`
+  if (payload.rank === 1) {
+    rankStr = '1st'
+  } else if (payload.rank === 2) {
+    rankStr = '2nd'
+  } else if (payload.rank === 3) {
+    rankStr = '3rd'
+  }
   const newResult = {
     id: `RES${String(results.length + 1).padStart(3, '0')}`,
     eventId: payload.event_id,
@@ -215,7 +223,7 @@ async function mockDeclareResult(payload) {
     type: payload.team_id ? 'Team' : 'Solo',
     rank: payload.rank,
     score: payload.score ?? '',
-    resultTitle: `${payload.rank === 1 ? '1st' : payload.rank === 2 ? '2nd' : payload.rank === 3 ? '3rd' : payload.rank + 'th'} Rank`,
+    resultTitle: `${rankStr} Rank`,
     date: new Date().toISOString().split('T')[0],
   }
   results.push(newResult)

@@ -292,6 +292,7 @@ export default function SettingsPage({ tokens }) {
                   tokens={tokens}
                   BRAND={BRAND}
                   inputStyle={inputStyle}
+                  email={profileForm.email}
                 />
               )}
 

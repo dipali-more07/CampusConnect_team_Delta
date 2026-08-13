@@ -21,7 +21,7 @@ const MOCK_REGISTRATIONS_KEY = 'campus_connect_mock_registrations'
 function getMockRegistrations() {
   const local = localStorage.getItem(MOCK_REGISTRATIONS_KEY)
   if (local) {
-    try { return JSON.parse(local) } catch { }
+    try { return JSON.parse(local) } catch { /* ignore */ }
   }
   localStorage.setItem(MOCK_REGISTRATIONS_KEY, JSON.stringify(defaultRegistrations))
   return defaultRegistrations
@@ -35,7 +35,7 @@ const MOCK_EVENTS_KEY = 'campus_connect_mock_events'
 function getMockEvents() {
   const local = localStorage.getItem(MOCK_EVENTS_KEY)
   if (local) {
-    try { return JSON.parse(local) } catch { }
+    try { return JSON.parse(local) } catch { /* ignore */ }
   }
   return defaultEvents
 }
@@ -107,7 +107,7 @@ async function apiFetchRegistrations() {
       return { success: false, message: data.message || 'Failed to fetch registrations.' }
     }
     return { success: true, registrations: data.registrations || [] }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }
@@ -124,7 +124,7 @@ async function apiUpdateStatus(id, status) {
       return { success: false, message: data.message || 'Failed to update registration status.' }
     }
     return { success: true, registration: data.registration }
-  } catch (err) {
+  } catch {
         return { success: false, message: 'Server unreachable.' }
   }
 }

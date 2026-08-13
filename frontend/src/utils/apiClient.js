@@ -175,6 +175,7 @@ export { encryptPayload, decryptPayload } from './payloadCrypto'
 export async function fetchWithAuth(url, options = {}) {
   const makeHeaders = (token) => ({
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...options.headers,
     'Authorization': `Bearer ${token}`,
   })
@@ -225,6 +226,7 @@ export function authHeaders(extra = {}) {
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${getAccessToken()}`,
+    'ngrok-skip-browser-warning': 'true',
     ...extra,
   }
 }

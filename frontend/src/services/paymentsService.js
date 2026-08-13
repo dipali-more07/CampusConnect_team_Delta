@@ -14,6 +14,15 @@ function parseJSON(res) {
   return res.json().catch(() => ({}))
 }
 
+function getSecureRandomString() {
+  if (typeof window !== 'undefined' && window.crypto) {
+    const arr = new Uint32Array(1)
+    window.crypto.getRandomValues(arr)
+    return arr[0].toString(36)
+  }
+  return Date.now().toString(36)
+}
+
 /* ── MOCK DATA ─────────────────────────────────────────────────── */
 const MOCK_PAYMENTS = [
   { id: 'PAY001', transactionId: 'TXN83940128', studentName: 'Arjun Patel', rollNo: '21CS001', email: 'arjun.patel@gmail.com', eventId: 'EVT081', eventName: 'TechFest 2025', amount: 250, method: 'UPI', status: 'Success', date: '2025-07-19 10:30' },
@@ -49,7 +58,7 @@ function formatIST(dateStr) {
     }
 
     const d = new Date(cleanStr)
-    if (isNaN(d.getTime())) return String(dateStr)
+    if (Number.isNaN(d.getTime())) return String(dateStr)
 
     return d.toLocaleString('en-IN', {
       timeZone: 'Asia/Kolkata',
@@ -61,7 +70,7 @@ function formatIST(dateStr) {
       second: '2-digit',
       hour12: true
     }).toLowerCase()
-  } catch (_e) {
+  } catch {
     return String(dateStr)
   }
 }
@@ -84,10 +93,13 @@ function mapPayment(p, index, eventsMap = {}) {
   let normStatus = 'Pending'
   if (rawStatus) {
     const s = String(rawStatus).toLowerCase()
-    if (s.includes('succ') || s.includes('comp') || s.includes('paid')) normStatus = 'Success'
-    else if (s.includes('fail') || s.includes('cancel')) normStatus = 'Failed'
-    else if (s.includes('pend')) normStatus = 'Pending'
-    else normStatus = s.charAt(0).toUpperCase() + s.slice(1)
+    if (s.includes('succ') || s.includes('comp') || s.includes('paid')) {
+      normStatus = 'Success'
+    } else if (s.includes('fail') || s.includes('cancel')) {
+      normStatus = 'Failed'
+    } else if (!s.includes('pend')) {
+      normStatus = s.charAt(0).toUpperCase() + s.slice(1)
+    }
   } else if (amt === 0) {
     normStatus = 'Success'
   }
@@ -161,7 +173,7 @@ function mapPayment(p, index, eventsMap = {}) {
     p.transaction_id ||
     p.transactionId ||
     p.payment_id ||
-    `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`
+    `TXN${getSecureRandomString().toUpperCase()}`
 
   const rawDate = p.payment_date || p.created_at || p.paid_at || p.date || ''
 
@@ -204,7 +216,8 @@ async function getEventsMap() {
           })
         }
       }
-    } catch (_e) {
+    } catch {
+      /* ignore */
     }
     return map
   })()
@@ -252,7 +265,7 @@ async function apiFetchPayments() {
     }
 
     return { success: true, payments: rawList.map((p, idx) => mapPayment(p, idx, eventsMap)) }
-  } catch (err) {
+  } catch {
     return { success: false, payments: [], message: 'Server unreachable.' }
   }
 }
@@ -306,14 +319,14 @@ async function apiFetchMyPayments({ page = 1, size = 100 } = {}) {
       payments: combined.map((p, idx) => mapPayment(p, idx, eventsMap)),
       total: combined.length,
     }
-  } catch (err) {
+  } catch {
     const storedPending = getStoredPendingPayments()
     if (storedPending.length > 0) {
       try {
         const eventsMap = await getEventsMap()
         return { success: true, payments: storedPending.map((p, idx) => mapPayment(p, idx, eventsMap)), total: storedPending.length }
-      } catch (_) {
-        return { success: true, payments: storedPending.map(mapPayment), total: storedPending.length }
+      } catch {
+        return { success: true, payments: storedPending.map((p, idx) => mapPayment(p, idx)), total: storedPending.length }
       }
     }
     return { success: false, payments: [], message: 'Server unreachable.' }
@@ -324,7 +337,7 @@ async function mockFetchMyPayments() {
   await new Promise(r => setTimeout(r, 400))
   const storedPending = getStoredPendingPayments()
   const combined = [...storedPending, ...MOCK_PAYMENTS.slice(0, 3)]
-  return { success: true, payments: combined.map(mapPayment), total: combined.length }
+  return { success: true, payments: combined.map((p, idx) => mapPayment(p, idx)), total: combined.length }
 }
 
 /**
@@ -347,11 +360,16 @@ async function apiFetchEventPayments(eventId, { page = 1, size = 500 } = {}, eve
 
     const data = await parseJSON(res)
     // Backend returns { data: [...], pagination: {...} }
-    const rawList = Array.isArray(data.data) ? data.data
-      : Array.isArray(data.data?.payments) ? data.data.payments
-        : Array.isArray(data.payments) ? data.payments
-          : Array.isArray(data.items) ? data.items
-            : []
+    let rawList = []
+    if (Array.isArray(data.data)) {
+      rawList = data.data
+    } else if (Array.isArray(data.data?.payments)) {
+      rawList = data.data.payments
+    } else if (Array.isArray(data.payments)) {
+      rawList = data.payments
+    } else if (Array.isArray(data.items)) {
+      rawList = data.items
+    }
 
     // Inject event_id & event_name into each record so mapPayment can display it
     const enriched = rawList.map(item => ({
@@ -365,7 +383,7 @@ async function apiFetchEventPayments(eventId, { page = 1, size = 500 } = {}, eve
       payments: enriched.map((p, idx) => mapPayment(p, idx, eventsMap)),
       total: data.pagination?.total ?? data.total ?? rawList.length,
     }
-  } catch (err) {
+  } catch {
     return { success: false, payments: [], message: 'Server unreachable.' }
   }
 }

@@ -55,7 +55,6 @@ export default function ChartsRow({ dark, tokens }) {
       if (res.success && res.data && res.data.length > 0) {
         const mapped = res.data.map(item => {
           let label = item.month || item.date || ''
-          const rawDate = item.date || item.month || ''
 
           // Shift the year to the selectedYear for labels
           if (label.includes('-')) {

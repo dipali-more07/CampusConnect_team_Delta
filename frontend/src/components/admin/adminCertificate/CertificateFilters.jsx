@@ -49,6 +49,7 @@ export default function CertificateFilters({
             const active = activeStatus === st
             return (
               <button
+                type="button"
                 key={st}
                 onClick={() => setActiveStatus(st)}
                 className="px-4 h-[32px] rounded-xl text-[12px] border-none cursor-pointer flex items-center transition-all duration-200"
@@ -88,14 +89,16 @@ export default function CertificateFilters({
         {selected.length > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-[12px] font-semibold" style={{ color: tokens.txtSec }}>{selected.length} selected</span>
-            <button
+             <button
+              type="button"
               onClick={() => handleGenerate(selected.filter(id => certs.find(c => c.id === id)?.status === 'Pending'))}
               className="px-3 py-1.5 rounded-lg text-[12px] font-bold border-none cursor-pointer text-white"
               style={{ background: BRAND }}
             >
               Generate
             </button>
-            <button
+             <button
+              type="button"
               onClick={() => handleSend(selected.filter(id => certs.find(c => c.id === id)?.status === 'Generated'))}
               disabled={sendLoading}
               className="px-3 py-1.5 rounded-lg text-[12px] font-bold border-none cursor-pointer text-white"
@@ -103,7 +106,8 @@ export default function CertificateFilters({
             >
               {sendLoading ? '...' : 'Send'}
             </button>
-            <button
+             <button
+              type="button"
               onClick={() => setSelected([])}
               className="w-7 h-7 rounded-lg border-none bg-transparent cursor-pointer flex items-center justify-center"
               style={{ color: tokens.txtSec }}

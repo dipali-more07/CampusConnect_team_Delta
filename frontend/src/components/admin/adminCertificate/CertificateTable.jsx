@@ -1,4 +1,5 @@
 import { Award, Zap, Send, RotateCcw, Eye, Download, RefreshCw } from 'lucide-react'
+import { downloadCertificatePDF } from '../../../utils/pdfGenerator'
 
 export default function CertificateTable({
   loading,
@@ -71,6 +72,7 @@ export default function CertificateTable({
             <div className="flex items-center gap-1.5">
               {cert.status === 'Pending' && (
                 <button
+                  type="button"
                   onClick={() => handleGenerate(cert)}
                   title="Generate Certificate"
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border-none cursor-pointer transition-all duration-150 text-white"
@@ -79,6 +81,7 @@ export default function CertificateTable({
               )}
               {cert.status === 'Generated' && (
                 <button
+                  type="button"
                   onClick={() => handleSend([cert.id])}
                   title="Send via Email"
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border-none cursor-pointer transition-all duration-150 text-white"
@@ -87,6 +90,7 @@ export default function CertificateTable({
               )}
               {cert.status === 'Sent' && (
                 <button
+                  type="button"
                   onClick={() => handleRevoke(cert.id)}
                   title="Revoke Certificate"
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border-none cursor-pointer transition-all duration-150"
@@ -94,6 +98,7 @@ export default function CertificateTable({
                 ><RotateCcw size={11} /> Revoke</button>
               )}
               <button
+                type="button"
                 onClick={() => setPreviewCert(cert)}
                 title="Preview Certificate"
                 className="w-[28px] h-[28px] rounded-lg border bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
@@ -102,6 +107,15 @@ export default function CertificateTable({
                 onMouseLeave={e => { e.currentTarget.style.borderColor = tokens.border; e.currentTarget.style.color = tokens.txtSec }}
               ><Eye size={12} /></button>
               <button
+                type="button"
+                onClick={() => downloadCertificatePDF({
+                  userName: cert.studentName,
+                  eventName: cert.eventName,
+                  certCode: cert.verifyCode || cert.id,
+                  issueDate: cert.issuedDate,
+                  position: cert.position || cert.certificate_type || cert.rank,
+                  certificate_number: cert.certificate_number || cert.verifyCode
+                })}
                 title="Download"
                 className="w-[28px] h-[28px] rounded-lg border bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150"
                 style={{ borderColor: tokens.border, color: tokens.txtSec }}
@@ -139,6 +153,7 @@ export default function CertificateTable({
             Showing {filtered.length} of {certs.length} certificates
           </span>
           <button
+            type="button"
             onClick={load}
             className="flex items-center gap-1.5 text-[12px] font-semibold bg-transparent border-none cursor-pointer transition-all duration-150"
             style={{ color: tokens.txtSec }}

@@ -7,6 +7,7 @@ import {
 import { useToast } from '../context/ToastContext'
 import { useAuth } from '../context/AuthContext'
 import authService from '../services/authService'
+import analyticsService from '../services/analyticsService'
 import SignUpForm from './SignUpForm'
 
 const STATS = [
@@ -18,6 +19,12 @@ const STATS = [
 const TAGS = ['TechFest 2025', 'Cultural Fest', 'Hackathon 2025']
 
 /* ── Interactive Constellation Canvas ── */
+const getRandom = () => {
+  const array = new Uint32Array(1)
+  window.crypto.getRandomValues(array)
+  return array[0] / 4294967296
+}
+
 function ConstellationCanvas() {
   const canvasRef = useRef(null)
 
@@ -31,18 +38,18 @@ function ConstellationCanvas() {
     let height = (canvas.height = canvas.parentElement.offsetHeight)
 
     const handleResize = () => {
-      if (!canvas || !canvas.parentElement) return
+      if (!canvas?.parentElement) return
       width = canvas.width = canvas.parentElement.offsetWidth
       height = canvas.height = canvas.parentElement.offsetHeight
     }
     window.addEventListener('resize', handleResize)
 
     const particles = Array.from({ length: 38 }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      radius: Math.random() * 2 + 1,
+      x: getRandom() * width,
+      y: getRandom() * height,
+      vx: (getRandom() - 0.5) * 0.5,
+      vy: (getRandom() - 0.5) * 0.5,
+      radius: getRandom() * 2 + 1,
     }))
 
     let mouse = { x: -1000, y: -1000 }
@@ -56,9 +63,8 @@ function ConstellationCanvas() {
       mouse.y = -1000
     }
 
-    const parent = canvas.parentElement
-    parent.addEventListener('mousemove', handleMouseMove)
-    parent.addEventListener('mouseleave', handleMouseLeave)
+    window.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseleave', handleMouseLeave)
 
     const render = () => {
       ctx.clearRect(0, 0, width, height)
@@ -81,7 +87,7 @@ function ConstellationCanvas() {
           const p2 = particles[j]
           const dx = p.x - p2.x
           const dy = p.y - p2.y
-          const dist = Math.sqrt(dx * dx + dy * dy)
+          const dist = Math.hypot(dx, dy)
 
           if (dist < 110) {
             ctx.beginPath()
@@ -96,7 +102,7 @@ function ConstellationCanvas() {
         // Connect particle to mouse cursor
         const mdx = p.x - mouse.x
         const mdy = p.y - mouse.y
-        const mdist = Math.sqrt(mdx * mdx + mdy * mdy)
+        const mdist = Math.hypot(mdx, mdy)
         if (mdist < 150) {
           ctx.beginPath()
           ctx.moveTo(p.x, p.y)
@@ -115,8 +121,8 @@ function ConstellationCanvas() {
     return () => {
       cancelAnimationFrame(animationFrameId)
       window.removeEventListener('resize', handleResize)
-      parent.removeEventListener('mousemove', handleMouseMove)
-      parent.removeEventListener('mouseleave', handleMouseLeave)
+      window.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseleave', handleMouseLeave)
     }
   }, [])
 
@@ -137,18 +143,40 @@ const HERO_FEATURE_ITEMS = [
   { text: 'Real-time Analytics', icon: BarChart3, gradient: 'from-indigo-200 via-violet-200 to-purple-300', badgeBg: 'rgba(167, 139, 250, 0.2)', border: 'rgba(167, 139, 250, 0.4)' },
 ]
 
+const formatNumber = (num, defaultVal) => {
+  if (num === undefined || num === null) return defaultVal
+  const val = Number(num)
+  if (Number.isNaN(val)) return String(num)
+  if (val >= 1000000) {
+    return (val / 1000000).toFixed(1).replace(/\.0$/, '') + 'M'
+  }
+  if (val >= 1000) {
+    return (val / 1000).toFixed(1).replace(/\.0$/, '') + 'K'
+  }
+  return String(val)
+}
+
+function extractPublicStats(data) {
+  const events = data.events_count ?? data.eventsCount ?? data.events ?? 247
+  const students = data.students_count ?? data.studentsCount ?? data.students ?? 12400
+  const certificates = data.certificates_count ?? data.certificatesCount ?? data.certificates ?? 8200
+  return { events, students, certificates }
+}
+
 function Morphing3DHeadline() {
   const [index, setIndex] = useState(0)
   const [animating, setAnimating] = useState(false)
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const updateIndex = () => {
+      setIndex((prev) => (prev + 1) % HERO_FEATURE_ITEMS.length)
+      setAnimating(false)
+    }
+    const triggerFlip = () => {
       setAnimating(true)
-      setTimeout(() => {
-        setIndex((prev) => (prev + 1) % HERO_FEATURE_ITEMS.length)
-        setAnimating(false)
-      }, 280)
-    }, 2600)
+      setTimeout(updateIndex, 280)
+    }
+    const interval = setInterval(triggerFlip, 2600)
     return () => clearInterval(interval)
   }, [])
 
@@ -180,6 +208,31 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false)
   const [remember, setRemember] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [stats, setStats] = useState(STATS)
+
+  useEffect(() => {
+    let active = true
+    const loadStats = async () => {
+      try {
+        const res = await analyticsService.fetchPublicStats()
+        if (res.success && res.data && active) {
+          const { events, students, certificates } = extractPublicStats(res.data)
+
+          setStats([
+            { icon: CalendarDays, value: formatNumber(events, '247'), label: 'Events' },
+            { icon: Users, value: formatNumber(students, '12.4K'), label: 'Students' },
+            { icon: Award, value: formatNumber(certificates, '8.2K'), label: 'Certificates' },
+          ])
+        }
+      } catch (err) {
+        console.error('Failed to load public stats:', err)
+      }
+    }
+    loadStats()
+    return () => {
+      active = false
+    }
+  }, [])
 
   // Sign Up state
   const [isSignUp, setIsSignUp] = useState(() => !!localStorage.getItem('pendingVerificationEmail'))
@@ -192,6 +245,16 @@ export default function LoginPage() {
   const [forgotOpen, setForgotOpen] = useState(false)
   const [forgotEmail, setForgotEmail] = useState('')
   const [forgotLoading, setForgotLoading] = useState(false)
+
+  const [isNarrow, setIsNarrow] = useState(window.innerWidth < 1024)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsNarrow(window.innerWidth < 1024)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Global auth & toast
   const { login } = useAuth()
@@ -240,7 +303,7 @@ export default function LoginPage() {
       } else {
         showToast(result.message || 'Login failed. Please try again.', 'error')
       }
-    } catch (err) {
+    } catch {
       showToast('Something went wrong. Please try again.', 'error')
     } finally {
       setLoading(false)
@@ -336,7 +399,7 @@ export default function LoginPage() {
           {/* Stats grid & 3D Morphing Headline */}
           <div className="relative z-10 flex flex-col gap-6 my-auto py-4">
             <div className="grid grid-cols-3 gap-3">
-              {STATS.map(({ icon: Icon, value, label }) => (
+              {stats.map(({ icon: Icon, value, label }) => (
                 <div
                   key={label}
                   className="group rounded-2xl p-4 flex flex-col items-center gap-1 text-center cursor-pointer transition-all duration-300 border border-white/10 hover:border-white/30 hover:-translate-y-1.5 hover:shadow-[0_12px_30px_rgba(0,0,0,0.25)] select-none"
@@ -391,12 +454,24 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* ── RIGHT PANEL (ULTRA-CLEAN ELEGANT WHITE FORM CARD) ── */}
-        <div className="flex-1 flex items-center justify-center bg-[#fafafc] px-6 py-12 relative overflow-hidden">
+        <div
+          className="flex-1 flex items-center justify-center px-6 py-12 relative overflow-hidden transition-all duration-300"
+          style={{
+            background: isNarrow
+              ? 'linear-gradient(135deg, #4338ca 0%, #6d28d9 45%, #7c3aed 100%)'
+              : '#fafafc',
+          }}
+        >
+          {/* Render constellation particle animation only when split view is collapsed (narrow view) */}
+          {isNarrow && <ConstellationCanvas />}
 
           {/* Background subtle light ambient glow */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-50/60 rounded-full blur-3xl pointer-events-none opacity-70" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-50/50 rounded-full blur-3xl pointer-events-none opacity-60" />
+          {!isNarrow && (
+            <>
+              <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-50/60 rounded-full blur-3xl pointer-events-none opacity-70" />
+              <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-50/50 rounded-full blur-3xl pointer-events-none opacity-60" />
+            </>
+          )}
 
           {/* Form Card Container */}
           <div className="w-full max-w-[430px] relative z-10 bg-white rounded-3xl border border-slate-200/80 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 hover:shadow-[0_25px_70px_-15px_rgba(99,102,241,0.1)]">
@@ -433,12 +508,13 @@ export default function LoginPage() {
 
                       {/* Email */}
                       <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                        <label htmlFor="login-email" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
                           Email Address
                         </label>
                         <div className="relative group">
                           <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
                           <input
+                            id="login-email"
                             type="email"
                             placeholder="name@university.edu"
                             value={email}
@@ -451,12 +527,13 @@ export default function LoginPage() {
 
                       {/* Password */}
                       <div>
-                        <label className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                        <label htmlFor="login-password" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
                           Password
                         </label>
                         <div className="relative group">
                           <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
                           <input
+                            id="login-password"
                             type={showPass ? 'text' : 'password'}
                             placeholder="••••••••"
                             value={password}
@@ -549,9 +626,11 @@ export default function LoginPage() {
       {/* ── FORGOT PASSWORD MODAL ── */}
       {forgotOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/40 backdrop-blur-xs"
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40 backdrop-blur-xs border-none cursor-default w-full h-full"
             onClick={() => setForgotOpen(false)}
+            aria-label="Close backdrop"
           />
           <div
             className="relative z-10 bg-white border border-slate-100 rounded-2xl shadow-2xl w-full max-w-md p-8"
@@ -576,12 +655,13 @@ export default function LoginPage() {
 
             <form onSubmit={handleForgotSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
+                <label htmlFor="forgot-email" className="text-xs font-semibold text-slate-700 mb-1.5 block">
                   Email Address
                 </label>
                 <div className="relative">
                   <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="forgot-email"
                     type="email"
                     placeholder="yourname@gmail.com"
                     value={forgotEmail}

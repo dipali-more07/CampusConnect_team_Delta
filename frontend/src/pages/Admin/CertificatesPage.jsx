@@ -439,6 +439,7 @@ export default function CertificatesPage({ tokens }) {
         dark={dark}
         BRAND={BRAND}
         showToast={showToast}
+        tmpl={tmpl}
       />
 
       {/* ── Verify Modal ── */}

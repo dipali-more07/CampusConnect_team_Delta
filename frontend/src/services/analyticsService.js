@@ -14,14 +14,6 @@ import studentsService from './studentsService'
 import certificatesService from './certificatesService'
 import attendanceService from './attendanceService'
 
-function authHeaders() {
-  const token = sessionStorage.getItem('cc_token') || sessionStorage.getItem('token') || ''
-  return {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${token}`
-  }
-}
-
 function parseJSON(res) {
   if (typeof res.json === 'function') {
     return res.json().catch(() => ({}))
@@ -33,6 +25,18 @@ function parseJSON(res) {
 async function mockFetchStats() {
   await new Promise(r => setTimeout(r, 200))
   return { success: true, stats: ANALYTICS_STATS }
+}
+
+async function mockFetchPublicStats() {
+  await new Promise(r => setTimeout(r, 200))
+  return {
+    success: true,
+    data: {
+      events_count: 247,
+      students_count: 12400,
+      certificates_count: 8200
+    }
+  }
 }
 
 async function mockFetchMonthlyTrend(tab) {
@@ -64,7 +68,7 @@ async function mockFetchDeptDistribution() {
   return { success: true, depts: DEPT_PIE_DATA }
 }
 
-async function mockFetchEventAnalytics(eventId) {
+async function mockFetchEventAnalytics(_eventId) {
   await new Promise(r => setTimeout(r, 200))
   return {
     success: true,
@@ -189,6 +193,19 @@ async function apiFetchStats() {
     return { success: true, stats }
   } catch (err) {
         return { success: false, stats: [], message: 'Server unreachable.' }
+  }
+}
+
+async function apiFetchPublicStats() {
+  try {
+    const res = await fetch(`${API_BASE}/analytics/public-stats`)
+    const data = await parseJSON(res)
+    if (!res.ok) {
+      return { success: false, message: data.message || 'Failed to fetch public stats.' }
+    }
+    return { success: true, data: data.data || data }
+  } catch (err) {
+    return { success: false, message: 'Server unreachable.' }
   }
 }
 
@@ -397,6 +414,9 @@ async function apiFetchGrowth(year) {
 const analyticsService = {
   fetchStats: () =>
     USE_MOCK ? mockFetchStats() : apiFetchStats(),
+
+  fetchPublicStats: () =>
+    USE_MOCK ? mockFetchPublicStats() : apiFetchPublicStats(),
 
   fetchMonthlyTrend: (tab) =>
     USE_MOCK ? mockFetchMonthlyTrend(tab) : apiFetchMonthlyTrend(tab),

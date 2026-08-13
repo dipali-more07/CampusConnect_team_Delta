@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Award, Download, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import studentService from '../../services/studentService'
+import certificatesService from '../../services/certificatesService'
 import { downloadCertificatePDF } from '../../utils/pdfGenerator'
 
 export default function CertificatesPage({ tokens, user }) {
@@ -12,12 +13,13 @@ export default function CertificatesPage({ tokens, user }) {
   const [loading, setLoading] = useState(true)
   const [selectedCert, setSelectedCert] = useState(null)
   const [downloadingId, setDownloadingId] = useState(null)
+  const [activeTmpl, setActiveTmpl] = useState({})
 
   const handleDownload = async (cert) => {
     if (!cert) return
     setDownloadingId(cert.id)
     try {
-      downloadCertificatePDF({ ...cert, userName: user?.name || cert.studentName })
+      downloadCertificatePDF({ ...cert, userName: user?.name || cert.studentName }, activeTmpl)
     } catch (err) {
       alert('Error occurred during download.')
     } finally {
@@ -27,10 +29,34 @@ export default function CertificatesPage({ tokens, user }) {
 
   useEffect(() => {
     let cancelled = false
+    // Fetch certificates
     studentService.fetchCertificatesData().then(res => {
       if (cancelled) return
       if (res.success) setCertificatesList(res.data)
       setLoading(false)
+    })
+    // Fetch active template to use in PDF
+    certificatesService.fetchTemplates().then(res => {
+      if (cancelled || !res.success) return
+      const templates = res.templates || []
+      const active = templates.find(t => t.is_active) || templates[0]
+      if (active) {
+        setActiveTmpl({
+          org:         active.organisation_name  || 'State University',
+          title:       active.certificate_title  || 'Certificate of Participation',
+          subtitle:    'This is to certify that',
+          body:        'has successfully participated in',
+          footer:      'campusconnect.university.edu/verify',
+          gradFrom:    active.background_gradient_from || active.background_image || '#1a1060',
+          gradMid:     active.background_gradient_mid  || '#0f0a45',
+          gradTo:      active.background_gradient_to   || '#0a0838',
+          accentColor: active.accent_color  || active.font_color || '#615FFF',
+          borderStyle: active.border_style  || 'none',
+          fontFamily:  active.font_family   || 'Manrope, sans-serif',
+          showLogo:        active.show_logo       !== false,
+          showSignatures:  active.show_signatures !== false,
+        })
+      }
     })
     return () => { cancelled = true }
   }, [])

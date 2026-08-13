@@ -35,6 +35,7 @@ export default function EventsHeader({
         {/* Actions Button */}
         <div className="flex gap-2.5 flex-wrap">
           <button
+            type="button"
             onClick={onOpenImport}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-transparent cursor-pointer transition-all duration-200"
             style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#7a98bb' : '#64748b' }}
@@ -45,6 +46,7 @@ export default function EventsHeader({
           </button>
           
           <button
+            type="button"
             onClick={onExport}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-transparent cursor-pointer transition-all duration-200"
             style={{ border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`, color: dark ? '#7a98bb' : '#64748b' }}
@@ -55,6 +57,7 @@ export default function EventsHeader({
           </button>
 
           <button
+            type="button"
             onClick={onOpenCreate}
             className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-bold text-white border-none cursor-pointer transition-all duration-200 hover:-translate-y-px"
             style={{ background: BRAND, boxShadow: '0 4px 14px rgba(97,95,255,0.4)' }}
@@ -110,14 +113,16 @@ export default function EventsHeader({
           >
             {statuses.map(st => {
               const active = activeStatus === st
+              const inactiveColor = dark ? '#7a98bb' : '#64748b'
               return (
                 <button
+                  type="button"
                   key={st}
                   onClick={() => setActiveStatus(st)}
                   className="px-3 py-1.5 rounded-lg text-[12px] font-bold border-none cursor-pointer transition-all duration-150 whitespace-nowrap"
                   style={{
                     background: active ? BRAND : 'transparent',
-                    color: active ? '#ffffff' : (dark ? '#7a98bb' : '#64748b'),
+                    color: active ? '#ffffff' : inactiveColor,
                   }}
                 >
                   {st}
