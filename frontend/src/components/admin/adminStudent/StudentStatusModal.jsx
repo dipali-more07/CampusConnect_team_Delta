@@ -2,6 +2,47 @@ import React from 'react'
 import { createPortal } from 'react-dom'
 import { UserCheck, UserX, Loader2 } from 'lucide-react'
 
+function StatusBadges({ statusTarget, isActivating, dark, tokens }) {
+  let currentStatusBg = '#e6fbf2'
+  if (dark) {
+    currentStatusBg = statusTarget.status === 'Active' ? 'rgba(0,188,125,.15)' : 'rgba(239,68,68,.15)'
+  } else if (statusTarget.status !== 'Active') {
+    currentStatusBg = '#fef2f2'
+  }
+
+  let nextStatusBg = '#e6fbf2'
+  if (dark) {
+    nextStatusBg = isActivating ? 'rgba(0,188,125,.15)' : 'rgba(249,115,22,.15)'
+  } else if (!isActivating) {
+    nextStatusBg = '#fff7ed'
+  }
+
+  return (
+    <div className="flex items-center justify-center gap-2 my-4">
+      <span className="text-[11px] font-semibold" style={{ color: tokens.txtSec }}>Current:</span>
+      <span
+        className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"
+        style={{
+          background: currentStatusBg,
+          color: statusTarget.status === 'Active' ? '#00BC7D' : '#ef4444'
+        }}
+      >
+        {statusTarget.status}
+      </span>
+      <span className="text-[11px]" style={{ color: tokens.txtSec }}>→</span>
+      <span
+        className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"
+        style={{
+          background: nextStatusBg,
+          color: isActivating ? '#00BC7D' : '#f97316'
+        }}
+      >
+        {isActivating ? 'Active' : 'Suspended'}
+      </span>
+    </div>
+  )
+}
+
 export default function StudentStatusModal({
   statusTarget,
   setStatusTarget,
@@ -17,17 +58,21 @@ export default function StudentStatusModal({
   const iconBg = isActivating ? 'rgba(0,188,125,0.12)' : 'rgba(249,115,22,0.12)'
   const Icon = isActivating ? UserCheck : UserX
   const actionLabel = isActivating ? 'Activate' : 'Suspend'
+
   const actionDesc = isActivating
     ? `This will activate <strong>${statusTarget.name}</strong>'s account. They will be able to log in again.`
     : `This will suspend <strong>${statusTarget.name}</strong>'s account. They won't be able to log in.`
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-9999 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5"
-      onClick={e => { if (e.target === e.currentTarget && !saving) setStatusTarget(null) }}
+    <button
+      type="button"
+      className="fixed inset-0 z-9999 bg-black/60 backdrop-blur-sm flex items-center justify-center p-5 outline-none border-none w-full h-full cursor-default"
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !saving) setStatusTarget(null)
+      }}
     >
       <div
-        className="rounded-[20px] w-full max-w-[400px] p-7 text-center"
+        className="rounded-[20px] w-full max-w-[400px] p-7 text-center cursor-default"
         style={{
           background: dark ? '#0c1829' : '#fff',
           border: `1px solid ${tokens.border}`,
@@ -35,7 +80,6 @@ export default function StudentStatusModal({
           animation: 'slideUp 0.25s ease'
         }}
       >
-        {/* Icon */}
         <div
           className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
           style={{ background: iconBg }}
@@ -43,49 +87,26 @@ export default function StudentStatusModal({
           <Icon size={24} color={actionColor} />
         </div>
 
-        {/* Title */}
         <h3 className="text-[17px] font-extrabold m-0 mb-2" style={{ color: tokens.txtPri }}>
           {actionLabel} Student?
         </h3>
 
-        {/* Description */}
         <p
           className="text-[13px] mb-1 leading-relaxed"
           style={{ color: tokens.txtSec }}
           dangerouslySetInnerHTML={{ __html: actionDesc }}
         />
 
-        {/* Current status badge */}
-        <div className="flex items-center justify-center gap-2 my-4">
-          <span className="text-[11px] font-semibold" style={{ color: tokens.txtSec }}>Current:</span>
-          <span
-            className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"
-            style={{
-              background: statusTarget.status === 'Active'
-                ? (dark ? 'rgba(0,188,125,.15)' : '#e6fbf2')
-                : (dark ? 'rgba(239,68,68,.15)' : '#fef2f2'),
-              color: statusTarget.status === 'Active' ? '#00BC7D' : '#ef4444'
-            }}
-          >
-            {statusTarget.status}
-          </span>
-          <span className="text-[11px]" style={{ color: tokens.txtSec }}>→</span>
-          <span
-            className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider"
-            style={{
-              background: isActivating
-                ? (dark ? 'rgba(0,188,125,.15)' : '#e6fbf2')
-                : (dark ? 'rgba(249,115,22,.15)' : '#fff7ed'),
-              color: isActivating ? '#00BC7D' : '#f97316'
-            }}
-          >
-            {isActivating ? 'Active' : 'Suspended'}
-          </span>
-        </div>
+        <StatusBadges
+          statusTarget={statusTarget}
+          isActivating={isActivating}
+          dark={dark}
+          tokens={tokens}
+        />
 
-        {/* Buttons */}
         <div className="flex gap-3 mt-5">
           <button
+            type="button"
             onClick={() => setStatusTarget(null)}
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl text-[13px] font-bold border cursor-pointer transition-all"
@@ -94,6 +115,7 @@ export default function StudentStatusModal({
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleConfirmStatus}
             disabled={saving}
             className="flex-1 py-2.5 rounded-xl text-[13px] font-bold text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all"
@@ -110,7 +132,7 @@ export default function StudentStatusModal({
           </button>
         </div>
       </div>
-    </div>,
+    </button>,
     document.body
   )
 }

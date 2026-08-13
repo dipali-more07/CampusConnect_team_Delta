@@ -128,7 +128,7 @@ export default function RegistrationModal({ event, onClose, onSuccess, initialRe
         }
         const updatedPending = [newPayment, ...storedPending.filter(p => p.event_id !== event.id)]
         sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updatedPending))
-      } catch (err) {}
+      } catch (err) { }
 
       // Transition to Payment Prompt Window
       setStep(STEPS.PAYMENT_PROMPT)
@@ -177,7 +177,7 @@ export default function RegistrationModal({ event, onClose, onSuccess, initialRe
           const stored = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
           const updated = stored.map(item => (item.id === regId || item.event_id === event.id) ? { ...item, payment_status: 'Success', status: 'Success', payment_method: 'UPI' } : item)
           sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
-        } catch (e) {}
+        } catch (e) { }
 
         setStep(STEPS.SUCCESS)
         setTimeout(() => { onSuccess(event.id) }, 1500)
@@ -200,7 +200,7 @@ export default function RegistrationModal({ event, onClose, onSuccess, initialRe
           userPhone = profileRes.data?.phone || ''
           userName = profileRes.data?.full_name || ''
         }
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         const options = {
@@ -224,7 +224,7 @@ export default function RegistrationModal({ event, onClose, onSuccess, initialRe
                 const stored = JSON.parse(sessionStorage.getItem('cc_student_pending_payments') || '[]')
                 const updated = stored.map(item => (item.id === regId || item.event_id === event.id) ? { ...item, payment_status: 'Success', status: 'Success', payment_method: 'UPI' } : item)
                 sessionStorage.setItem('cc_student_pending_payments', JSON.stringify(updated))
-              } catch (e) {}
+              } catch (e) { }
 
               setStep(STEPS.SUCCESS)
               setTimeout(() => { onSuccess(event.id) }, 1500)
@@ -398,9 +398,8 @@ export default function RegistrationModal({ event, onClose, onSuccess, initialRe
                       disabled={isDisabled}
                       onClick={() => !isDisabled && setRegType(val)}
                       title={isDisabled ? 'You have already registered as an Individual for this event' : ''}
-                      className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold border flex items-center justify-center gap-1.5 transition-all ${
-                        isDisabled ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : 'cursor-pointer'
-                      }`}
+                      className={`flex-1 py-2.5 rounded-xl text-[12px] font-bold border flex items-center justify-center gap-1.5 transition-all ${isDisabled ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800' : 'cursor-pointer'
+                        }`}
                       style={{
                         background: regType === val ? BRAND : 'transparent',
                         color: regType === val ? '#fff' : txtSec,
