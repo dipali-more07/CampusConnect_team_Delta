@@ -200,7 +200,8 @@ async def force_cors_headers_middleware(request: Request, call_next):
     Guarantees CORS headers on 100% of responses including OPTIONS preflights,
     ngrok tunnels, 400 Bad Request, 422 Unprocessable Entity, and 500 errors.
     """
-    origin = request.headers.get("origin") or "*"
+    origin = request.headers.get("origin")
+    req_headers = request.headers.get("access-control-request-headers", "*")
     
     if request.method == "OPTIONS":
         response = JSONResponse(content="OK", status_code=200)
@@ -214,10 +215,14 @@ async def force_cors_headers_middleware(request: Request, call_next):
                 content={"success": False, "message": str(exc), "data": None}
             )
 
-    response.headers["Access-Control-Allow-Origin"] = origin if origin != "*" else "http://localhost:5173"
-    response.headers["Access-Control-Allow-Credentials"] = "true"
+    if origin:
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = "*"
+
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning, Accept, Origin, payload, encrypted_data"
+    response.headers["Access-Control-Allow-Headers"] = f"{req_headers}, Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning, Accept, Origin, payload, encrypted_data"
     response.headers["Access-Control-Expose-Headers"] = "*"
     return response
 
