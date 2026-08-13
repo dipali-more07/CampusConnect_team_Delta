@@ -13,6 +13,8 @@ FEATURES:
   7. Autonomous Agent Action Execution (Publish Event, Complete Event, Bulk Certificates, Approve Organizers)
 """
 
+from app.core.constants import EventType
+from app.core.constants import EventCategory
 import json
 import logging
 import re
