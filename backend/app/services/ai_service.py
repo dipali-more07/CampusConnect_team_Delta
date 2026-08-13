@@ -391,19 +391,13 @@ class AIService:
         import httpx
 
         system_instruction = (
-            f"You are CampusBot, the official intelligent AI assistant for CampusConnect.\n"
-            f"Logged in user details:\n"
-            f"- Name: {context['full_name']}\n"
-            f"- Role: {context['role']}\n"
-            f"- Course: {context['course']}, Department: {context['department']}\n"
-            f"- Badge Level: {context['badge']} (Score: {context['performance_score']})\n"
-            f"- Certificates Earned: {context['certificates_count']}\n\n"
-            f"Live Available Events: {json.dumps(context['available_events'])}\n\n"
-            f"Instructions:\n"
-            f"1. Give friendly, helpful, role-personalized responses.\n"
-            f"2. You MUST answer BOTH CampusConnect platform queries AND general user questions (coding help, study advice, general knowledge, science, career tips, jokes, etc.).\n"
-            f"3. For CampusConnect queries, use the live database context and available events provided.\n"
-            f"4. Keep formatting clean with markdown bullet points and emojis."
+            f"You are an expert AI assistant. User Context: Role={context['role']}, Course={context['course']}.\n"
+            f"Live Events Context: {json.dumps(context['available_events'])}\n\n"
+            f"STRICT RULES:\n"
+            f"1. Answer the user's question IMMEDIATELY and STRAIGHTFORWARDLY.\n"
+            f"2. DO NOT include greetings like 'Hello', 'Hi', 'Dear', or mention the user's name or 'CampusConnect' in the opening line unless the user explicitly greeted you.\n"
+            f"3. NO preambles, pleasantries, or filler intro phrases. Start directly with the answer content.\n"
+            f"4. Keep answers concise using markdown headers, bullet points, or code blocks."
         )
 
         headers = {"Content-Type": "application/json"}
@@ -504,13 +498,8 @@ class AIService:
         # -------------------------------------------------------------
         if any(w in query for w in ["hi", "hello", "hey", "greetings", "good morning", "good evening", "who are you"]):
             reply = (
-                f"Hello **{name}**! 👋 I am **CampusBot**, your intelligent AI Assistant for CampusConnect.\n\n"
-                f"I can help you with:\n"
-                f"- 🎓 **Event Recommendations** matching your course (**{context['course']}**)\n"
-                f"- 📜 **Certificates & Badges** (Current Level: `{context['badge']}`)\n"
-                f"- 💻 **Coding & Academic Q&A** (Python, JS, SQL, Web Dev, General Knowledge, Science)\n"
-                f"- ⚡ **Executing Organizer/Admin Commands** (Publish Events, Issue Certificates)\n\n"
-                f"How can I assist you today?"
+                f"Hello! I am **CampusBot**, your AI Assistant.\n\n"
+                f"How can I help you today?"
             )
             return reply, rec_events
 
@@ -522,10 +511,9 @@ class AIService:
                 f"### 🐍 Python Programming Overview\n\n"
                 f"Python is a high-level, interpreted programming language famous for clean readability and versatile libraries.\n\n"
                 f"**Key Highlights:**\n"
-                f"- **Web Frameworks:** FastAPI (used in CampusConnect!), Django, Flask\n"
+                f"- **Web Frameworks:** FastAPI, Django, Flask\n"
                 f"- **Data & AI:** NumPy, Pandas, PyTorch, TensorFlow, Scikit-Learn\n"
-                f"- **Async Support:** `asyncio` & `httpx` for high-concurrency APIs\n\n"
-                f"💡 *Need a specific Python code snippet or explanation? Feel free to ask!*"
+                f"- **Async Support:** `asyncio` & `httpx` for high-concurrency APIs"
             )
             return reply, []
 
@@ -536,8 +524,7 @@ class AIService:
                 f"**Core Concepts:**\n"
                 f"- **Async Operations:** Promises, `async/await`, `fetch()` API\n"
                 f"- **React State:** `useState`, `useEffect`, Custom Hooks\n"
-                f"- **Obfuscation & Security:** `btoa()` / `atob()` for base64 encoding payloads\n\n"
-                f"💡 *Ask me any JavaScript or React question!*"
+                f"- **Security:** `btoa()` / `atob()` for base64 encoding payloads"
             )
             return reply, []
 
@@ -545,19 +532,17 @@ class AIService:
             reply = (
                 f"### 🗄️ Database & SQL Guide\n\n"
                 f"SQL (Structured Query Language) is used to store, query, and manipulate relational data.\n\n"
-                f"**CampusConnect Tech Stack:**\n"
+                f"**Core Tech Stack:**\n"
                 f"- **Database:** PostgreSQL with SQLAlchemy 2.0 ORM & Alembic Migrations\n"
-                f"- **Key Tables:** `users`, `events`, `registrations`, `certificates`, `results`\n\n"
-                f"💡 *Need help writing a SQL query or database design? Ask away!*"
+                f"- **Key Tables:** `users`, `events`, `registrations`, `certificates`, `results`"
             )
             return reply, []
 
         if any(w in query for w in ["interview", "prep", "career", "resume", "job"]):
             reply = (
-                f"### 💼 Technical Interview & Career Preparation Tips\n\n"
-                f"Hi **{name}**! Here is a proven roadmap for cracking tech interviews:\n\n"
+                f"### 💼 Technical Interview Roadmap\n\n"
                 f"1. 🧠 **Data Structures & Algorithms:** Focus on Arrays, HashMaps, Two Pointers, Trees, and Dynamic Programming.\n"
-                f"2. 🛠️ **Build Real Projects:** Participate in CampusConnect Hackathons to gain verified certificates & portfolio projects!\n"
+                f"2. 🛠️ **Build Real Projects:** Build production-grade full-stack apps with verified certificates.\n"
                 f"3. 📄 **Resume Strategy:** Highlight key impact metrics, tech stack used, and QR-verifiable certificates.\n"
                 f"4. 💬 **Mock Interviews:** Practice explaining your system architecture clearly out loud."
             )
@@ -568,16 +553,15 @@ class AIService:
         # -------------------------------------------------------------
         if any(w in query for w in ["description", "draft", "organize", "template"]):
             reply = (
-                f"Hello Organizer **{name}**! ✍️ Here is a high-converting event description template:\n\n"
-                f"### 🚀 [Event Title]: Annual Innovation Hackathon 2026\n\n"
+                f"### ✍️ High-Converting Event Description Template\n\n"
+                f"**Title:** Annual Innovation Hackathon 2026\n\n"
                 f"**About the Event:**\n"
                 f"Join us for an exciting 24-hour hands-on hackathon where student teams collaborate to solve real-world industry challenges! "
                 f"Gain mentorship from industry experts, win cash prizes, and earn verified certificates of merit.\n\n"
                 f"**Highlights:**\n"
                 f"- 💡 Real-world Problem Statements\n"
                 f"- 🏆 Cash Prizes & Verified Winner Certificates\n"
-                f"- 🍕 Complimentary Refreshments & Mentorship\n\n"
-                f"**Registration:** Open for all courses! Limited seats available."
+                f"- 🍕 Complimentary Refreshments & Mentorship"
             )
             return reply, []
 
@@ -586,13 +570,13 @@ class AIService:
         # -------------------------------------------------------------
         if any(w in query for w in ["certificate", "download", "verify", "badge", "score", "points"]):
             reply = (
-                f"Hi **{name}**! 📜 Here is your Certificate & Achievement overview:\n\n"
-                f"- 🏆 **Current Badge Level:** `{context['badge']}` ({context['performance_score']} Pts)\n"
+                f"### 📜 Certificate & Achievement Overview\n\n"
+                f"- 🏆 **Badge Level:** `{context['badge']}` ({context['performance_score']} Pts)\n"
                 f"- 📄 **Verified Certificates:** `{context['certificates_count']}` Earned\n\n"
-                f"**How to Manage Your Certificates:**\n"
-                f"1. Visit the **My Certificates** tab in your student dashboard to download PDF copies.\n"
+                f"**Management Steps:**\n"
+                f"1. Visit the **My Certificates** tab in your dashboard to download PDF copies.\n"
                 f"2. Every certificate includes a unique **Verification QR Code**.\n"
-                f"3. Anyone (HR, Recruiters, Colleges) can scan the QR code to verify authenticity instantly at `/api/v1/certificates/verify/<cert_no>`."
+                f"3. Anyone can scan the QR code to verify authenticity instantly at `/api/v1/certificates/verify/<cert_no>`."
             )
             return reply, []
 
@@ -601,11 +585,7 @@ class AIService:
         # -------------------------------------------------------------
         if any(w in query for w in ["recommend", "suggest", "hackathon", "event", "upcoming", "show events"]):
             if not events:
-                return (
-                    f"Hello **{name}**! 👋 Currently, there are no published upcoming events in your campus. "
-                    f"Check back soon or ask your club organizers to publish new events!",
-                    []
-                )
+                return "Currently, there are no published upcoming events.", []
             
             event_items = []
             for e in events[:4]:
@@ -616,12 +596,7 @@ class AIService:
                 event_items.append(f"- 🚀 **{title_str}** ({cat_str}) - Location: {loc_str} | Price: {price_str}")
             event_list_str = "\n".join(event_items)
 
-            reply = (
-                f"Hello **{name}**! 🎓 Based on your profile (**{context['course']} - {context['department']}**), "
-                f"here are top upcoming events recommended for you:\n\n"
-                f"{event_list_str}\n\n"
-                f"💡 **Tip:** Click on any event card to view full details and register instantly!"
-            )
+            reply = f"### 🎓 Recommended Events for {context['course']}:\n\n{event_list_str}"
             return reply, rec_events
 
         # -------------------------------------------------------------
@@ -629,11 +604,10 @@ class AIService:
         # -------------------------------------------------------------
         if any(w in query for w in ["overview", "platform", "stats", "admin", "system"]):
             reply = (
-                f"Greetings **{name}**! 🛡️ Here is the live CampusConnect platform summary:\n\n"
+                f"### 🛡️ Live Platform Overview\n\n"
                 f"- 📅 **Active Published Events:** `{len(events)}` Events\n"
-                f"- 👤 **Your Account Role:** `{role.upper()}`\n"
-                f"- ⚡ **System Status:** All Services Operational (JWT Auth, QR Scanner, PDF Generator, SMTP Engine)\n\n"
-                f"Need help reviewing event approvals or user roles? Let me know!"
+                f"- 👤 **Account Role:** `{role.upper()}`\n"
+                f"- ⚡ **System Status:** All Services Operational (JWT Auth, QR Scanner, PDF Generator, SMTP Engine)"
             )
             return reply, []
 
@@ -649,8 +623,7 @@ class AIService:
         # -------------------------------------------------------------
         reply = (
             f"Here is what I can share regarding **'{raw_query}'**:\n\n"
-            f"- I am **CampusBot**, your intelligent assistant for CampusConnect.\n"
-            f"- I can answer technical & coding questions, help you organize events, generate certificates, and recommend hackathons.\n\n"
-            f"💡 *Tip: Try asking a coding question (e.g. 'Explain Python FastAPI async'), or select a Quick Action chip below!*"
+            f"- I am **CampusBot**, your intelligent assistant.\n"
+            f"- Ask me any technical question, event creation guidance, certificate verification, or platform features!"
         )
         return reply, []
