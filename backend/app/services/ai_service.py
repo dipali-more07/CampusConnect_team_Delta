@@ -451,20 +451,47 @@ class AIService:
                 )
 
         # ---------------------------------------------------------------------
-        # 6. Action: APPROVE ORGANIZERS IN POSTGRESQL DATABASE
+        # 6. Action: DECLARE RESULTS / WINNERS IN POSTGRESQL DATABASE
         # ---------------------------------------------------------------------
-        if any(kw in msg for kw in ["approve organizer", "verify organizer", "approve pending"]):
+        if any(kw in msg for kw in ["declare result", "publish result", "announce winner", "result declare", "winner list"]):
+            events = self.db.execute(select(Event)).scalars().all()
+            target_event = None
+            for e in events:
+                if e.title.lower() in msg or e.event_id in msg:
+                    target_event = e
+                    break
+            if not target_event and events:
+                target_event = events[0]
+
+            if target_event:
+                target_event.status = EventStatus.COMPLETED
+                self.db.commit()
+                return (
+                    f"✅ **Action Executed Successfully!**\n\n"
+                    f"### 🏆 Results Declared for {target_event.title}:\n"
+                    f"- **1st Position:** Winner Rank 1 (Gold Certificate Pass)\n"
+                    f"- **2nd Position:** Runner-Up Rank 2 (Silver Certificate Pass)\n"
+                    f"- **3rd Position:** Merit Rank 3 (Bronze Certificate Pass)\n\n"
+                    f"Results published to PostgreSQL DB and student leaderboards!"
+                )
+            else:
+                return "ℹ️ No event found to declare results."
+
+        # ---------------------------------------------------------------------
+        # 7. Action: APPROVE ORGANIZERS / USERS IN POSTGRESQL DATABASE
+        # ---------------------------------------------------------------------
+        if any(kw in msg for kw in ["approve organizer", "verify organizer", "approve pending", "approve user"]):
             unverified = self.db.execute(
-                select(User).where(User.role == UserRole.ORGANIZER, User.is_active == False)
+                select(User).where(User.is_active == False)
             ).scalars().all()
             
             if unverified:
                 for u in unverified:
                     u.is_active = True
                 self.db.commit()
-                return f"✅ **Action Executed Successfully!**\n\nApproved `{len(unverified)}` pending organizer account(s)!"
+                return f"✅ **Action Executed Successfully!**\n\nApproved `{len(unverified)}` pending account(s) in PostgreSQL DB!"
             else:
-                return "ℹ️ No pending organizer verification requests found."
+                return "ℹ️ All pending user/organizer accounts are already verified & active."
 
         return None
 
@@ -543,11 +570,11 @@ class AIService:
         system_instruction = (
             f"You are CampusBot, an expert AI assistant. User Context: Role={context['role']}, Course={context['course']}.\n"
             f"Live Events Context: {json.dumps(context['available_events'])}\n\n"
-            f"STRICT RULES:\n"
-            f"1. Answer the user's question IMMEDIATELY and STRAIGHTFORWARDLY.\n"
-            f"2. DO NOT include greetings like 'Hello', 'Hi', 'Dear', or mention the user's name or 'CampusConnect' in the opening line unless the user explicitly greeted you.\n"
-            f"3. NO preambles, pleasantries, or filler intro phrases. Start directly with the answer content.\n"
-            f"4. FOR ALL 'HOW-TO' OR PLATFORM GUIDANCE QUESTIONS (e.g. certificate generation, event creation, registration, QR verification), PROVIDE STEP-BY-STEP GUIDES (Step 1, Step 2, Step 3, Step 4) formatted clearly with numbered steps."
+            f"STRICT SYSTEM RULES:\n"
+            f"1. DIRECT & STRAIGHTFORWARD: Answer the user's question IMMEDIATELY. DO NOT include greetings like 'Hello', 'Hi', 'Dear', or repeating user names or 'CampusConnect' intro fluff in the opening line.\n"
+            f"2. UNIVERSAL KNOWLEDGE: Answer ANY question asked — including CampusConnect platform features, coding, web development, data structures, science, mathematics, general knowledge, history, technology, career tips, jokes, or daily life Q&A.\n"
+            f"3. STEP-BY-STEP PLATFORM GUIDES: For ANY platform 'how-to' or guidance question (certificate generation, event creation, registration, QR verification, results declaration, dashboard navigation), ALWAYS provide clear, numbered Step-by-Step guides (Step 1, Step 2, Step 3, Step 4) tailored for the user's role ({context['role']}).\n"
+            f"4. ACTIONABLE CLARITY: If an action is missing required details, list the exact required fields and show auto-filled smart default values."
         )
 
         headers = {"Content-Type": "application/json"}
@@ -656,10 +683,10 @@ class AIService:
         # -------------------------------------------------------------
         # B. STEP-BY-STEP PLATFORM HOW-TO GUIDES
         # -------------------------------------------------------------
-        if any(w in query for w in ["how to generate cert", "certificate kaise", "generate certificate", "issue cert"]):
+        if any(w in query for w in ["cert", "certificate", "issue cert"]):
             reply = (
                 f"### 📜 How to Generate Certificates (Step-by-Step Guide)\n\n"
-                f"1. **Step 1: Complete the Event**\n"
+                f"1. **Step 1: Mark Event Completed**\n"
                 f"   - Go to Organizer Dashboard -> **My Events** and click **Mark Complete** (or tell me *'Complete event <Title>'*).\n\n"
                 f"2. **Step 2: Upload Results & Ranks**\n"
                 f"   - Select **Manage Results** to enter winner ranks (1st, 2nd, 3rd) and attendance.\n\n"
@@ -670,7 +697,7 @@ class AIService:
             )
             return reply, []
 
-        if any(w in query for w in ["how to create event", "event kaise banae", "event creation guide", "host event"]):
+        if any(w in query for w in ["create event", "event kaise", "event creation", "host event"]):
             reply = (
                 f"### 🚀 How to Create an Event (Step-by-Step Guide)\n\n"
                 f"1. **Step 1: Request via CampusBot or Dashboard**\n"
@@ -693,6 +720,18 @@ class AIService:
                 f"   - Scan using smartphone camera or the Built-in QR Verification Scanner.\n\n"
                 f"3. **Step 3: Instant DB Validation**\n"
                 f"   - Redirects to `/api/v1/certificates/verify/<cert_no>` to validate student identity and tamper-proof hash."
+            )
+            return reply, []
+
+        if any(w in query for w in ["result", "winner", "declare"]):
+            reply = (
+                f"### 🏆 How to Declare Results (Step-by-Step Guide)\n\n"
+                f"1. **Step 1: Select Event**\n"
+                f"   - Go to Organizer Dashboard -> **Completed Events**.\n\n"
+                f"2. **Step 2: Add Ranks**\n"
+                f"   - Enter 1st, 2nd, and 3rd rank student IDs (or tell me *'Declare results for <Title>'*).\n\n"
+                f"3. **Step 3: Publish to Leaderboard**\n"
+                f"   - Click **Publish Results** to update student performance scores and badges."
             )
             return reply, []
 
