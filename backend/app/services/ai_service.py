@@ -303,7 +303,6 @@ class AIService:
 
             self.db.add(new_evt)
             self.db.commit()
-            self.db.refresh(new_evt)
             return (
                 f"✅ **Real Database Record Created!**\n\n"
                 f"### 📅 Event Details Saved to PostgreSQL:\n"
