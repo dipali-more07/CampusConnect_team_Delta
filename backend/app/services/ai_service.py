@@ -417,11 +417,18 @@ class AIService:
             ]
         }
 
-        # Try Google Gemini model endpoints in sequence
-        candidate_models = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest"]
+        # Multi-model Candidate endpoints (Auto-Switches if rate-limited or quota exceeded)
+        candidate_models = [
+            "gemini-1.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-pro",
+            "gemini-2.0-flash-lite-preview-02-05",
+            "gemini-flash-latest"
+        ]
         
         async with httpx.AsyncClient(timeout=15.0) as client:
             last_err = None
+            # 1. Try Google Gemini Models
             for model_name in candidate_models:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
                 try:
@@ -432,13 +439,38 @@ class AIService:
                         if candidates and "content" in candidates[0]:
                             parts = candidates[0]["content"].get("parts", [])
                             if parts and "text" in parts[0]:
+                                logger.info(f"✅ LLM Response generated successfully using model: {model_name}")
                                 return parts[0]["text"]
                     else:
                         last_err = f"Model {model_name} HTTP {resp.status_code}: {resp.text}"
                 except Exception as ex:
                     last_err = str(ex)
+
+            # 2. Try Groq Free API if configured
+            groq_key = getattr(settings, "GROQ_API_KEY", None)
+            if groq_key and len(groq_key.strip()) > 5:
+                groq_models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "gemma2-9b-it"]
+                groq_headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
+                for g_model in groq_models:
+                    g_url = "https://api.groq.com/openai/v1/chat/completions"
+                    g_payload = {
+                        "model": g_model,
+                        "messages": [
+                            {"role": "system", "content": system_instruction},
+                            {"role": "user", "content": message}
+                        ]
+                    }
+                    try:
+                        g_resp = await client.post(g_url, json=g_payload, headers=groq_headers)
+                        if g_resp.status_code == 200:
+                            g_data = g_resp.json()
+                            content = g_data["choices"][0]["message"]["content"]
+                            logger.info(f"✅ LLM Response generated successfully using Groq Model: {g_model}")
+                            return content
+                    except Exception as g_ex:
+                        last_err = f"Groq {g_model}: {g_ex}"
             
-            raise Exception(f"All Gemini API endpoints failed: {last_err}")
+            raise Exception(f"All LLM API model endpoints failed: {last_err}")
 
     async def _query_duckduckgo_knowledge(self, query: str) -> Optional[str]:
         """Queries free DuckDuckGo Instant Answer API for out-of-project general knowledge & science queries."""
