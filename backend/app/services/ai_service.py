@@ -526,8 +526,14 @@ class AIService:
                 }
             }
 
-        # 2. Try External LLM API if valid key is configured
-        api_key = getattr(settings, "GEMINI_API_KEY", None) or getattr(settings, "OPENAI_API_KEY", None)
+        # 2. Try External LLM API if valid key is configured (checks settings & env vars)
+        import os
+        api_key = (
+            getattr(settings, "GEMINI_API_KEY", None) or 
+            os.getenv("GEMINI_API_KEY", "").strip() or 
+            getattr(settings, "OPENAI_API_KEY", None) or 
+            os.getenv("OPENAI_API_KEY", "").strip()
+        )
         
         if api_key and len(api_key.strip()) > 10:
             try:
@@ -546,6 +552,8 @@ class AIService:
                 }
             except Exception as e:
                 logger.warning(f"External LLM API call failed: {e}. Falling back to Instant Knowledge Engine.")
+        else:
+            logger.info("ℹ️ GEMINI_API_KEY not found in server environment. Using Instant Knowledge & Native RAG Engine.")
 
         # 3. Intelligent Native RAG & Instant Knowledge Engine (Answers general + campus questions)
         reply, rec_events = await self._generate_native_rag_reply(user_query, rag_context)
@@ -620,7 +628,8 @@ class AIService:
                     last_err = str(ex)
 
             # 2. Try Groq Free API if configured
-            groq_key = getattr(settings, "GROQ_API_KEY", None)
+            import os
+            groq_key = getattr(settings, "GROQ_API_KEY", None) or os.getenv("GROQ_API_KEY", "")
             if groq_key and len(groq_key.strip()) > 5:
                 groq_models = ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "gemma2-9b-it"]
                 groq_headers = {"Authorization": f"Bearer {groq_key}", "Content-Type": "application/json"}
@@ -673,12 +682,13 @@ class AIService:
         # -------------------------------------------------------------
         # A. GENERAL GREETINGS & CHAT
         # -------------------------------------------------------------
-        if any(w in query for w in ["hi", "hello", "hey", "greetings", "good morning", "good evening", "who are you"]):
-            reply = (
-                f"Hello! I am **CampusBot**, your AI Assistant.\n\n"
-                f"How can I help you today?"
-            )
+        if any(w in query for w in ["hi", "hello", "hey", "greetings", "good morning", "good evening"]):
+            reply = "How can I help you today?"
             return reply, rec_events
+
+        if any(w in query for w in ["who are you", "what is your name"]):
+            reply = "I am CampusBot, your AI Assistant for CampusConnect."
+            return reply, []
 
         # -------------------------------------------------------------
         # B. STEP-BY-STEP PLATFORM HOW-TO GUIDES
@@ -795,8 +805,9 @@ class AIService:
         # E. GENERAL HELPFUL RESPONSE FOR CUSTOM USER QUESTIONS
         # -------------------------------------------------------------
         reply = (
-            f"Here is what I can share regarding **'{raw_query}'**:\n\n"
-            f"- I am **CampusBot**, your intelligent assistant.\n"
-            f"- Ask me any technical question, event creation guidance, certificate verification, or platform features!"
+            f"Regarding **'{raw_query}'**:\n\n"
+            f"Here is how you can perform this action or query:\n"
+            f"- To manage events, certificates, or results, simply tell me your request (e.g. *'Create event <Title>'*, *'Generate certificates'*, or *'Declare results'*).\n"
+            f"- For platform features or technical guides, ask any question directly!"
         )
         return reply, []
