@@ -30,6 +30,7 @@ services:
     environment:
       DATABASE_URL: postgresql://campusconnect_user:campusconnect_password@db:5432/campusconnect_db
     ports:
+      - "5000:5000"
       - "8000:8000"
     volumes:
       - ./uploads:/app/uploads

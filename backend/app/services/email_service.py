@@ -52,7 +52,7 @@ def build_email_template(
     if cta_text and cta_url:
         button_html = f"""
         <div style="text-align: center; margin: 32px 0;">
-            <a href="{cta_url}" target="_blank" class="btn-animated" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 16px 36px; border-radius: 12px; display: inline-block; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35); letter-spacing: 0.5px; transition: transform 0.2s ease;">
+            <a href="{cta_url}" target="_blank" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #d946ef 100%); color: #ffffff; text-decoration: none; font-size: 16px; font-weight: 700; padding: 16px 36px; border-radius: 12px; display: inline-block; box-shadow: 0 10px 25px rgba(99, 102, 241, 0.35); letter-spacing: 0.5px;">
                 {cta_text} &rarr;
             </a>
         </div>
@@ -61,9 +61,9 @@ def build_email_template(
     code_box_html = ""
     if code_box:
         code_box_html = f"""
-        <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border: 2px dashed #6366f1; border-radius: 16px; padding: 24px; text-align: center; margin: 24px 0; box-shadow: inset 0 2px 4px rgba(0,0,0,0.02);">
-            <span style="font-size: 12px; color: #6366f1; text-transform: uppercase; letter-spacing: 2px; font-weight: 800; display: block; margin-bottom: 8px;">✨ VERIFICATION / RESET CODE</span>
-            <code style="font-size: 32px; font-weight: 900; color: #4f46e5; letter-spacing: 6px; font-family: 'Courier New', monospace;">{code_box}</code>
+        <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px; padding: 20px; text-align: center; margin: 24px 0;">
+            <span style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; display: block; margin-bottom: 8px;">VERIFICATION / RESET CODE</span>
+            <code style="font-size: 28px; font-weight: 800; color: #4f46e5; letter-spacing: 4px; font-family: 'Courier New', monospace;">{code_box}</code>
         </div>
         """
 
@@ -75,41 +75,27 @@ def build_email_template(
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{title}</title>
-    <style>
-        @keyframes glowPulse {{
-            0% {{ box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }}
-            70% {{ box-shadow: 0 0 0 14px rgba(99, 102, 241, 0); }}
-            100% {{ box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }}
-        }}
-        .btn-animated {{
-            animation: glowPulse 2.5s infinite ease-in-out;
-        }}
-        @media only screen and (max-width: 600px) {{
-            .main-card {{ width: 100% !important; border-radius: 12px !important; }}
-            .padding-box {{ padding: 24px 16px !important; }}
-        }}
-    </style>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #f1f5f9; padding: 40px 16px;">
         <tr>
             <td align="center">
-                <table role="presentation" class="main-card" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0;">
+                <table role="presentation" width="100%" style="max-width: 600px; background-color: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08); border: 1px solid #e2e8f0;">
                     <!-- HEADER GRADIENT -->
                     <tr>
                         <td style="background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%); padding: 36px 32px; text-align: center;">
-                            <div style="display: inline-block; background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(10px); padding: 8px 20px; border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.25); margin-bottom: 12px;">
-                                <span style="color: #a5b4fc; font-size: 18px; vertical-align: middle;">✦</span>
-                                <span style="color: #ffffff; font-weight: 800; font-size: 16px; letter-spacing: 1.5px; vertical-align: middle; margin-left: 6px;">CampusConnect</span>
+                            <div style="display: inline-block; background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); padding: 8px 18px; border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.2); margin-bottom: 12px;">
+                                <span style="color: #818cf8; font-size: 18px; vertical-align: middle;">✦</span>
+                                <span style="color: #ffffff; font-weight: 800; font-size: 16px; letter-spacing: 1px; vertical-align: middle; margin-left: 6px;">CampusConnect</span>
                             </div>
-                            <h1 style="color: #ffffff; font-size: 26px; font-weight: 800; margin: 12px 0 6px 0; letter-spacing: -0.5px;">{title}</h1>
-                            <p style="color: #a5b4fc; font-size: 14px; margin: 0; font-weight: 500;">{subtitle}</p>
+                            <h1 style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 12px 0 6px 0; letter-spacing: -0.5px;">{title}</h1>
+                            <p style="color: #94a3b8; font-size: 14px; margin: 0; font-weight: 500;">{subtitle}</p>
                         </td>
                     </tr>
                     
                     <!-- BODY CONTENT -->
                     <tr>
-                        <td class="padding-box" style="padding: 36px 32px; background-color: #ffffff;">
+                        <td style="padding: 36px 32px; background-color: #ffffff;">
                             <div style="font-size: 15px; line-height: 1.7; color: #334155;">
                                 {content_html}
                             </div>
