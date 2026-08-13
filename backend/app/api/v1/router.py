@@ -1,4 +1,3 @@
- 
 from fastapi import APIRouter
 
 from app.api.v1 import auth, users, colleges, organizers, events, registrations, attendance, certificates, notifications, analytics, search, results, payments, feedback, ai
