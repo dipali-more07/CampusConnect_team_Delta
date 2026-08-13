@@ -173,7 +173,7 @@ export default function StudentDashboard() {
   /* ── Unified Theme Tokens matching app theme ── */
   const tokens = {
     dark,
-    brand: accentColor || BRAND,
+    brand: accentColor || '#2563eb',
     bg: dark ? '#060e1c' : '#f4f6fa',
     sidebar: dark ? '#0c1829' : '#ffffff',
     header: dark ? '#0c1829' : '#ffffff',

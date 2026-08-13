@@ -9,6 +9,7 @@ import StudentDashboard from './pages/Student/StudentDashboard'
 import OrganizerDashboard from './pages/Organizer/OrganizerDashboard'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import SplashLoader from './components/common/SplashLoader'
+import CampusBotWidget from './components/common/CampusBotWidget'
 
 function getEffectiveRole(user) {
   const r = (user?.role || user?.userType || user?.user_type || '').toLowerCase()
@@ -161,6 +162,8 @@ function AppRouter() {
       {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      {/* Global CampusBot AI Chatbot Widget */}
+      {isLoggedIn && <CampusBotWidget />}
       {showSplash && <SplashLoader onDone={() => setShowSplash(false)} />}
     </>
   )
