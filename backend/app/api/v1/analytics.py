@@ -15,6 +15,19 @@ from app.models.user import User
 router = APIRouter()
 
 
+@router.get("/public-stats", summary="Public platform statistics for login/landing pages (Unauthenticated)")
+def public_platform_stats(
+    db: Session = Depends(get_db),
+):
+    """
+    Returns real-time public stats (events count, students count, certificates count)
+    for display on login/landing pages without requiring user authentication.
+    """
+    service = AnalyticsService(db)
+    stats = service.get_public_stats()
+    return success_response(message="Public platform statistics", data=stats)
+
+
 @router.get("/platform", summary="Platform-wide statistics (Admin only)")
 def platform_stats(
     admin: User = Depends(require_admin),

@@ -32,10 +32,30 @@ class ResultService:
             raise NotFoundException(f"Event with ID '{data.event_id}' not found")
 
         # Check event has completed
-        from datetime import datetime
+        from datetime import datetime, timedelta
         from app.core.constants import EventStatus
-        if event.end_datetime and event.end_datetime > datetime.utcnow() and event.status != EventStatus.COMPLETED:
+
+        status_val = str(event.status.value if hasattr(event.status, "value") else event.status).upper()
+        now = datetime.now()
+        now_utc = datetime.utcnow()
+
+        is_ended = False
+        if not event.end_datetime:
+            is_ended = True
+        else:
+            is_ended = (
+                event.end_datetime <= now or
+                event.end_datetime <= now_utc or
+                event.end_datetime <= (now_utc + timedelta(hours=6))
+            )
+
+        if status_val != EventStatus.COMPLETED.value.upper() and not is_ended:
             raise BadRequestException("Results can only be declared after the event has completed")
+
+        if status_val != EventStatus.COMPLETED.value.upper():
+            event.status = EventStatus.COMPLETED
+            self.db.commit()
+            self.db.refresh(event)
 
         # 2. Check if user is organizer of the event or admin
         if current_user.role != UserRole.ADMIN and event.organizer_id != current_user.user_id:
@@ -86,6 +106,7 @@ class ResultService:
                 existing.score = data.score
                 self.db.commit()
                 self.db.refresh(existing)
+                self._update_certificates_for_result(data.event_id, data.participant_id, data.team_id, data.rank)
                 return existing
         elif data.team_id:
             existing = self.db.execute(
@@ -99,6 +120,7 @@ class ResultService:
                 existing.score = data.score
                 self.db.commit()
                 self.db.refresh(existing)
+                self._update_certificates_for_result(data.event_id, data.participant_id, data.team_id, data.rank)
                 return existing
 
         # Create new Result
@@ -112,7 +134,51 @@ class ResultService:
         self.result_repo.create(result)
         self.db.commit()
         self.db.refresh(result)
+        self._update_certificates_for_result(data.event_id, data.participant_id, data.team_id, data.rank)
         return result
+
+    def _update_certificates_for_result(self, event_id: str, participant_id: Optional[str], team_id: Optional[str], rank: Optional[int]):
+        if not rank:
+            return
+
+        cert_type = "participation"
+        if rank == 1:
+            cert_type = "winner_1st"
+        elif rank == 2:
+            cert_type = "runner_up_2nd"
+        elif rank == 3:
+            cert_type = "runner_up_3rd"
+        else:
+            cert_type = f"merit_{rank}"
+
+        user_ids = []
+        if participant_id:
+            user_ids.append(participant_id)
+        elif team_id:
+            try:
+                from app.models.team import Team
+                from app.models.team_member import TeamMember
+                team_obj = self.db.execute(
+                    select(Team).where(Team.team_id == team_id)
+                ).scalar_one_or_none()
+                if team_obj and team_obj.leader_id:
+                    user_ids.append(team_obj.leader_id)
+                members = self.db.execute(
+                    select(TeamMember.user_id).where(TeamMember.team_id == team_id)
+                ).scalars().all()
+                user_ids.extend(members)
+            except Exception:
+                pass
+
+        from app.models.certificate import Certificate
+        from app.repositories.certificate_repository import CertificateRepository
+        cert_repo = CertificateRepository(self.db)
+
+        for uid in user_ids:
+            cert = cert_repo.get_by_event_and_user(event_id, uid)
+            if cert:
+                cert.certificate_type = cert_type
+                self.db.commit()
 
     def get_event_results(self, event_id: str) -> List[Result]:
         """Get sorted results for a specific event."""

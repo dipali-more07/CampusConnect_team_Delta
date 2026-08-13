@@ -32,18 +32,51 @@ from app.core.config import settings
 # PASSWORD HASHING
 # ---------------------------------------------------------------
 
+import base64
+
+
+def decode_prehashed_or_base64_password(password: str) -> str:
+    """
+    If password is base64 encoded (e.g. btoa from frontend), dynamically decode it.
+    Otherwise return the password as-is.
+    """
+    if not isinstance(password, str):
+        return password
+
+    v_clean = password.strip()
+    if not v_clean:
+        return v_clean
+
+    try:
+        padding_needed = (4 - len(v_clean) % 4) % 4
+        padded_v = v_clean + ("=" * padding_needed)
+
+        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                decoded_bytes = decoder(padded_v)
+                decoded_str = decoded_bytes.decode("utf-8").strip()
+                if decoded_str and all(ord(c) >= 32 for c in decoded_str):
+                    encoded_again = base64.b64encode(decoded_str.encode("utf-8")).decode("utf-8").rstrip("=")
+                    if encoded_again == v_clean.rstrip("="):
+                        return decoded_str
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return v_clean
+
+
 def hash_password(plain_password: str) -> str:
     """
-    Convert a plain text password to a secure hash.
+    Convert a plain text (or base64 btoa prehashed) password to a secure bcrypt hash.
 
     Example:
         hash_password("mypassword123") → "$2b$12$abcdef..."
         The "$2b$12$" part tells us it's bcrypt with 12 rounds.
-        12 rounds means it takes ~250ms - slow enough to prevent brute force.
     """
-    # bcrypt expects bytes and returns bytes
-    pwd_bytes = plain_password.encode("utf-8")
-    # Generate salt with 12 rounds (default is 12)
+    clean_pwd = decode_prehashed_or_base64_password(plain_password)
+    pwd_bytes = clean_pwd.encode("utf-8")
     salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(pwd_bytes, salt)
     return hashed.decode("utf-8")
@@ -51,20 +84,30 @@ def hash_password(plain_password: str) -> str:
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Check if a plain password matches a stored hash.
-
-    Example:
-        verify_password("mypassword123", "$2b$12$abcdef...") → True
-        verify_password("wrongpassword", "$2b$12$abcdef...") → False
-
-    NOTE: We never "unhash" the password. We hash the attempt and compare.
+    Check if a plain password (or base64 btoa prehashed password) matches a stored hash.
+    Supports both direct string comparison and base64 decoded string verification.
     """
-    pwd_bytes = plain_password.encode("utf-8")
     hashed_bytes = hashed_password.encode("utf-8")
+
+    # Try 1: Direct verification
+    pwd_bytes = plain_password.encode("utf-8")
     try:
-        return bcrypt.checkpw(pwd_bytes, hashed_bytes)
+        if bcrypt.checkpw(pwd_bytes, hashed_bytes):
+            return True
     except Exception:
-        return False
+        pass
+
+    # Try 2: Base64 (btoa) decoded password verification
+    try:
+        decoded_pwd = decode_prehashed_or_base64_password(plain_password)
+        if decoded_pwd != plain_password:
+            dec_bytes = decoded_pwd.encode("utf-8")
+            if bcrypt.checkpw(dec_bytes, hashed_bytes):
+                return True
+    except Exception:
+        pass
+
+    return False
 
 
 # ---------------------------------------------------------------

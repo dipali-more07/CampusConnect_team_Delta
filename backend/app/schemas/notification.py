@@ -16,6 +16,12 @@ class CreateNotificationRequest(BaseModel):
     notification_type: NotificationType = NotificationType.SYSTEM
 
 
+class CreateEventNotificationRequest(BaseModel):
+    title: str = Field(..., max_length=255)
+    message: str
+    notification_type: NotificationType = NotificationType.EVENT
+
+
 class NotificationResponse(BaseModel):
     notification_id: str
     user_id: str

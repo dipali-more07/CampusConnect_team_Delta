@@ -59,6 +59,38 @@ class AnalyticsService:
             total_colleges=count(College),
         )
 
+    def get_public_stats(self) -> dict:
+        """
+        Get public high-level stats for login/landing pages (no authentication required).
+        Calculates live database totals for Events, Students, Certificates, and Registrations.
+        """
+        def _format_num(n: int) -> str:
+            if n >= 1_000_000:
+                return f"{n / 1_000_000:.1f}M".replace(".0M", "M")
+            if n >= 1_000:
+                return f"{n / 1_000:.1f}K".replace(".0K", "K")
+            return str(n)
+
+        total_events = self.db.execute(select(func.count()).select_from(Event)).scalar() or 0
+        total_students = self.db.execute(
+            select(func.count()).select_from(User).where(User.role == UserRole.PARTICIPANT)
+        ).scalar() or 0
+        if total_students == 0:
+            total_students = self.db.execute(select(func.count()).select_from(User)).scalar() or 0
+
+        total_certificates = self.db.execute(select(func.count()).select_from(Certificate)).scalar() or 0
+        total_registrations = self.db.execute(select(func.count()).select_from(EventRegistration)).scalar() or 0
+
+        return {
+            "events": total_events,
+            "students": total_students,
+            "certificates": total_certificates,
+            "registrations": total_registrations,
+            "events_formatted": _format_num(total_events),
+            "students_formatted": _format_num(total_students),
+            "certificates_formatted": _format_num(total_certificates),
+        }
+
     def get_event_stats(self, event_id: str) -> EventStats:
         """Get detailed statistics for a single event."""
         event = self.db.execute(

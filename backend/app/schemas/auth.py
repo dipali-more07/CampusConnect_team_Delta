@@ -1,11 +1,64 @@
-"""
-app/schemas/auth.py
-Authentication request and response schemas.
-"""
 import re
+import base64
 from pydantic import BaseModel, EmailStr, Field, field_validator
 from app.core.constants import UserRole, Gender
 from typing import Optional
+
+
+def decode_btoa_email(v: any) -> any:
+    """Dynamically decodes plain text or base64 (btoa) encoded email."""
+    if not isinstance(v, str):
+        return v
+
+    v_clean = v.strip()
+    if "@" in v_clean:
+        return v_clean
+
+    try:
+        padding_needed = (4 - len(v_clean) % 4) % 4
+        padded_v = v_clean + ("=" * padding_needed)
+
+        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                decoded_bytes = decoder(padded_v)
+                decoded_str = decoded_bytes.decode("utf-8", errors="ignore").strip()
+                if "@" in decoded_str:
+                    return decoded_str
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return v_clean
+
+
+def decode_btoa_password(v: any) -> any:
+    """Dynamically decodes plain text or base64 (btoa) encoded password."""
+    if not isinstance(v, str):
+        return v
+
+    v_clean = v.strip()
+    if not v_clean:
+        return v_clean
+
+    try:
+        padding_needed = (4 - len(v_clean) % 4) % 4
+        padded_v = v_clean + ("=" * padding_needed)
+
+        for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                decoded_bytes = decoder(padded_v)
+                decoded_str = decoded_bytes.decode("utf-8").strip()
+                if decoded_str and all(ord(c) >= 32 for c in decoded_str):
+                    encoded_again = base64.b64encode(decoded_str.encode("utf-8")).decode("utf-8").rstrip("=")
+                    if encoded_again == v_clean.rstrip("="):
+                        return decoded_str
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return v_clean
 
 
 class RegisterRequest(BaseModel):
@@ -20,6 +73,16 @@ class RegisterRequest(BaseModel):
     college_id: str = Field(..., description="College identifier UUID")
     gender: Optional[Gender] = Field(None, description="Gender (male, female, other, prefer_not_to_say)")
     year_of_study: Optional[int] = Field(None, ge=1, le=5, description="Year of study (1-5)")
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
+    @field_validator("password", "confirm_password", mode="before")
+    @classmethod
+    def validate_btoa_passwords(cls, v: any) -> any:
+        return decode_btoa_password(v)
 
     @field_validator("gender", mode="before")
     @classmethod
@@ -56,6 +119,8 @@ class RegisterRequest(BaseModel):
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
         """Enforce strong password rules."""
+        if isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdefABCDEF" for c in v):
+            return v
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must contain at least one uppercase letter")
         if not re.search(r"[a-z]", v):
@@ -78,6 +143,16 @@ class LoginRequest(BaseModel):
     email: EmailStr
     password: str
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
+    @field_validator("password", mode="before")
+    @classmethod
+    def validate_btoa_password(cls, v: any) -> any:
+        return decode_btoa_password(v)
+
 
 class TokenResponse(BaseModel):
     """Response after successful login."""
@@ -94,15 +169,27 @@ class RefreshTokenRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
 
 class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
     confirm_password: str
 
+    @field_validator("new_password", "confirm_password", mode="before")
+    @classmethod
+    def validate_btoa_passwords(cls, v: any) -> any:
+        return decode_btoa_password(v)
+
     @field_validator("new_password")
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
+        if isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdefABCDEF" for c in v):
+            return v
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must contain at least one uppercase letter")
         if not re.search(r"[a-z]", v):
@@ -124,9 +211,16 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
     confirm_password: str
 
+    @field_validator("current_password", "new_password", "confirm_password", mode="before")
+    @classmethod
+    def validate_btoa_passwords(cls, v: any) -> any:
+        return decode_btoa_password(v)
+
     @field_validator("new_password")
     @classmethod
     def validate_password_strength(cls, v: str) -> str:
+        if isinstance(v, str) and len(v) == 64 and all(c in "0123456789abcdefABCDEF" for c in v):
+            return v
         if not re.search(r"[A-Z]", v):
             raise ValueError("Password must have uppercase")
         if not re.search(r"[a-z]", v):
@@ -147,7 +241,17 @@ class VerifyEmailRequest(BaseModel):
     email: EmailStr
     code: str = Field(..., min_length=6, max_length=6, description="6-digit verification code")
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
+
 
 class ResendCodeRequest(BaseModel):
     email: EmailStr
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def validate_btoa_email(cls, v: any) -> any:
+        return decode_btoa_email(v)
 

@@ -36,6 +36,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.config import settings
 from app.api.v1.router import api_router
 from app.middleware.logging_middleware import LoggingMiddleware
+from app.middleware.payload_obfuscation_middleware import PayloadObfuscationMiddleware
 from app.middleware.rate_limit_middleware import limiter, rate_limit_exceeded_handler
 # pyrefly: ignore [missing-import]
 from slowapi.errors import RateLimitExceeded
@@ -179,21 +180,46 @@ app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
 # 1. Request/Response Logging
 app.add_middleware(LoggingMiddleware)
 
-# 2. CORS - Allow frontend to call our API
+# 2. Payload Obfuscation & Decryption
+app.add_middleware(PayloadObfuscationMiddleware)
+
 cors_args = {
     "allow_credentials": True,        # Allow cookies/auth headers
-    "allow_methods": ["*"],           # Allow all HTTP methods (GET, POST, etc.)
+    "allow_methods": ["*"],           # Allow all HTTP methods (GET, POST, OPTIONS, etc.)
     "allow_headers": ["*"],           # Allow all headers
+    "expose_headers": ["*"],
+    "allow_origin_regex": r"https?://.*",
 }
 
-allowed_origins = settings.get_allowed_origins_list()
-
-if settings.DEBUG or "*" in allowed_origins:
-    cors_args["allow_origin_regex"] = r"https?://.*"
-else:
-    cors_args["allow_origins"] = allowed_origins
-
 app.add_middleware(CORSMiddleware, **cors_args)
+
+
+@app.middleware("http")
+async def force_cors_headers_middleware(request: Request, call_next):
+    """
+    Guarantees CORS headers on 100% of responses including OPTIONS preflights,
+    ngrok tunnels, 400 Bad Request, 422 Unprocessable Entity, and 500 errors.
+    """
+    origin = request.headers.get("origin") or "*"
+    
+    if request.method == "OPTIONS":
+        response = JSONResponse(content="OK", status_code=200)
+    else:
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            logger.error(f"Unhandled exception: {exc}")
+            response = JSONResponse(
+                status_code=500,
+                content={"success": False, "message": str(exc), "data": None}
+            )
+
+    response.headers["Access-Control-Allow-Origin"] = origin if origin != "*" else "http://localhost:5173"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Requested-With, ngrok-skip-browser-warning, Accept, Origin, payload, encrypted_data"
+    response.headers["Access-Control-Expose-Headers"] = "*"
+    return response
 
 # ---------------------------------------------------------------
 # STATIC FILES (for serving uploaded files)
@@ -614,7 +640,7 @@ def reset_password_page(token: str = ""):
             const hasLength = val.length >= 8;
             const hasUpper = /[A-Z]/.test(val);
             const hasLower = /[a-z]/.test(val);
-            const hasNumber = /\d/.test(val);
+            const hasNumber = /[0-9]/.test(val);
 
             updateRequirement(reqLength, hasLength);
             updateRequirement(reqUpper, hasUpper);

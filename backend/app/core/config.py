@@ -56,6 +56,11 @@ class Settings(BaseSettings):
     RAZORPAY_KEY_SECRET: str = ""
     MOCK_PAYMENT: bool = True
 
+    # --- AI Chatbot ---
+    GEMINI_API_KEY: str = ""
+    GROQ_API_KEY: str = ""
+    HUGGINGFACE_API_KEY: str = ""
+
     # --- File Storage ---
     UPLOAD_DIR: str = "uploads"
     MAX_FILE_SIZE_MB: int = 10
