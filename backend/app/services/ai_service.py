@@ -419,11 +419,13 @@ class AIService:
 
         # Multi-model Candidate endpoints (Auto-Switches if rate-limited or quota exceeded)
         candidate_models = [
-            "gemini-1.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-pro",
-            "gemini-2.0-flash-lite-preview-02-05",
-            "gemini-flash-latest"
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-3-flash-preview",
+            "gemini-flash-lite-latest",
+            "gemma-4-31b-it",
+            "gemma-4-26b-a4b-it"
         ]
         
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -646,8 +648,9 @@ class AIService:
         # H. GENERAL HELPFUL RESPONSE FOR CUSTOM USER QUESTIONS
         # -------------------------------------------------------------
         reply = (
-            f"Hello **{name}**! 💡 Here is what I found regarding **'{raw_query}'**:\n\n"
-            f"- I am CampusBot, your AI Assistant. I can answer general knowledge questions, technical topics, and help you navigate CampusConnect events and certificates.\n"
-            f"- Feel free to ask me any coding question, general concept, or platform query!"
+            f"Here is what I can share regarding **'{raw_query}'**:\n\n"
+            f"- I am **CampusBot**, your intelligent assistant for CampusConnect.\n"
+            f"- I can answer technical & coding questions, help you organize events, generate certificates, and recommend hackathons.\n\n"
+            f"💡 *Tip: Try asking a coding question (e.g. 'Explain Python FastAPI async'), or select a Quick Action chip below!*"
         )
         return reply, []
