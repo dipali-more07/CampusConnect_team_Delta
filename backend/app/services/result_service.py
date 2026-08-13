@@ -155,11 +155,20 @@ class ResultService:
         if participant_id:
             user_ids.append(participant_id)
         elif team_id:
-            from app.models.team import TeamMember
-            members = self.db.execute(
-                select(TeamMember.user_id).where(TeamMember.team_id == team_id)
-            ).scalars().all()
-            user_ids.extend(members)
+            try:
+                from app.models.team import Team
+                from app.models.team_member import TeamMember
+                team_obj = self.db.execute(
+                    select(Team).where(Team.team_id == team_id)
+                ).scalar_one_or_none()
+                if team_obj and team_obj.leader_id:
+                    user_ids.append(team_obj.leader_id)
+                members = self.db.execute(
+                    select(TeamMember.user_id).where(TeamMember.team_id == team_id)
+                ).scalars().all()
+                user_ids.extend(members)
+            except Exception:
+                pass
 
         from app.models.certificate import Certificate
         from app.repositories.certificate_repository import CertificateRepository
