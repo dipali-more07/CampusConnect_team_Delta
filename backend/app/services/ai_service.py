@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
 from app.core.config import settings
-from app.core.constants import UserRole, EventStatus, AttendanceStatus, EventCategory, EventType, RegistrationStatus, PaymentStatus
+from app.core.constants import UserRole, EventStatus, AttendanceStatus, EventCategory, EventType
 from app.models.user import User, UserProfile
 from app.models.event import Event
 from app.models.registration import EventRegistration
@@ -303,19 +303,18 @@ class AIService:
 
             self.db.add(new_evt)
             self.db.commit()
+            self.db.refresh(new_evt)
+
             return (
                 f"✅ **Real Database Record Created!**\n\n"
-                f"### 📅 Event Details Saved to PostgreSQL:\n"
-                f"Below are the required fields saved for **{new_evt.title}**:\n"
+                f"### 📅 Event Saved to PostgreSQL:\n"
                 f"- **Title:** {new_evt.title}\n"
                 f"- **Event ID:** `{new_evt.event_id}`\n"
-                f"- **Category:** `{cat_val.value.upper()}` (Auto-detected)\n"
-                f"- **Status:** `PUBLISHED (Live on Dashboard)`\n"
-                f"- **Venue:** {new_evt.venue} (Auto-filled)\n"
-                f"- **Date & Time:** {start_dt.strftime('%Y-%m-%d %H:%M UTC')} (Auto-filled)\n"
-                f"- **Capacity:** 150 Participants (Auto-filled)\n"
-                f"- **Entry Fee:** Free / Rs. 0.0 (Auto-filled)\n\n"
-                f"💡 *Tip: If you'd like to update any specific field (e.g. Venue, Date, or Ticket Price), simply tell me (e.g. 'Change venue to Lab 3')!*"
+                f"- **Category:** `{cat_val.value.upper()}`\n"
+                f"- **Status:** `PUBLISHED (Live)`\n"
+                f"- **Venue:** {new_evt.venue}\n"
+                f"- **Date:** {start_dt.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+                f"Students can now see and register for **{new_evt.title}** on their dashboard!"
             )
 
         # ---------------------------------------------------------------------
@@ -352,9 +351,8 @@ class AIService:
                     registration_id=str(uuid.uuid4()),
                     event_id=target_evt.event_id,
                     participant_id=user_id,
-                    registration_status=RegistrationStatus.CONFIRMED,
-                    payment_status=PaymentStatus.FREE,
-                    registered_at=datetime.utcnow()
+                    registration_date=datetime.utcnow(),
+                    attendance_status=AttendanceStatus.REGISTERED
                 )
                 self.db.add(new_reg)
                 self.db.commit()
@@ -364,7 +362,7 @@ class AIService:
                     f"✅ **Real Registration Record Saved!**\n\n"
                     f"- **Event:** {target_evt.title}\n"
                     f"- **Registration ID:** `{new_reg.registration_id}`\n"
-                    f"- **Status:** Confirmed (Live in PostgreSQL)\n\n"
+                    f"- **Status:** Confirmed\n\n"
                     f"A confirmation pass has been issued for your profile."
                 )
             else:
@@ -451,47 +449,20 @@ class AIService:
                 )
 
         # ---------------------------------------------------------------------
-        # 6. Action: DECLARE RESULTS / WINNERS IN POSTGRESQL DATABASE
+        # 6. Action: APPROVE ORGANIZERS IN POSTGRESQL DATABASE
         # ---------------------------------------------------------------------
-        if any(kw in msg for kw in ["declare result", "publish result", "announce winner", "result declare", "winner list"]):
-            events = self.db.execute(select(Event)).scalars().all()
-            target_event = None
-            for e in events:
-                if e.title.lower() in msg or e.event_id in msg:
-                    target_event = e
-                    break
-            if not target_event and events:
-                target_event = events[0]
-
-            if target_event:
-                target_event.status = EventStatus.COMPLETED
-                self.db.commit()
-                return (
-                    f"✅ **Action Executed Successfully!**\n\n"
-                    f"### 🏆 Results Declared for {target_event.title}:\n"
-                    f"- **1st Position:** Winner Rank 1 (Gold Certificate Pass)\n"
-                    f"- **2nd Position:** Runner-Up Rank 2 (Silver Certificate Pass)\n"
-                    f"- **3rd Position:** Merit Rank 3 (Bronze Certificate Pass)\n\n"
-                    f"Results published to PostgreSQL DB and student leaderboards!"
-                )
-            else:
-                return "ℹ️ No event found to declare results."
-
-        # ---------------------------------------------------------------------
-        # 7. Action: APPROVE ORGANIZERS / USERS IN POSTGRESQL DATABASE
-        # ---------------------------------------------------------------------
-        if any(kw in msg for kw in ["approve organizer", "verify organizer", "approve pending", "approve user"]):
+        if any(kw in msg for kw in ["approve organizer", "verify organizer", "approve pending"]):
             unverified = self.db.execute(
-                select(User).where(User.is_active == False)
+                select(User).where(User.role == UserRole.ORGANIZER, User.is_active == False)
             ).scalars().all()
             
             if unverified:
                 for u in unverified:
                     u.is_active = True
                 self.db.commit()
-                return f"✅ **Action Executed Successfully!**\n\nApproved `{len(unverified)}` pending account(s) in PostgreSQL DB!"
+                return f"✅ **Action Executed Successfully!**\n\nApproved `{len(unverified)}` pending organizer account(s)!"
             else:
-                return "ℹ️ All pending user/organizer accounts are already verified & active."
+                return "ℹ️ No pending organizer verification requests found."
 
         return None
 
@@ -510,7 +481,7 @@ class AIService:
             c = re.sub(r"[*_#`~>|-]", " ", t)
             return re.sub(r"\s+", " ", c).strip()
 
-        # 1. Execute DB Agent Actions if command requested
+        # 1. Execute autonomous agent action if requested by Organizer / Admin
         action_reply = await self._execute_agent_action_if_requested(user_query, current_user, user_query)
         if action_reply:
             return {
@@ -518,7 +489,7 @@ class AIService:
                 "speech_text": clean_speech(action_reply),
                 "role": "assistant",
                 "action_chips": action_chips,
-                "recommended_events": event_recs,
+                "recommended_events": [],
                 "user_context": {
                     "full_name": rag_context["full_name"],
                     "role": rag_context["role"],
@@ -568,13 +539,13 @@ class AIService:
         import httpx
 
         system_instruction = (
-            f"You are CampusBot, an expert AI assistant. User Context: Role={context['role']}, Course={context['course']}.\n"
+            f"You are an expert AI assistant. User Context: Role={context['role']}, Course={context['course']}.\n"
             f"Live Events Context: {json.dumps(context['available_events'])}\n\n"
-            f"STRICT SYSTEM RULES:\n"
-            f"1. DIRECT & STRAIGHTFORWARD: Answer the user's question IMMEDIATELY. DO NOT include greetings like 'Hello', 'Hi', 'Dear', or repeating user names or 'CampusConnect' intro fluff in the opening line.\n"
-            f"2. UNIVERSAL KNOWLEDGE: Answer ANY question asked — including CampusConnect platform features, coding, web development, data structures, science, mathematics, general knowledge, history, technology, career tips, jokes, or daily life Q&A.\n"
-            f"3. STEP-BY-STEP PLATFORM GUIDES: For ANY platform 'how-to' or guidance question (certificate generation, event creation, registration, QR verification, results declaration, dashboard navigation), ALWAYS provide clear, numbered Step-by-Step guides (Step 1, Step 2, Step 3, Step 4) tailored for the user's role ({context['role']}).\n"
-            f"4. ACTIONABLE CLARITY: If an action is missing required details, list the exact required fields and show auto-filled smart default values."
+            f"STRICT RULES:\n"
+            f"1. Answer the user's question IMMEDIATELY and STRAIGHTFORWARDLY.\n"
+            f"2. DO NOT include greetings like 'Hello', 'Hi', 'Dear', or mention the user's name or 'CampusConnect' in the opening line unless the user explicitly greeted you.\n"
+            f"3. NO preambles, pleasantries, or filler intro phrases. Start directly with the answer content.\n"
+            f"4. Keep answers concise using markdown headers, bullet points, or code blocks."
         )
 
         headers = {"Content-Type": "application/json"}
@@ -681,62 +652,7 @@ class AIService:
             return reply, rec_events
 
         # -------------------------------------------------------------
-        # B. STEP-BY-STEP PLATFORM HOW-TO GUIDES
-        # -------------------------------------------------------------
-        if any(w in query for w in ["cert", "certificate", "issue cert"]):
-            reply = (
-                f"### 📜 How to Generate Certificates (Step-by-Step Guide)\n\n"
-                f"1. **Step 1: Mark Event Completed**\n"
-                f"   - Go to Organizer Dashboard -> **My Events** and click **Mark Complete** (or tell me *'Complete event <Title>'*).\n\n"
-                f"2. **Step 2: Upload Results & Ranks**\n"
-                f"   - Select **Manage Results** to enter winner ranks (1st, 2nd, 3rd) and attendance.\n\n"
-                f"3. **Step 3: Trigger Bulk Certificates**\n"
-                f"   - Click **Generate Bulk Certificates** (or tell me *'Generate certificates for <Title>'*).\n\n"
-                f"4. **Step 4: Automated QR & PDF Issue**\n"
-                f"   - System generates PDF certificates with unique QR codes and emails them to participants."
-            )
-            return reply, []
-
-        if any(w in query for w in ["create event", "event kaise", "event creation", "host event"]):
-            reply = (
-                f"### 🚀 How to Create an Event (Step-by-Step Guide)\n\n"
-                f"1. **Step 1: Request via CampusBot or Dashboard**\n"
-                f"   - Tell me *'Create event <Title>'* or click **Create Event** on your Dashboard.\n\n"
-                f"2. **Step 2: Provide Required Fields**\n"
-                f"   - Required fields: **Title, Category, Start Date/Time, Venue, Capacity, Entry Fee**.\n\n"
-                f"3. **Step 3: Auto-Fill & Save**\n"
-                f"   - I auto-fill smart defaults and insert the record into PostgreSQL database.\n\n"
-                f"4. **Step 4: Go Live**\n"
-                f"   - Set status to **PUBLISHED** so students can view and register immediately."
-            )
-            return reply, []
-
-        if any(w in query for w in ["qr verify", "how qr works", "verify certificate", "scan qr"]):
-            reply = (
-                f"### 🔍 How QR Certificate Verification Works (Step-by-Step Guide)\n\n"
-                f"1. **Step 1: Open Certificate PDF**\n"
-                f"   - Every generated certificate features an embedded 2D QR Code.\n\n"
-                f"2. **Step 2: Scan QR Code**\n"
-                f"   - Scan using smartphone camera or the Built-in QR Verification Scanner.\n\n"
-                f"3. **Step 3: Instant DB Validation**\n"
-                f"   - Redirects to `/api/v1/certificates/verify/<cert_no>` to validate student identity and tamper-proof hash."
-            )
-            return reply, []
-
-        if any(w in query for w in ["result", "winner", "declare"]):
-            reply = (
-                f"### 🏆 How to Declare Results (Step-by-Step Guide)\n\n"
-                f"1. **Step 1: Select Event**\n"
-                f"   - Go to Organizer Dashboard -> **Completed Events**.\n\n"
-                f"2. **Step 2: Add Ranks**\n"
-                f"   - Enter 1st, 2nd, and 3rd rank student IDs (or tell me *'Declare results for <Title>'*).\n\n"
-                f"3. **Step 3: Publish to Leaderboard**\n"
-                f"   - Click **Publish Results** to update student performance scores and badges."
-            )
-            return reply, []
-
-        # -------------------------------------------------------------
-        # C. CODING, PROGRAMMING & TECHNICAL QUESTIONS
+        # B. CODING, PROGRAMMING & TECHNICAL QUESTIONS
         # -------------------------------------------------------------
         if "python" in query:
             reply = (
@@ -772,27 +688,86 @@ class AIService:
 
         if any(w in query for w in ["interview", "prep", "career", "resume", "job"]):
             reply = (
-                f"### 💼 Technical Interview Roadmap (Step-by-Step Guide)\n\n"
-                f"1. **Step 1: Data Structures & Algorithms**\n"
-                f"   - Practice Arrays, HashMaps, Two Pointers, Trees, and Dynamic Programming.\n\n"
-                f"2. **Step 2: Build Real Full-Stack Apps**\n"
-                f"   - Build production-grade full-stack apps with verified certificates.\n\n"
-                f"3. **Step 3: Resume Strategy**\n"
-                f"   - Highlight key impact metrics, tech stack used, and QR-verifiable certificates.\n\n"
-                f"4. **Step 4: Mock Interviews**\n"
-                f"   - Practice explaining your system architecture clearly out loud."
+                f"### 💼 Technical Interview Roadmap\n\n"
+                f"1. 🧠 **Data Structures & Algorithms:** Focus on Arrays, HashMaps, Two Pointers, Trees, and Dynamic Programming.\n"
+                f"2. 🛠️ **Build Real Projects:** Build production-grade full-stack apps with verified certificates.\n"
+                f"3. 📄 **Resume Strategy:** Highlight key impact metrics, tech stack used, and QR-verifiable certificates.\n"
+                f"4. 💬 **Mock Interviews:** Practice explaining your system architecture clearly out loud."
             )
             return reply, []
 
         # -------------------------------------------------------------
-        # D. OUT-OF-PROJECT GENERAL KNOWLEDGE SEARCH (DUCKDUCKGO API)
+        # C. EVENT DRAFTING & ORGANIZER GUIDANCE
+        # -------------------------------------------------------------
+        if any(w in query for w in ["description", "draft", "organize", "template"]):
+            reply = (
+                f"### ✍️ High-Converting Event Description Template\n\n"
+                f"**Title:** Annual Innovation Hackathon 2026\n\n"
+                f"**About the Event:**\n"
+                f"Join us for an exciting 24-hour hands-on hackathon where student teams collaborate to solve real-world industry challenges! "
+                f"Gain mentorship from industry experts, win cash prizes, and earn verified certificates of merit.\n\n"
+                f"**Highlights:**\n"
+                f"- 💡 Real-world Problem Statements\n"
+                f"- 🏆 Cash Prizes & Verified Winner Certificates\n"
+                f"- 🍕 Complimentary Refreshments & Mentorship"
+            )
+            return reply, []
+
+        # -------------------------------------------------------------
+        # D. CERTIFICATES, BADGES & QR VERIFICATION
+        # -------------------------------------------------------------
+        if any(w in query for w in ["certificate", "download", "verify", "badge", "score", "points"]):
+            reply = (
+                f"### 📜 Certificate & Achievement Overview\n\n"
+                f"- 🏆 **Badge Level:** `{context['badge']}` ({context['performance_score']} Pts)\n"
+                f"- 📄 **Verified Certificates:** `{context['certificates_count']}` Earned\n\n"
+                f"**Management Steps:**\n"
+                f"1. Visit the **My Certificates** tab in your dashboard to download PDF copies.\n"
+                f"2. Every certificate includes a unique **Verification QR Code**.\n"
+                f"3. Anyone can scan the QR code to verify authenticity instantly at `/api/v1/certificates/verify/<cert_no>`."
+            )
+            return reply, []
+
+        # -------------------------------------------------------------
+        # E. EVENT RECOMMENDATIONS & REGISTRATION
+        # -------------------------------------------------------------
+        if any(w in query for w in ["recommend", "suggest", "hackathon", "event", "upcoming", "show events"]):
+            if not events:
+                return "Currently, there are no published upcoming events.", []
+            
+            event_items = []
+            for e in events[:4]:
+                price_str = "Free" if not e.get("is_paid") else f"Rs {e.get('price', 0)}"
+                loc_str = e.get("location") or "Campus Hall"
+                title_str = e.get("title")
+                cat_str = e.get("category")
+                event_items.append(f"- 🚀 **{title_str}** ({cat_str}) - Location: {loc_str} | Price: {price_str}")
+            event_list_str = "\n".join(event_items)
+
+            reply = f"### 🎓 Recommended Events for {context['course']}:\n\n{event_list_str}"
+            return reply, rec_events
+
+        # -------------------------------------------------------------
+        # F. PLATFORM OVERVIEW & ADMIN STATS
+        # -------------------------------------------------------------
+        if any(w in query for w in ["overview", "platform", "stats", "admin", "system"]):
+            reply = (
+                f"### 🛡️ Live Platform Overview\n\n"
+                f"- 📅 **Active Published Events:** `{len(events)}` Events\n"
+                f"- 👤 **Account Role:** `{role.upper()}`\n"
+                f"- ⚡ **System Status:** All Services Operational (JWT Auth, QR Scanner, PDF Generator, SMTP Engine)"
+            )
+            return reply, []
+
+        # -------------------------------------------------------------
+        # G. OUT-OF-PROJECT GENERAL KNOWLEDGE SEARCH (DUCKDUCKGO API)
         # -------------------------------------------------------------
         ddg_answer = await self._query_duckduckgo_knowledge(raw_query)
         if ddg_answer:
             return ddg_answer, []
 
         # -------------------------------------------------------------
-        # E. GENERAL HELPFUL RESPONSE FOR CUSTOM USER QUESTIONS
+        # H. GENERAL HELPFUL RESPONSE FOR CUSTOM USER QUESTIONS
         # -------------------------------------------------------------
         reply = (
             f"Here is what I can share regarding **'{raw_query}'**:\n\n"
