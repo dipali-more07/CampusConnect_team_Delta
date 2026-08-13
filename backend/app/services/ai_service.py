@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, func
 
 from app.core.config import settings
-from app.core.constants import UserRole, EventStatus, AttendanceStatus, EventCategory, EventType
+from app.core.constants import UserRole, EventStatus, AttendanceStatus, EventCategory, EventType, RegistrationStatus, PaymentStatus
 from app.models.user import User, UserProfile
 from app.models.event import Event
 from app.models.registration import EventRegistration
@@ -352,8 +352,9 @@ class AIService:
                     registration_id=str(uuid.uuid4()),
                     event_id=target_evt.event_id,
                     participant_id=user_id,
-                    registration_date=datetime.utcnow(),
-                    attendance_status=AttendanceStatus.REGISTERED
+                    registration_status=RegistrationStatus.CONFIRMED,
+                    payment_status=PaymentStatus.FREE,
+                    registered_at=datetime.utcnow()
                 )
                 self.db.add(new_reg)
                 self.db.commit()
@@ -363,7 +364,7 @@ class AIService:
                     f"✅ **Real Registration Record Saved!**\n\n"
                     f"- **Event:** {target_evt.title}\n"
                     f"- **Registration ID:** `{new_reg.registration_id}`\n"
-                    f"- **Status:** Confirmed\n\n"
+                    f"- **Status:** Confirmed (Live in PostgreSQL)\n\n"
                     f"A confirmation pass has been issued for your profile."
                 )
             else:
