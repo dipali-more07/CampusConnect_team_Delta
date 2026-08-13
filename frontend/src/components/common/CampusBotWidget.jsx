@@ -3,26 +3,58 @@ import { useNavigate } from 'react-router-dom'
 import {
   Send, Loader2, Calendar, ChevronRight, User, Trash2,
   X, Award, Zap, ExternalLink, Mic, Volume2, VolumeX,
-  Sparkles, Square
+  Sparkles, Square, SlidersHorizontal, Play
 } from 'lucide-react'
 import aiService from '../../services/aiService'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
 import EmoBotCharacter from './EmoBotCharacter'
 
-/* ── Helper to find an Indian accent voice for TTS ── */
-function getIndianVoice() {
+/* ── Helper to find the best Cute Female Voice for Camy EMO AI ── */
+function getEmoFemaleVoice() {
   if (!window.speechSynthesis) return null
   const voices = window.speechSynthesis.getVoices()
   if (!voices || voices.length === 0) return null
 
-  return (
-    voices.find(v => v.lang === 'en-IN' || v.lang === 'en_IN') ||
-    voices.find(v => v.lang.includes('IN') || v.lang.includes('in')) ||
-    voices.find(v => /india/i.test(v.name) || /heera/i.test(v.name) || /veena/i.test(v.name) || /rishi/i.test(v.name)) ||
-    voices.find(v => v.lang.startsWith('en')) ||
-    null
+  // Male voices blacklist
+  const isMale = (v) => /rishi|david|mark|george|male|guy|stefan|pavel|deepak|ravindra/i.test(v.name)
+  // High quality female voice names
+  const isFemaleName = (v) => /heera|veena|zira|samantha|karen|victoria|female|girl|neerja|swara|kalpana|ananya|google/i.test(v.name)
+
+  // 1. Google High Quality Female Voices (Google English India, Google US/UK Female)
+  const googleFemale = voices.find(v => v.name.toLowerCase().includes('google') && !isMale(v))
+  if (googleFemale) return googleFemale
+
+  // 2. Microsoft / System Indian Female Voice (Microsoft Heera, Veena, Swara)
+  const indianFemale = voices.find(v =>
+    (v.lang === 'en-IN' || v.lang === 'en_IN' || v.lang === 'hi-IN' || v.lang.includes('IN') || v.lang.includes('in') || /india/i.test(v.name)) &&
+    isFemaleName(v) &&
+    !isMale(v)
   )
+  if (indianFemale) return indianFemale
+
+  // 3. Microsoft Zira / Natural English Female Voice
+  const systemFemale = voices.find(v => isFemaleName(v) && !isMale(v))
+  if (systemFemale) return systemFemale
+
+  // 4. Any Indian voice that is not male
+  const anyIndianNonMale = voices.find(v =>
+    (v.lang === 'en-IN' || v.lang === 'en_IN' || v.lang === 'hi-IN' || v.lang.includes('IN') || /india/i.test(v.name)) &&
+    !isMale(v)
+  )
+  if (anyIndianNonMale) return anyIndianNonMale
+
+  // 5. Fallback non-male English voice
+  return voices.find(v => v.lang.startsWith('en') && !isMale(v)) || voices[0] || null
+}
+
+/* ── Helper to list all available Female voices in browser ── */
+function getFemaleVoicesList() {
+  if (!window.speechSynthesis) return []
+  const voices = window.speechSynthesis.getVoices()
+  if (!voices || voices.length === 0) return []
+  const isMale = (v) => /rishi|david|mark|george|male|guy|stefan|pavel|deepak|ravindra/i.test(v.name)
+  return voices.filter(v => !isMale(v))
 }
 
 /* ── Sentiment Analyzer for Camy's Dynamic EMO Expressions ── */
@@ -171,8 +203,8 @@ function WidgetHeader({
 }) {
   return (
     <div className={`relative flex items-center justify-between px-4 py-3 shrink-0 ${dark
-        ? 'bg-gradient-to-r from-[#0c1829] via-[#0e1f3a] to-[#0c1829] border-b border-cyan-900/30'
-        : 'bg-gradient-to-r from-slate-50 via-white to-slate-50 border-b border-slate-200'
+      ? 'bg-gradient-to-r from-[#0c1829] via-[#0e1f3a] to-[#0c1829] border-b border-cyan-900/30'
+      : 'bg-gradient-to-r from-slate-50 via-white to-slate-50 border-b border-slate-200'
       }`}>
       <div className="flex items-center gap-3 z-10">
         <div className="shrink-0">
@@ -248,6 +280,7 @@ export default function CampusBotWidget() {
   const [voiceEnabled, setVoiceEnabled] = useState(true)
 
   const wasVoiceUsedRef = useRef(false)
+  const isRecordingActiveRef = useRef(false)
   const recognitionRef = useRef(null)
 
   const messagesEndRef = useRef(null)
@@ -264,16 +297,28 @@ export default function CampusBotWidget() {
   const speakReply = useCallback((text) => {
     if (!voiceEnabled || !window.speechSynthesis) return
     window.speechSynthesis.cancel()
-    const clean = text.replaceAll(/[*_#`[\]()]/g, '').replaceAll('\n', '. ')
-    const utterance = new SpeechSynthesisUtterance(clean)
 
-    utterance.lang = 'en-IN'
-    const indianVoice = getIndianVoice()
-    if (indianVoice) {
-      utterance.voice = indianVoice
+    // Clean text: strip emojis, markdown formatting, and extra whitespace for natural speech
+    const clean = text
+      .replaceAll(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F1E6}-\u{1F1FF}]/gu, '')
+      .replaceAll(/[*_#`[\]()]/g, '')
+      .replaceAll('\n', '. ')
+      .replaceAll(/\s+/g, ' ')
+      .trim()
+
+    if (!clean) return
+
+    const utterance = new SpeechSynthesisUtterance(clean)
+    const femaleVoice = getEmoFemaleVoice()
+    if (femaleVoice) {
+      utterance.voice = femaleVoice
+      utterance.lang = femaleVoice.lang || 'en-IN'
+    } else {
+      utterance.lang = 'en-IN'
     }
-    utterance.rate = 1.02
-    utterance.pitch = 1.15
+
+    utterance.rate = 1.05
+    utterance.pitch = 1.35 // Cute EMO Robot Female Pitch
 
     utterance.onstart = () => setIsSpeaking(true)
     utterance.onend = () => setIsSpeaking(false)
@@ -295,6 +340,13 @@ export default function CampusBotWidget() {
   }, [])
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.getVoices()
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices()
+      }
+    }
+
     window.camyCelebrate = () => triggerCelebration()
 
     const handleCustomCelebrate = () => triggerCelebration()
@@ -400,8 +452,29 @@ export default function CampusBotWidget() {
         wasVoiceUsedRef.current = true
       }
 
-      recognition.onerror = () => setIsListening(false)
-      recognition.onend = () => setIsListening(false)
+      recognition.onerror = (e) => {
+        if (e.error === 'no-speech' && isRecordingActiveRef.current) {
+          return
+        }
+        if (e.error !== 'aborted') {
+          isRecordingActiveRef.current = false
+          setIsListening(false)
+        }
+      }
+
+      recognition.onend = () => {
+        if (isRecordingActiveRef.current) {
+          try {
+            recognition.start()
+          } catch {
+            isRecordingActiveRef.current = false
+            setIsListening(false)
+          }
+        } else {
+          setIsListening(false)
+        }
+      }
+
       recognitionRef.current = recognition
     }
   }, [])
@@ -415,17 +488,22 @@ export default function CampusBotWidget() {
     if (!recognitionRef.current) return
     stopSpeaking()
     wasVoiceUsedRef.current = true
+    isRecordingActiveRef.current = true
     try {
       recognitionRef.current.start()
       setIsListening(true)
-    } catch { }
+    } catch {
+      setIsListening(false)
+      isRecordingActiveRef.current = false
+    }
   }
 
   const stopRecording = () => {
-    if (recognitionRef.current && isListening) {
+    isRecordingActiveRef.current = false
+    if (recognitionRef.current) {
       try { recognitionRef.current.stop() } catch { }
-      setIsListening(false)
     }
+    setIsListening(false)
   }
 
   const cancelRecording = () => {
@@ -512,7 +590,7 @@ export default function CampusBotWidget() {
       }
       setMessages(prev => [...prev, botMsg])
 
-      if (isVoiceInput) {
+      if (voiceEnabled || isVoiceInput) {
         speakReply(res.data.reply)
       }
 
@@ -585,8 +663,8 @@ export default function CampusBotWidget() {
       {isOpen && (
         <div
           className={`flex flex-col w-[380px] sm:w-[420px] h-[600px] max-h-[85vh] rounded-[24px] shadow-2xl border overflow-hidden backdrop-blur-xl transition-all duration-300 ${dark
-              ? 'bg-[#0a0f1e]/95 text-slate-100 border-cyan-900/40 shadow-[0_8px_40px_rgba(8,145,178,0.15)]'
-              : 'bg-white/98 text-slate-900 border-slate-200 shadow-[0_8px_40px_rgba(0,0,0,0.12)]'
+            ? 'bg-[#0a0f1e]/95 text-slate-100 border-cyan-900/40 shadow-[0_8px_40px_rgba(8,145,178,0.15)]'
+            : 'bg-white/98 text-slate-900 border-slate-200 shadow-[0_8px_40px_rgba(0,0,0,0.12)]'
             }`}
           style={{ animation: 'cbPop 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
         >
