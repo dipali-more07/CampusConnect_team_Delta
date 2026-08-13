@@ -35,12 +35,6 @@ except ImportError:
     mail_config = None
 
 
-class EmailService:
-    """
-    Handles all email sending in the application.
-    Integrates with fastapi-mail for real SMTP sending when configured.
-    """
-
 def build_email_template(
     title: str,
     subtitle: str,
