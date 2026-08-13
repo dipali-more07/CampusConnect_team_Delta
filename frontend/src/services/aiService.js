@@ -5,7 +5,7 @@ import { fetchWithAuth } from '../utils/apiClient'
  * Connects frontend widget to backend FastAPI / Express AI endpoints.
  */
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api/v1'
+const API_URL = import.meta.env.VITE_API_BASE_URL
 
 const aiService = {
   /**
@@ -37,13 +37,40 @@ const aiService = {
         }
       }
 
+      const extractReply = (d) => {
+        if (!d) return null
+        if (typeof d === 'string') return d
+        return (
+          d.data?.reply ||
+          d.data?.response ||
+          d.data?.speech_text ||
+          d.data?.text ||
+          d.data?.answer ||
+          d.data?.content ||
+          d.reply ||
+          d.response ||
+          d.speech_text ||
+          d.text ||
+          d.answer ||
+          d.content ||
+          d.data?.message ||
+          d.result ||
+          (typeof d.message === 'string' && !d.message.toLowerCase().includes('success') ? d.message : null) ||
+          null
+        )
+      }
+
+      const replyText = extractReply(data) || 'I am ready to help you with campus events!'
+      const resPayload = data.data || data
+
       return {
         success: true,
         data: {
-          reply: data.reply || data.response || data.text || 'I am ready to help you with campus events!',
-          action_chips: data.action_chips || data.chips || [],
-          recommended_events: data.recommended_events || data.events || [],
-          user_context: data.user_context || null
+          reply: replyText,
+          speech_text: resPayload.speech_text || replyText,
+          action_chips: resPayload.action_chips || resPayload.chips || data.action_chips || data.chips || [],
+          recommended_events: resPayload.recommended_events || resPayload.events || data.recommended_events || data.events || [],
+          user_context: resPayload.user_context || data.user_context || null
         }
       }
     } catch (err) {
