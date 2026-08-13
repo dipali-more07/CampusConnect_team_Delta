@@ -6,10 +6,11 @@ AI Chatbot & RAG (Retrieval-Augmented Generation) Service.
 FEATURES:
   1. Role-Personalized Context (Student vs Organizer vs Admin)
   2. Live Database RAG Data (Events, Registrations, Certificates, Attendance)
-  3. External LLM Integration (Google Gemini 1.5/2.5 Flash API with multi-model fallback)
-  4. Intelligent Offline RAG & General Knowledge Engine (Answers tech, coding, platform, and general Q&A)
-  5. Interactive Quick Action Chips Generator
-  6. Autonomous Agent Action Execution (Publish Event, Complete Event, Bulk Certificates, Approve Organizers)
+  3. External LLM Integration (Google Gemini API with multi-model fallback)
+  4. DuckDuckGo Instant Knowledge Engine (Answers out-of-project general knowledge, science & tech queries)
+  5. Native CampusConnect Domain Engine (Certificates, QR Verification, Event Recommendations, Organizer Templates)
+  6. Interactive Quick Action Chips Generator
+  7. Autonomous Agent Action Execution (Publish Event, Complete Event, Bulk Certificates, Approve Organizers)
 """
 
 import json
@@ -367,10 +368,10 @@ class AIService:
                     }
                 }
             except Exception as e:
-                logger.warning(f"External LLM API call failed: {e}. Falling back to native RAG & Q&A engine.")
+                logger.warning(f"External LLM API call failed: {e}. Falling back to Instant Knowledge Engine.")
 
-        # 3. Intelligent Native RAG & General Q&A Engine (Guaranteed 100% relevant answers to ANY query)
-        reply, rec_events = self._generate_native_rag_reply(user_query, rag_context)
+        # 3. Intelligent Native RAG & Instant Knowledge Engine (Answers general + campus questions)
+        reply, rec_events = await self._generate_native_rag_reply(user_query, rag_context)
 
         return {
             "reply": reply,
@@ -439,8 +440,25 @@ class AIService:
             
             raise Exception(f"All Gemini API endpoints failed: {last_err}")
 
-    def _generate_native_rag_reply(self, raw_query: str, context: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
-        """Generates dynamic, highly relevant answers to ANY question (Tech, Coding, General, or CampusConnect)."""
+    async def _query_duckduckgo_knowledge(self, query: str) -> Optional[str]:
+        """Queries free DuckDuckGo Instant Answer API for out-of-project general knowledge & science queries."""
+        import httpx
+        try:
+            url = f"https://api.duckduckgo.com/?q={query}&format=json&no_html=1"
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(url)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    abstract = data.get("AbstractText", "").strip()
+                    if abstract:
+                        heading = data.get("Heading", "Instant Knowledge")
+                        return f"### 💡 {heading}\n\n{abstract}"
+        except Exception as e:
+            logger.debug(f"DuckDuckGo knowledge query skipped: {e}")
+        return None
+
+    async def _generate_native_rag_reply(self, raw_query: str, context: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
+        """Generates dynamic, highly relevant answers to ANY question (Tech, Coding, General Knowledge, or CampusConnect)."""
         name = context["full_name"]
         role = context["role"]
         query = raw_query.lower().strip()
@@ -456,7 +474,7 @@ class AIService:
                 f"I can help you with:\n"
                 f"- 🎓 **Event Recommendations** matching your course (**{context['course']}**)\n"
                 f"- 📜 **Certificates & Badges** (Current Level: `{context['badge']}`)\n"
-                f"- 💻 **Coding & Academic Q&A** (Python, JS, SQL, Web Dev, Study Tips)\n"
+                f"- 💻 **Coding & Academic Q&A** (Python, JS, SQL, Web Dev, General Knowledge, Science)\n"
                 f"- ⚡ **Executing Organizer/Admin Commands** (Publish Events, Issue Certificates)\n\n"
                 f"How can I assist you today?"
             )
@@ -586,12 +604,18 @@ class AIService:
             return reply, []
 
         # -------------------------------------------------------------
-        # G. DEFAULT INTELLIGENT DIRECT ANSWER (NO FORCED EVENT LIST)
+        # G. OUT-OF-PROJECT GENERAL KNOWLEDGE SEARCH (DUCKDUCKGO API)
+        # -------------------------------------------------------------
+        ddg_answer = await self._query_duckduckgo_knowledge(raw_query)
+        if ddg_answer:
+            return ddg_answer, []
+
+        # -------------------------------------------------------------
+        # H. GENERAL HELPFUL RESPONSE FOR CUSTOM USER QUESTIONS
         # -------------------------------------------------------------
         reply = (
-            f"Hello **{name}**! 💡 Thank you for reaching out to CampusBot.\n\n"
-            f"Regarding your query **'{raw_query}'**:\n\n"
-            f"- I am configured to assist you with all CampusConnect features, coding & technical questions, certificate management, and event organization.\n"
-            f"- If you're looking for specific campus events, registered hackathons, or certificate downloads, select one of the Quick Action chips below or ask me directly!"
+            f"Hello **{name}**! 💡 Here is what I found regarding **'{raw_query}'**:\n\n"
+            f"- I am CampusBot, your AI Assistant. I can answer general knowledge questions, technical topics, and help you navigate CampusConnect events and certificates.\n"
+            f"- Feel free to ask me any coding question, general concept, or platform query!"
         )
         return reply, []
