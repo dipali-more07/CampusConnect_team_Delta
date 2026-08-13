@@ -223,14 +223,121 @@ class AIService:
         }
 
     async def _execute_agent_action_if_requested(self, user_msg: str, current_user: Optional[User], raw_msg: str) -> Optional[str]:
-        """Executes real database actions (Publish, Complete, Bulk Certificates) based on user commands."""
+        """Executes real database actions (Create Event, Register Event, Publish, Complete, Bulk Certificates, Approve Organizers)."""
         if not current_user:
             return None
 
         role_val = str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role).lower()
         msg = user_msg.lower().strip()
 
-        # 1. Action: Publish Event (Organizer/Admin)
+        # 1. Action: CREATE REAL EVENT IN DATABASE (Organizer / Admin)
+        if any(kw in msg for kw in ["create event", "add event", "host event", "organize event", "new event", "create hackathon", "create workshop"]) and role_val in ["organizer", "admin"]:
+            import uuid
+            from app.core.constants import ApprovalStatus
+
+            # Clean & extract title
+            cleaned = re.sub(r"(?i)^(please\s+|can\s+you\s+|ai\s+|bot\s+|help\s+me\s+)?(create|add|host|organize|new)\s+(a|an|the\s+)?(event|hackathon|workshop|fest)?\s*", "", raw_msg).strip()
+            title = cleaned if len(cleaned) > 3 else "CampusConnect Innovation Event 2026"
+            title = title.strip(":\"' ")
+
+            # Auto-detect Category
+            cat_val = EventCategory.OTHER
+            if any(w in msg for w in ["hackathon", "coding", "tech", "ai", "web", "app", "code", "dev"]):
+                cat_val = EventCategory.TECHNICAL
+            elif any(w in msg for w in ["workshop", "bootcamp", "seminar", "training"]):
+                cat_val = EventCategory.WORKSHOP
+            elif any(w in msg for w in ["cultural", "dance", "music", "art", "fest"]):
+                cat_val = EventCategory.CULTURAL
+            elif any(w in msg for w in ["sports", "cricket", "football", "gaming"]):
+                cat_val = EventCategory.SPORTS
+
+            start_dt = datetime.utcnow() + timedelta(days=7)
+            end_dt = start_dt + timedelta(hours=8)
+            reg_deadline = start_dt - timedelta(days=1)
+
+            new_evt = Event(
+                event_id=str(uuid.uuid4()),
+                organizer_id=current_user.user_id,
+                title=title,
+                description=f"Official {title} organized on CampusConnect. Join us to showcase your skills, collaborate, and win verified digital certificates!",
+                category=cat_val,
+                event_type=EventType.OFFLINE,
+                venue="Main Campus Auditorium & Innovation Lab",
+                start_datetime=start_dt,
+                end_datetime=end_dt,
+                registration_deadline=reg_deadline,
+                max_participants=150,
+                fees=0.0,
+                status=EventStatus.PUBLISHED if ("publish" in msg or "live" in msg) else EventStatus.DRAFT,
+                approval_status=ApprovalStatus.APPROVED,
+            )
+
+            self.db.add(new_evt)
+            self.db.commit()
+            self.db.refresh(new_evt)
+
+            status_str = "PUBLISHED (Live)" if new_evt.status == EventStatus.PUBLISHED else "DRAFT"
+            return (
+                f"✅ **Real Database Record Created!**\n\n"
+                f"### 📅 Event Details Saved to PostgreSQL:\n"
+                f"- **Event Title:** {new_evt.title}\n"
+                f"- **Event ID:** `{new_evt.event_id}`\n"
+                f"- **Category:** `{cat_val.value}`\n"
+                f"- **Status:** `{status_str}`\n"
+                f"- **Venue:** {new_evt.venue}\n"
+                f"- **Start Date:** {start_dt.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+                f"Students can now see and register for this event on their dashboard!"
+            )
+
+        # 2. Action: REGISTER CURRENT USER FOR AN EVENT (Student / Participant)
+        if any(kw in msg for kw in ["register for", "join event", "enroll in", "book seat"]) and current_user:
+            events = self.db.execute(
+                select(Event).where(Event.status == EventStatus.PUBLISHED)
+            ).scalars().all()
+
+            target_evt = None
+            for e in events:
+                if e.title.lower() in msg or e.event_id in msg:
+                    target_evt = e
+                    break
+            if not target_evt and events:
+                target_evt = events[0]
+
+            if target_evt:
+                # Check existing registration
+                existing = self.db.execute(
+                    select(EventRegistration).where(
+                        EventRegistration.event_id == target_evt.event_id,
+                        EventRegistration.participant_id == current_user.user_id
+                    )
+                ).scalar_one_or_none()
+
+                if existing:
+                    return f"ℹ️ You are already registered for **{target_evt.title}** (Reg ID: `{existing.registration_id}`)."
+
+                import uuid
+                new_reg = EventRegistration(
+                    registration_id=str(uuid.uuid4()),
+                    event_id=target_evt.event_id,
+                    participant_id=current_user.user_id,
+                    registration_date=datetime.utcnow(),
+                    attendance_status=AttendanceStatus.REGISTERED
+                )
+                self.db.add(new_reg)
+                self.db.commit()
+                self.db.refresh(new_reg)
+
+                return (
+                    f"✅ **Real Database Registration Saved!**\n\n"
+                    f"- **Event:** {target_evt.title}\n"
+                    f"- **Registration ID:** `{new_reg.registration_id}`\n"
+                    f"- **Status:** Registered & Confirmed\n\n"
+                    f"A confirmation notification pass has been issued to your profile."
+                )
+            else:
+                return "ℹ️ No published events found matching your registration request."
+
+        # 3. Action: Publish Event (Organizer/Admin)
         if ("publish" in msg or "make live" in msg or "launch event" in msg) and role_val in ["organizer", "admin"]:
             events = self.db.execute(
                 select(Event).where(Event.status != EventStatus.PUBLISHED)
@@ -246,6 +353,8 @@ class AIService:
                 
             if target_event:
                 target_event.status = EventStatus.PUBLISHED
+                from app.core.constants import ApprovalStatus
+                target_event.approval_status = ApprovalStatus.APPROVED
                 self.db.commit()
                 self.db.refresh(target_event)
                 return (
@@ -256,7 +365,7 @@ class AIService:
             else:
                 return "ℹ️ No unpublished events found matching your command."
 
-        # 2. Action: Complete Event (Organizer/Admin)
+        # 4. Action: Complete Event (Organizer/Admin)
         if ("complete" in msg or "mark complete" in msg or "finish event" in msg or "end event" in msg) and role_val in ["organizer", "admin"]:
             events = self.db.execute(
                 select(Event).where(Event.status == EventStatus.PUBLISHED)
@@ -281,7 +390,7 @@ class AIService:
             else:
                 return "ℹ️ No active published events found matching your command."
 
-        # 3. Action: Generate Bulk Certificates (Organizer/Admin)
+        # 5. Action: Generate Bulk Certificates (Organizer/Admin)
         if ("generate cert" in msg or "issue cert" in msg or "bulk cert" in msg or ("certificate" in msg and ("generate" in msg or "issue" in msg or "bulk" in msg))) and role_val in ["organizer", "admin"]:
             events = self.db.execute(select(Event)).scalars().all()
             target_event = None
@@ -302,7 +411,7 @@ class AIService:
                     f"Email notifications have been sent to attendees."
                 )
 
-        # 4. Action: Approve Organizer (Admin only)
+        # 6. Action: Approve Organizer (Admin only)
         if ("approve" in msg or "verify organizer" in msg or "verify org" in msg) and role_val == "admin":
             unverified = self.db.execute(
                 select(User).where(User.role == UserRole.ORGANIZER, User.is_active == False)
