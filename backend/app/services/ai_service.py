@@ -231,8 +231,8 @@ class AIService:
             f"Live Available Events: {json.dumps(context['available_events'])}\n\n"
             f"Instructions:\n"
             f"1. Give friendly, helpful, role-personalized responses.\n"
-            f"2. Recommend specific events matching their course/department if asked.\n"
-            f"3. Guide them clearly on certificates, QR verification, registration, and payments.\n"
+            f"2. You can answer BOTH CampusConnect platform queries AND general user questions (coding help, study advice, general knowledge, science, career tips, jokes, etc.).\n"
+            f"3. For CampusConnect queries, use the live database context and available events provided.\n"
             f"4. Keep formatting clean with markdown bullet points and emojis."
         )
 
