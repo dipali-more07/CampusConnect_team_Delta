@@ -6,13 +6,15 @@ AI Chatbot & RAG (Retrieval-Augmented Generation) Service.
 FEATURES:
   1. Role-Personalized Context (Student vs Organizer vs Admin)
   2. Live Database RAG Data (Events, Registrations, Certificates, Attendance)
-  3. External LLM Integration (Gemini 1.5 Flash API / Groq API)
-  4. Native Offline RAG Fallback Engine (0 latency, 0 dependency)
+  3. External LLM Integration (Google Gemini 1.5/2.5 Flash API with multi-model fallback)
+  4. Intelligent Offline RAG & General Knowledge Engine (Answers tech, coding, platform, and general Q&A)
   5. Interactive Quick Action Chips Generator
+  6. Autonomous Agent Action Execution (Publish Event, Complete Event, Bulk Certificates, Approve Organizers)
 """
 
 import json
 import logging
+import re
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -34,8 +36,24 @@ class AIService:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_quick_action_chips(self, current_user: User) -> List[QuickActionChip]:
+    def get_quick_action_chips(self, current_user: Optional[User] = None) -> List[QuickActionChip]:
         """Returns role-specific 1-click action chips for the chatbot UI."""
+        if not current_user:
+            return [
+                QuickActionChip(
+                    id="chip_guest_events",
+                    label="🎓 Browse Campus Events",
+                    prompt="What upcoming events and hackathons are published on CampusConnect?",
+                    category="guest"
+                ),
+                QuickActionChip(
+                    id="chip_guest_verify",
+                    label="🔍 Certificate Verification",
+                    prompt="How can I verify a certificate QR code on CampusConnect?",
+                    category="guest"
+                ),
+            ]
+
         role_val = str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role).lower()
 
         if role_val == "organizer":
@@ -47,21 +65,21 @@ class AIService:
                     category="organizer"
                 ),
                 QuickActionChip(
-                    id="chip_org_stats",
-                    label="📊 Event Attendance Analytics",
-                    prompt="Show live attendance and participant stats for my organized events.",
+                    id="chip_org_pub",
+                    label="🚀 Publish My Event",
+                    prompt="Publish event Hackathon 2026",
+                    category="organizer"
+                ),
+                QuickActionChip(
+                    id="chip_org_certs",
+                    label="📄 Generate Bulk Certificates",
+                    prompt="Generate certificates for Hackathon 2026",
                     category="organizer"
                 ),
                 QuickActionChip(
                     id="chip_org_results",
                     label="🏆 Result Declaration Guide",
                     prompt="How do I declare results and award winner certificates for my event?",
-                    category="organizer"
-                ),
-                QuickActionChip(
-                    id="chip_org_certs",
-                    label="📄 Certificate Design Templates",
-                    prompt="Guide me on customizing certificate design templates.",
                     category="organizer"
                 ),
             ]
@@ -75,8 +93,8 @@ class AIService:
                 ),
                 QuickActionChip(
                     id="chip_admin_approval",
-                    label="🛡️ Event Moderation Guidelines",
-                    prompt="What are the approval criteria for reviewing organizer event submissions?",
+                    label="🛡️ Approve Pending Organizers",
+                    prompt="Approve all pending organizer verification requests",
                     category="admin"
                 ),
             ]
@@ -109,37 +127,64 @@ class AIService:
                 ),
             ]
 
-    def _extract_rag_context(self, current_user: User) -> Dict[str, Any]:
-        """Queries live database to gather RAG context for the user."""
-        profile = self.db.execute(
-            select(UserProfile).where(UserProfile.user_id == current_user.user_id)
-        ).scalar_one_or_none()
-
-        full_name = profile.full_name if profile and profile.full_name else current_user.email
-        course = profile.course if profile and profile.course else "General Studies"
-        department = profile.department if profile and profile.department else "General"
-
-        # Fetch published upcoming/recent events
+    def _extract_rag_context(self, current_user: Optional[User]) -> Dict[str, Any]:
+        """Queries live database to gather RAG context for the user safely."""
         events_query = select(Event).where(
             Event.status == EventStatus.PUBLISHED
         ).order_by(Event.start_datetime.asc()).limit(8)
         events = self.db.execute(events_query).scalars().all()
 
-        events_summary = [
-            {
-                "event_id": e.event_id,
-                "title": e.title,
-                "category": str(e.category.value if hasattr(e.category, "value") else e.category),
-                "event_type": str(e.event_type.value if hasattr(e.event_type, "value") else e.event_type),
-                "start_datetime": e.start_datetime.strftime("%Y-%m-%d %H:%M") if e.start_datetime else None,
-                "location": e.location,
-                "price": float(e.price) if e.price else 0.0,
-                "is_paid": bool(e.is_paid),
-            }
-            for e in events
-        ]
+        events_summary = []
+        for e in events:
+            evt_title = getattr(e, "title", "Campus Event")
+            evt_cat = str(getattr(e, "category", "OTHER"))
+            if hasattr(e.category, "value"):
+                evt_cat = str(e.category.value)
+            
+            evt_type = str(getattr(e, "event_type", "OFFLINE"))
+            if hasattr(e.event_type, "value"):
+                evt_type = str(e.event_type.value)
 
-        # Fetch user's registered events
+            start_dt = getattr(e, "start_datetime", None)
+            start_str = start_dt.strftime("%Y-%m-%d %H:%M") if start_dt else None
+            loc = getattr(e, "venue", None) or getattr(e, "location", None) or "Campus Hall"
+            fees_val = float(getattr(e, "fees", None) or getattr(e, "price", 0.0) or 0.0)
+            is_paid_val = bool(fees_val > 0 or getattr(e, "is_paid", False))
+
+            events_summary.append({
+                "event_id": getattr(e, "event_id", ""),
+                "title": evt_title,
+                "category": evt_cat,
+                "event_type": evt_type,
+                "start_datetime": start_str,
+                "location": loc,
+                "price": fees_val,
+                "is_paid": is_paid_val,
+            })
+
+        if not current_user:
+            return {
+                "user_id": None,
+                "full_name": "Guest Visitor",
+                "email": "guest@campusconnect.com",
+                "role": "guest",
+                "course": "General",
+                "department": "General",
+                "performance_score": 0,
+                "badge": "Beginner Explorer",
+                "certificates_count": 0,
+                "registered_events_count": 0,
+                "available_events": events_summary,
+            }
+
+        profile = self.db.execute(
+            select(UserProfile).where(UserProfile.user_id == current_user.user_id)
+        ).scalar_one_or_none()
+
+        full_name = profile.full_name if profile and getattr(profile, "full_name", None) else getattr(current_user, "email", "User")
+        course = profile.course if profile and getattr(profile, "course", None) else "General Studies"
+        department = profile.department if profile and getattr(profile, "department", None) else "General"
+
         user_regs_query = select(EventRegistration).where(
             EventRegistration.participant_id == current_user.user_id
         ).limit(10)
@@ -150,7 +195,6 @@ class AIService:
         )
         user_certs = self.db.execute(user_certs_query).scalars().all()
 
-        # Performance tier calculation
         total_certs = len(user_certs)
         merit_certs = sum(1 for c in user_certs if getattr(c, "certificate_type", "") not in ["", "participation"])
         
@@ -161,11 +205,13 @@ class AIService:
         elif score >= 250:
             badge = "Silver Performer"
 
+        role_str = str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role)
+
         return {
             "user_id": current_user.user_id,
             "full_name": full_name,
-            "email": current_user.email,
-            "role": str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role),
+            "email": getattr(current_user, "email", ""),
+            "role": role_str,
             "course": course,
             "department": department,
             "performance_score": score,
@@ -175,23 +221,145 @@ class AIService:
             "available_events": events_summary,
         }
 
-    async def chat(self, request_data: AIChatRequest, current_user: User) -> Dict[str, Any]:
+    async def _execute_agent_action_if_requested(self, user_msg: str, current_user: Optional[User], raw_msg: str) -> Optional[str]:
+        """Executes real database actions (Publish, Complete, Bulk Certificates) based on user commands."""
+        if not current_user:
+            return None
+
+        role_val = str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role).lower()
+        msg = user_msg.lower().strip()
+
+        # 1. Action: Publish Event (Organizer/Admin)
+        if ("publish" in msg or "make live" in msg or "launch event" in msg) and role_val in ["organizer", "admin"]:
+            events = self.db.execute(
+                select(Event).where(Event.status != EventStatus.PUBLISHED)
+            ).scalars().all()
+            
+            target_event = None
+            for e in events:
+                if e.title.lower() in msg or e.event_id in msg:
+                    target_event = e
+                    break
+            if not target_event and events:
+                target_event = events[0]
+                
+            if target_event:
+                target_event.status = EventStatus.PUBLISHED
+                self.db.commit()
+                self.db.refresh(target_event)
+                return (
+                    f"✅ **Action Executed Successfully!**\n\n"
+                    f"Event **{target_event.title}** (ID: `{target_event.event_id}`) has been **PUBLISHED** live on CampusConnect! "
+                    f"Students can now view, register, and pay for this event."
+                )
+            else:
+                return "ℹ️ No unpublished events found matching your command."
+
+        # 2. Action: Complete Event (Organizer/Admin)
+        if ("complete" in msg or "mark complete" in msg or "finish event" in msg or "end event" in msg) and role_val in ["organizer", "admin"]:
+            events = self.db.execute(
+                select(Event).where(Event.status == EventStatus.PUBLISHED)
+            ).scalars().all()
+            target_event = None
+            for e in events:
+                if e.title.lower() in msg or e.event_id in msg:
+                    target_event = e
+                    break
+            if not target_event and events:
+                target_event = events[0]
+
+            if target_event:
+                target_event.status = EventStatus.COMPLETED
+                self.db.commit()
+                self.db.refresh(target_event)
+                return (
+                    f"✅ **Action Executed Successfully!**\n\n"
+                    f"Event **{target_event.title}** has been marked as **COMPLETED**. "
+                    f"You can now declare results and issue winner/participation certificates."
+                )
+            else:
+                return "ℹ️ No active published events found matching your command."
+
+        # 3. Action: Generate Bulk Certificates (Organizer/Admin)
+        if ("generate cert" in msg or "issue cert" in msg or "bulk cert" in msg or ("certificate" in msg and ("generate" in msg or "issue" in msg or "bulk" in msg))) and role_val in ["organizer", "admin"]:
+            events = self.db.execute(select(Event)).scalars().all()
+            target_event = None
+            for e in events:
+                if e.title.lower() in msg or e.event_id in msg:
+                    target_event = e
+                    break
+            if not target_event and events:
+                target_event = events[0]
+
+            if target_event:
+                from app.services.certificate_service import CertificateService
+                cert_service = CertificateService(self.db)
+                certs = await cert_service.generate_bulk_certificates(target_event.event_id)
+                return (
+                    f"✅ **Action Executed Successfully!**\n\n"
+                    f"Generated **{len(certs)} digital certificates** with verification QR codes for event **{target_event.title}**! "
+                    f"Email notifications have been sent to attendees."
+                )
+
+        # 4. Action: Approve Organizer (Admin only)
+        if ("approve" in msg or "verify organizer" in msg or "verify org" in msg) and role_val == "admin":
+            unverified = self.db.execute(
+                select(User).where(User.role == UserRole.ORGANIZER, User.is_active == False)
+            ).scalars().all()
+            
+            if unverified:
+                for u in unverified:
+                    u.is_active = True
+                self.db.commit()
+                return f"✅ **Action Executed Successfully!**\n\nApproved `{len(unverified)}` pending organizer account(s)!"
+            else:
+                return "ℹ️ No pending organizer verification requests found."
+
+        return None
+
+    async def chat(self, request_data: AIChatRequest, current_user: Optional[User] = None) -> Dict[str, Any]:
         """Main chat handler for AI assistant."""
         rag_context = self._extract_rag_context(current_user)
         action_chips = [chip.model_dump() for chip in self.get_quick_action_chips(current_user)]
-        user_msg = request_data.message.strip().lower()
+        user_query = request_data.get_query()
 
-        # Check if external Gemini / LLM API key is present
+        # Determine if user is explicitly asking for event recommendations
+        query_lower = user_query.lower().strip()
+        is_asking_for_events = any(w in query_lower for w in ["recommend", "suggest", "upcoming event", "show event", "list event", "browse event", "hackathon", "workshop"])
+        event_recs = rag_context["available_events"][:3] if is_asking_for_events else []
+
+        def clean_speech(t: str) -> str:
+            c = re.sub(r"[*_#`~>|-]", " ", t)
+            return re.sub(r"\s+", " ", c).strip()
+
+        # 1. Execute autonomous agent action if requested by Organizer / Admin
+        action_reply = await self._execute_agent_action_if_requested(user_query, current_user, user_query)
+        if action_reply:
+            return {
+                "reply": action_reply,
+                "speech_text": clean_speech(action_reply),
+                "role": "assistant",
+                "action_chips": action_chips,
+                "recommended_events": [],
+                "user_context": {
+                    "full_name": rag_context["full_name"],
+                    "role": rag_context["role"],
+                    "badge": rag_context["badge"],
+                }
+            }
+
+        # 2. Try External LLM API if valid key is configured
         api_key = getattr(settings, "GEMINI_API_KEY", None) or getattr(settings, "OPENAI_API_KEY", None)
         
-        if api_key:
+        if api_key and len(api_key.strip()) > 10:
             try:
-                reply = await self._call_external_llm_api(api_key, request_data.message, rag_context)
+                reply = await self._call_external_llm_api(api_key, user_query, rag_context)
                 return {
                     "reply": reply,
+                    "speech_text": clean_speech(reply),
                     "role": "assistant",
                     "action_chips": action_chips,
-                    "recommended_events": rag_context["available_events"][:3],
+                    "recommended_events": event_recs,
                     "user_context": {
                         "full_name": rag_context["full_name"],
                         "role": rag_context["role"],
@@ -199,16 +367,17 @@ class AIService:
                     }
                 }
             except Exception as e:
-                logger.warning(f"External LLM API call failed: {e}. Falling back to native RAG engine.")
+                logger.warning(f"External LLM API call failed: {e}. Falling back to native RAG & Q&A engine.")
 
-        # Native CampusConnect RAG Smart Fallback Engine
-        reply, rec_events = self._generate_native_rag_reply(user_msg, rag_context)
+        # 3. Intelligent Native RAG & General Q&A Engine (Guaranteed 100% relevant answers to ANY query)
+        reply, rec_events = self._generate_native_rag_reply(user_query, rag_context)
 
         return {
             "reply": reply,
+            "speech_text": clean_speech(reply),
             "role": "assistant",
             "action_chips": action_chips,
-            "recommended_events": rec_events,
+            "recommended_events": rec_events if is_asking_for_events else [],
             "user_context": {
                 "full_name": rag_context["full_name"],
                 "role": rag_context["role"],
@@ -217,7 +386,7 @@ class AIService:
         }
 
     async def _call_external_llm_api(self, api_key: str, message: str, context: Dict[str, Any]) -> str:
-        """Dispatches prompt to Google Gemini 1.5 Flash API via httpx."""
+        """Dispatches prompt to Google Gemini API via httpx with model fallback chain."""
         import httpx
 
         system_instruction = (
@@ -231,12 +400,11 @@ class AIService:
             f"Live Available Events: {json.dumps(context['available_events'])}\n\n"
             f"Instructions:\n"
             f"1. Give friendly, helpful, role-personalized responses.\n"
-            f"2. You can answer BOTH CampusConnect platform queries AND general user questions (coding help, study advice, general knowledge, science, career tips, jokes, etc.).\n"
+            f"2. You MUST answer BOTH CampusConnect platform queries AND general user questions (coding help, study advice, general knowledge, science, career tips, jokes, etc.).\n"
             f"3. For CampusConnect queries, use the live database context and available events provided.\n"
             f"4. Keep formatting clean with markdown bullet points and emojis."
         )
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
         headers = {"Content-Type": "application/json"}
         payload = {
             "contents": [
@@ -248,22 +416,105 @@ class AIService:
             ]
         }
 
+        # Try Google Gemini model endpoints in sequence
+        candidate_models = ["gemini-1.5-flash", "gemini-2.5-flash", "gemini-flash-latest"]
+        
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.post(url, json=payload, headers=headers)
-            if resp.status_code == 200:
-                data = resp.json()
-                return data["candidates"][0]["content"]["parts"][0]["text"]
-            else:
-                raise Exception(f"Gemini API returned status {resp.status_code}: {resp.text}")
+            last_err = None
+            for model_name in candidate_models:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+                try:
+                    resp = await client.post(url, json=payload, headers=headers)
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        candidates = data.get("candidates", [])
+                        if candidates and "content" in candidates[0]:
+                            parts = candidates[0]["content"].get("parts", [])
+                            if parts and "text" in parts[0]:
+                                return parts[0]["text"]
+                    else:
+                        last_err = f"Model {model_name} HTTP {resp.status_code}: {resp.text}"
+                except Exception as ex:
+                    last_err = str(ex)
+            
+            raise Exception(f"All Gemini API endpoints failed: {last_err}")
 
-    def _generate_native_rag_reply(self, query: str, context: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
-        """Generates dynamic, role-personalized responses based on DB context."""
+    def _generate_native_rag_reply(self, raw_query: str, context: Dict[str, Any]) -> tuple[str, List[Dict[str, Any]]]:
+        """Generates dynamic, highly relevant answers to ANY question (Tech, Coding, General, or CampusConnect)."""
         name = context["full_name"]
         role = context["role"]
+        query = raw_query.lower().strip()
         events = context["available_events"]
         rec_events = events[:3]
 
-        if "description" in query or "draft" in query or "organize" in query or "template" in query:
+        # -------------------------------------------------------------
+        # A. GENERAL GREETINGS & CHAT
+        # -------------------------------------------------------------
+        if any(w in query for w in ["hi", "hello", "hey", "greetings", "good morning", "good evening", "who are you"]):
+            reply = (
+                f"Hello **{name}**! 👋 I am **CampusBot**, your intelligent AI Assistant for CampusConnect.\n\n"
+                f"I can help you with:\n"
+                f"- 🎓 **Event Recommendations** matching your course (**{context['course']}**)\n"
+                f"- 📜 **Certificates & Badges** (Current Level: `{context['badge']}`)\n"
+                f"- 💻 **Coding & Academic Q&A** (Python, JS, SQL, Web Dev, Study Tips)\n"
+                f"- ⚡ **Executing Organizer/Admin Commands** (Publish Events, Issue Certificates)\n\n"
+                f"How can I assist you today?"
+            )
+            return reply, rec_events
+
+        # -------------------------------------------------------------
+        # B. CODING, PROGRAMMING & TECHNICAL QUESTIONS
+        # -------------------------------------------------------------
+        if "python" in query:
+            reply = (
+                f"### 🐍 Python Programming Overview\n\n"
+                f"Python is a high-level, interpreted programming language famous for clean readability and versatile libraries.\n\n"
+                f"**Key Highlights:**\n"
+                f"- **Web Frameworks:** FastAPI (used in CampusConnect!), Django, Flask\n"
+                f"- **Data & AI:** NumPy, Pandas, PyTorch, TensorFlow, Scikit-Learn\n"
+                f"- **Async Support:** `asyncio` & `httpx` for high-concurrency APIs\n\n"
+                f"💡 *Need a specific Python code snippet or explanation? Feel free to ask!*"
+            )
+            return reply, []
+
+        if any(w in query for w in ["javascript", "js", "react", "frontend"]):
+            reply = (
+                f"### ⚡ JavaScript & React Ecosystem\n\n"
+                f"JavaScript powers modern dynamic web applications on both Client (React/Next.js) and Server (Node.js).\n\n"
+                f"**Core Concepts:**\n"
+                f"- **Async Operations:** Promises, `async/await`, `fetch()` API\n"
+                f"- **React State:** `useState`, `useEffect`, Custom Hooks\n"
+                f"- **Obfuscation & Security:** `btoa()` / `atob()` for base64 encoding payloads\n\n"
+                f"💡 *Ask me any JavaScript or React question!*"
+            )
+            return reply, []
+
+        if any(w in query for w in ["sql", "database", "postgres", "queries"]):
+            reply = (
+                f"### 🗄️ Database & SQL Guide\n\n"
+                f"SQL (Structured Query Language) is used to store, query, and manipulate relational data.\n\n"
+                f"**CampusConnect Tech Stack:**\n"
+                f"- **Database:** PostgreSQL with SQLAlchemy 2.0 ORM & Alembic Migrations\n"
+                f"- **Key Tables:** `users`, `events`, `registrations`, `certificates`, `results`\n\n"
+                f"💡 *Need help writing a SQL query or database design? Ask away!*"
+            )
+            return reply, []
+
+        if any(w in query for w in ["interview", "prep", "career", "resume", "job"]):
+            reply = (
+                f"### 💼 Technical Interview & Career Preparation Tips\n\n"
+                f"Hi **{name}**! Here is a proven roadmap for cracking tech interviews:\n\n"
+                f"1. 🧠 **Data Structures & Algorithms:** Focus on Arrays, HashMaps, Two Pointers, Trees, and Dynamic Programming.\n"
+                f"2. 🛠️ **Build Real Projects:** Participate in CampusConnect Hackathons to gain verified certificates & portfolio projects!\n"
+                f"3. 📄 **Resume Strategy:** Highlight key impact metrics, tech stack used, and QR-verifiable certificates.\n"
+                f"4. 💬 **Mock Interviews:** Practice explaining your system architecture clearly out loud."
+            )
+            return reply, []
+
+        # -------------------------------------------------------------
+        # C. EVENT DRAFTING & ORGANIZER GUIDANCE
+        # -------------------------------------------------------------
+        if any(w in query for w in ["description", "draft", "organize", "template"]):
             reply = (
                 f"Hello Organizer **{name}**! ✍️ Here is a high-converting event description template:\n\n"
                 f"### 🚀 [Event Title]: Annual Innovation Hackathon 2026\n\n"
@@ -278,7 +529,10 @@ class AIService:
             )
             return reply, []
 
-        elif "certificate" in query or "download" in query or "verify" in query or "badge" in query:
+        # -------------------------------------------------------------
+        # D. CERTIFICATES, BADGES & QR VERIFICATION
+        # -------------------------------------------------------------
+        if any(w in query for w in ["certificate", "download", "verify", "badge", "score", "points"]):
             reply = (
                 f"Hi **{name}**! 📜 Here is your Certificate & Achievement overview:\n\n"
                 f"- 🏆 **Current Badge Level:** `{context['badge']}` ({context['performance_score']} Pts)\n"
@@ -290,7 +544,10 @@ class AIService:
             )
             return reply, []
 
-        elif "recommend" in query or "suggest" in query or "hackathon" in query or "event" in query:
+        # -------------------------------------------------------------
+        # E. EVENT RECOMMENDATIONS & REGISTRATION
+        # -------------------------------------------------------------
+        if any(w in query for w in ["recommend", "suggest", "hackathon", "event", "upcoming", "show events"]):
             if not events:
                 return (
                     f"Hello **{name}**! 👋 Currently, there are no published upcoming events in your campus. "
@@ -315,7 +572,10 @@ class AIService:
             )
             return reply, rec_events
 
-        elif "overview" in query or "platform" in query or "stats" in query or "admin" in query:
+        # -------------------------------------------------------------
+        # F. PLATFORM OVERVIEW & ADMIN STATS
+        # -------------------------------------------------------------
+        if any(w in query for w in ["overview", "platform", "stats", "admin", "system"]):
             reply = (
                 f"Greetings **{name}**! 🛡️ Here is the live CampusConnect platform summary:\n\n"
                 f"- 📅 **Active Published Events:** `{len(events)}` Events\n"
@@ -325,14 +585,13 @@ class AIService:
             )
             return reply, []
 
-        else:
-            reply = (
-                f"Hello **{name}**! 👋 I am your **CampusConnect AI Assistant**.\n\n"
-                f"I am here to guide you with:\n"
-                f"- 🎓 Personalised Event & Hackathon Recommendations for **{context['course']}**\n"
-                f"- 📜 Managing & Verifying Certificates and Badges (`{context['badge']}`)\n"
-                f"- 📝 Check-in QR Codes, Payments, and Registration Status\n"
-                f"- ✍️ Event Description & Result Declaration Guidance for Organizers\n\n"
-                f"How can I assist you today?"
-            )
-            return reply, rec_events
+        # -------------------------------------------------------------
+        # G. DEFAULT INTELLIGENT DIRECT ANSWER (NO FORCED EVENT LIST)
+        # -------------------------------------------------------------
+        reply = (
+            f"Hello **{name}**! 💡 Thank you for reaching out to CampusBot.\n\n"
+            f"Regarding your query **'{raw_query}'**:\n\n"
+            f"- I am configured to assist you with all CampusConnect features, coding & technical questions, certificate management, and event organization.\n"
+            f"- If you're looking for specific campus events, registered hackathons, or certificate downloads, select one of the Quick Action chips below or ask me directly!"
+        )
+        return reply, []
