@@ -106,6 +106,7 @@ class ResultService:
                 existing.score = data.score
                 self.db.commit()
                 self.db.refresh(existing)
+                self._update_certificates_for_result(data.event_id, data.participant_id, data.team_id, data.rank)
                 return existing
         elif data.team_id:
             existing = self.db.execute(
@@ -119,6 +120,7 @@ class ResultService:
                 existing.score = data.score
                 self.db.commit()
                 self.db.refresh(existing)
+                self._update_certificates_for_result(data.event_id, data.participant_id, data.team_id, data.rank)
                 return existing
 
         # Create new Result
@@ -132,7 +134,42 @@ class ResultService:
         self.result_repo.create(result)
         self.db.commit()
         self.db.refresh(result)
+        self._update_certificates_for_result(data.event_id, data.participant_id, data.team_id, data.rank)
         return result
+
+    def _update_certificates_for_result(self, event_id: str, participant_id: Optional[str], team_id: Optional[str], rank: Optional[int]):
+        if not rank:
+            return
+
+        cert_type = "participation"
+        if rank == 1:
+            cert_type = "winner_1st"
+        elif rank == 2:
+            cert_type = "runner_up_2nd"
+        elif rank == 3:
+            cert_type = "runner_up_3rd"
+        else:
+            cert_type = f"merit_{rank}"
+
+        user_ids = []
+        if participant_id:
+            user_ids.append(participant_id)
+        elif team_id:
+            from app.models.team import TeamMember
+            members = self.db.execute(
+                select(TeamMember.user_id).where(TeamMember.team_id == team_id)
+            ).scalars().all()
+            user_ids.extend(members)
+
+        from app.models.certificate import Certificate
+        from app.repositories.certificate_repository import CertificateRepository
+        cert_repo = CertificateRepository(self.db)
+
+        for uid in user_ids:
+            cert = cert_repo.get_by_event_and_user(event_id, uid)
+            if cert:
+                cert.certificate_type = cert_type
+                self.db.commit()
 
     def get_event_results(self, event_id: str) -> List[Result]:
         """Get sorted results for a specific event."""
