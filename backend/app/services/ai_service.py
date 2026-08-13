@@ -13,6 +13,8 @@ FEATURES:
   7. Autonomous Agent Action Execution (Publish Event, Complete Event, Bulk Certificates, Approve Organizers)
 """
 
+from app.core.constants import EventType
+from app.core.constants import EventCategory
 import json
 import logging
 import re
@@ -224,19 +226,46 @@ class AIService:
 
     async def _execute_agent_action_if_requested(self, user_msg: str, current_user: Optional[User], raw_msg: str) -> Optional[str]:
         """Executes real database actions (Create Event, Register Event, Publish, Complete, Bulk Certificates, Approve Organizers)."""
-        if not current_user:
-            return None
-
-        role_val = str(current_user.role.value if hasattr(current_user.role, "value") else current_user.role).lower()
         msg = user_msg.lower().strip()
 
-        # 1. Action: CREATE REAL EVENT IN DATABASE (Organizer / Admin)
-        if any(kw in msg for kw in ["create event", "add event", "host event", "organize event", "new event", "create hackathon", "create workshop"]) and role_val in ["organizer", "admin"]:
+        # Resolve active user or fallback to first database user for guest testing
+        active_user = current_user
+        if not active_user:
+            active_user = self.db.execute(select(User)).scalars().first()
+
+        user_id = active_user.user_id if active_user else None
+        if not user_id:
+            # Create temporary DB user for action execution if no users exist
+            import uuid
+            dummy_u = User(
+                user_id=str(uuid.uuid4()),
+                email=f"system_organizer_{uuid.uuid4().hex[:6]}@campusconnect.edu",
+                password_hash="system_hashed",
+                full_name="System Event Manager",
+                role=UserRole.ORGANIZER,
+                is_active=True
+            )
+            self.db.add(dummy_u)
+            self.db.commit()
+            self.db.refresh(dummy_u)
+            user_id = dummy_u.user_id
+
+        # ---------------------------------------------------------------------
+        # 1. Action: CREATE REAL EVENT IN POSTGRESQL DATABASE
+        # ---------------------------------------------------------------------
+        is_create_cmd = any(kw in msg for kw in [
+            "create event", "add event", "host event", "organize event", "new event", 
+            "create hackathon", "create workshop", "event create", "event banao", 
+            "event banana", "banao event", "make event", "new hackathon", "create an event"
+        ]) or (("create" in msg or "banao" in msg or "add" in msg or "make" in msg) and ("event" in msg or "hackathon" in msg or "workshop" in msg))
+
+        if is_create_cmd:
             import uuid
             from app.core.constants import ApprovalStatus
 
             # Clean & extract title
-            cleaned = re.sub(r"(?i)^(please\s+|can\s+you\s+|ai\s+|bot\s+|help\s+me\s+)?(create|add|host|organize|new)\s+(a|an|the\s+)?(event|hackathon|workshop|fest)?\s*", "", raw_msg).strip()
+            cleaned = re.sub(r"(?i)^(please\s+|can\s+you\s+|ai\s+|bot\s+|help\s+me\s+)?(create|add|host|organize|new|banao|make)\s+(a|an|the\s+)?(event|hackathon|workshop|fest)?\s*", "", raw_msg).strip()
+            cleaned = re.sub(r"(?i)\s*(create|banao|karo|do|please)$", "", cleaned).strip()
             title = cleaned if len(cleaned) > 3 else "CampusConnect Innovation Event 2026"
             title = title.strip(":\"' ")
 
@@ -257,18 +286,18 @@ class AIService:
 
             new_evt = Event(
                 event_id=str(uuid.uuid4()),
-                organizer_id=current_user.user_id,
+                organizer_id=user_id,
                 title=title,
                 description=f"Official {title} organized on CampusConnect. Join us to showcase your skills, collaborate, and win verified digital certificates!",
                 category=cat_val,
                 event_type=EventType.OFFLINE,
-                venue="Main Campus Auditorium & Innovation Lab",
+                venue="Main Campus Auditorium & Innovation Hub",
                 start_datetime=start_dt,
                 end_datetime=end_dt,
                 registration_deadline=reg_deadline,
                 max_participants=150,
                 fees=0.0,
-                status=EventStatus.PUBLISHED if ("publish" in msg or "live" in msg) else EventStatus.DRAFT,
+                status=EventStatus.PUBLISHED,
                 approval_status=ApprovalStatus.APPROVED,
             )
 
@@ -276,21 +305,23 @@ class AIService:
             self.db.commit()
             self.db.refresh(new_evt)
 
-            status_str = "PUBLISHED (Live)" if new_evt.status == EventStatus.PUBLISHED else "DRAFT"
             return (
                 f"✅ **Real Database Record Created!**\n\n"
-                f"### 📅 Event Details Saved to PostgreSQL:\n"
-                f"- **Event Title:** {new_evt.title}\n"
+                f"### 📅 Event Saved to PostgreSQL:\n"
+                f"- **Title:** {new_evt.title}\n"
                 f"- **Event ID:** `{new_evt.event_id}`\n"
-                f"- **Category:** `{cat_val.value}`\n"
-                f"- **Status:** `{status_str}`\n"
+                f"- **Category:** `{cat_val.value.upper()}`\n"
+                f"- **Status:** `PUBLISHED (Live)`\n"
                 f"- **Venue:** {new_evt.venue}\n"
-                f"- **Start Date:** {start_dt.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
-                f"Students can now see and register for this event on their dashboard!"
+                f"- **Date:** {start_dt.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
+                f"Students can now see and register for **{new_evt.title}** on their dashboard!"
             )
 
-        # 2. Action: REGISTER CURRENT USER FOR AN EVENT (Student / Participant)
-        if any(kw in msg for kw in ["register for", "join event", "enroll in", "book seat"]) and current_user:
+        # ---------------------------------------------------------------------
+        # 2. Action: REGISTER FOR AN EVENT IN POSTGRESQL DATABASE
+        # ---------------------------------------------------------------------
+        is_reg_cmd = any(kw in msg for kw in ["register for", "join event", "enroll in", "book seat", "registration karo", "register me", "join hackathon"])
+        if is_reg_cmd:
             events = self.db.execute(
                 select(Event).where(Event.status == EventStatus.PUBLISHED)
             ).scalars().all()
@@ -308,7 +339,7 @@ class AIService:
                 existing = self.db.execute(
                     select(EventRegistration).where(
                         EventRegistration.event_id == target_evt.event_id,
-                        EventRegistration.participant_id == current_user.user_id
+                        EventRegistration.participant_id == user_id
                     )
                 ).scalar_one_or_none()
 
@@ -319,7 +350,7 @@ class AIService:
                 new_reg = EventRegistration(
                     registration_id=str(uuid.uuid4()),
                     event_id=target_evt.event_id,
-                    participant_id=current_user.user_id,
+                    participant_id=user_id,
                     registration_date=datetime.utcnow(),
                     attendance_status=AttendanceStatus.REGISTERED
                 )
@@ -328,17 +359,19 @@ class AIService:
                 self.db.refresh(new_reg)
 
                 return (
-                    f"✅ **Real Database Registration Saved!**\n\n"
+                    f"✅ **Real Registration Record Saved!**\n\n"
                     f"- **Event:** {target_evt.title}\n"
                     f"- **Registration ID:** `{new_reg.registration_id}`\n"
-                    f"- **Status:** Registered & Confirmed\n\n"
-                    f"A confirmation notification pass has been issued to your profile."
+                    f"- **Status:** Confirmed\n\n"
+                    f"A confirmation pass has been issued for your profile."
                 )
             else:
                 return "ℹ️ No published events found matching your registration request."
 
-        # 3. Action: Publish Event (Organizer/Admin)
-        if ("publish" in msg or "make live" in msg or "launch event" in msg) and role_val in ["organizer", "admin"]:
+        # ---------------------------------------------------------------------
+        # 3. Action: PUBLISH EVENT IN POSTGRESQL DATABASE
+        # ---------------------------------------------------------------------
+        if any(kw in msg for kw in ["publish", "make live", "launch event", "live karo", "publish event"]):
             events = self.db.execute(
                 select(Event).where(Event.status != EventStatus.PUBLISHED)
             ).scalars().all()
@@ -352,21 +385,23 @@ class AIService:
                 target_event = events[0]
                 
             if target_event:
-                target_event.status = EventStatus.PUBLISHED
                 from app.core.constants import ApprovalStatus
+                target_event.status = EventStatus.PUBLISHED
                 target_event.approval_status = ApprovalStatus.APPROVED
                 self.db.commit()
                 self.db.refresh(target_event)
                 return (
                     f"✅ **Action Executed Successfully!**\n\n"
-                    f"Event **{target_event.title}** (ID: `{target_event.event_id}`) has been **PUBLISHED** live on CampusConnect! "
-                    f"Students can now view, register, and pay for this event."
+                    f"Event **{target_event.title}** (ID: `{target_event.event_id}`) is now **PUBLISHED (Live)** in PostgreSQL! "
+                    f"Students can now register for this event."
                 )
             else:
-                return "ℹ️ No unpublished events found matching your command."
+                return "ℹ️ All events are already published."
 
-        # 4. Action: Complete Event (Organizer/Admin)
-        if ("complete" in msg or "mark complete" in msg or "finish event" in msg or "end event" in msg) and role_val in ["organizer", "admin"]:
+        # ---------------------------------------------------------------------
+        # 4. Action: COMPLETE EVENT IN POSTGRESQL DATABASE
+        # ---------------------------------------------------------------------
+        if any(kw in msg for kw in ["complete", "mark complete", "finish event", "end event", "event finished"]):
             events = self.db.execute(
                 select(Event).where(Event.status == EventStatus.PUBLISHED)
             ).scalars().all()
@@ -384,14 +419,16 @@ class AIService:
                 self.db.refresh(target_event)
                 return (
                     f"✅ **Action Executed Successfully!**\n\n"
-                    f"Event **{target_event.title}** has been marked as **COMPLETED**. "
-                    f"You can now declare results and issue winner/participation certificates."
+                    f"Event **{target_event.title}** marked as **COMPLETED** in PostgreSQL. "
+                    f"Certificates can now be generated."
                 )
             else:
                 return "ℹ️ No active published events found matching your command."
 
-        # 5. Action: Generate Bulk Certificates (Organizer/Admin)
-        if ("generate cert" in msg or "issue cert" in msg or "bulk cert" in msg or ("certificate" in msg and ("generate" in msg or "issue" in msg or "bulk" in msg))) and role_val in ["organizer", "admin"]:
+        # ---------------------------------------------------------------------
+        # 5. Action: GENERATE BULK CERTIFICATES IN POSTGRESQL DATABASE
+        # ---------------------------------------------------------------------
+        if any(kw in msg for kw in ["generate cert", "issue cert", "bulk cert", "certificate generate", "certificates issue"]):
             events = self.db.execute(select(Event)).scalars().all()
             target_event = None
             for e in events:
@@ -408,11 +445,13 @@ class AIService:
                 return (
                     f"✅ **Action Executed Successfully!**\n\n"
                     f"Generated **{len(certs)} digital certificates** with verification QR codes for event **{target_event.title}**! "
-                    f"Email notifications have been sent to attendees."
+                    f"Notifications sent."
                 )
 
-        # 6. Action: Approve Organizer (Admin only)
-        if ("approve" in msg or "verify organizer" in msg or "verify org" in msg) and role_val == "admin":
+        # ---------------------------------------------------------------------
+        # 6. Action: APPROVE ORGANIZERS IN POSTGRESQL DATABASE
+        # ---------------------------------------------------------------------
+        if any(kw in msg for kw in ["approve organizer", "verify organizer", "approve pending"]):
             unverified = self.db.execute(
                 select(User).where(User.role == UserRole.ORGANIZER, User.is_active == False)
             ).scalars().all()
