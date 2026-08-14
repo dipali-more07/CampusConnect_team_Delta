@@ -8,10 +8,11 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Configure SSH
         run: |
@@ -22,6 +23,10 @@ jobs:
 
       - name: Deploy Application
         run: |
-          ssh -i ~/.ssh/github_actions_cc \
-          ${{ secrets.JUMP_USER }}@${{ secrets.JUMP_HOST }} \
-          "bash ~/deploy-jump.sh"
+          ssh -o BatchMode=yes \
+              -o ConnectTimeout=15 \
+              -o ServerAliveInterval=30 \
+              -o ServerAliveCountMax=3 \
+              -i ~/.ssh/github_actions_cc \
+              ${{ secrets.JUMP_USER }}@${{ secrets.JUMP_HOST }} \
+              "bash ~/deploy-jump.sh"
