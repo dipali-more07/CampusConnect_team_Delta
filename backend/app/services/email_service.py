@@ -142,6 +142,7 @@ class EmailService:
     async def _send(self, email: str, subject: str, body: str, html_body: Optional[str] = None) -> bool:
         """
         Helper method to dispatch emails or fallback to logging.
+        Supports authenticated SMTP (Gmail) & unauthenticated Jump Server relays (Port 25/587).
         """
         if self._should_mock():
             logger.info(
@@ -152,14 +153,18 @@ class EmailService:
             )
             return True
 
+        from_email = (settings.MAIL_FROM or settings.MAIL_USERNAME or "noreply@campusconnect.com").strip()
+        if not from_email or len(from_email) < 3 or "@" not in from_email:
+            from_email = "noreply@campusconnect.com"
+
         # 1. Primary Dispatch: Try fastapi_mail with dynamic ConnectionConfig
         if HAS_FASTAPI_MAIL:
             try:
                 dynamic_config = ConnectionConfig(
                     MAIL_USERNAME=settings.MAIL_USERNAME or "",
                     MAIL_PASSWORD=settings.MAIL_PASSWORD or "",
-                    MAIL_FROM=settings.MAIL_FROM or settings.MAIL_USERNAME or "noreply@campusconnect.com",
-                    MAIL_PORT=settings.MAIL_PORT or 587,
+                    MAIL_FROM=from_email,
+                    MAIL_PORT=settings.MAIL_PORT or 25,
                     MAIL_SERVER=settings.MAIL_SERVER,
                     MAIL_STARTTLS=settings.MAIL_STARTTLS,
                     MAIL_SSL_TLS=settings.MAIL_SSL_TLS,
@@ -174,17 +179,17 @@ class EmailService:
                 )
                 fm = FastMail(dynamic_config)
                 await fm.send_message(message)
-                logger.info(f"✅ Email successfully sent to {email} with subject: '{subject}'")
+                logger.info(f"✅ Email successfully sent via FastMail to {email} with subject: '{subject}'")
                 return True
             except Exception as e:
                 logger.warning(f"fastapi_mail failed: {e}. Attempting robust smtplib fallback...")
 
-        # 2. Robust Fallback: Built-in Python smtplib (Supports SSL/TLS/Plain Relay)
+        # 2. Robust Fallback: Built-in Python smtplib (Supports SSL/TLS/Plain Jump Server Relay)
         import ssl
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
-            msg["From"] = settings.MAIL_FROM or settings.MAIL_USERNAME or "noreply@campusconnect.com"
+            msg["From"] = from_email
             msg["To"] = email
 
             msg.attach(MIMEText(body, "plain"))
@@ -192,7 +197,7 @@ class EmailService:
                 msg.attach(MIMEText(html_body, "html"))
 
             server_host = settings.MAIL_SERVER
-            server_port = settings.MAIL_PORT or (465 if settings.MAIL_SSL_TLS else 587)
+            server_port = settings.MAIL_PORT or (465 if settings.MAIL_SSL_TLS else 25)
 
             ssl_context = ssl.create_default_context()
             ssl_context.check_hostname = False
@@ -202,7 +207,7 @@ class EmailService:
                 with smtplib.SMTP_SSL(server_host, server_port, context=ssl_context, timeout=15) as server:
                     if settings.MAIL_USERNAME and settings.MAIL_PASSWORD:
                         server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
-                    server.sendmail(msg["From"], [email], msg.as_string())
+                    server.sendmail(from_email, [email], msg.as_string())
             else:
                 with smtplib.SMTP(server_host, server_port, timeout=15) as server:
                     if settings.MAIL_STARTTLS:
@@ -215,7 +220,7 @@ class EmailService:
                             server.login(settings.MAIL_USERNAME, settings.MAIL_PASSWORD)
                         except Exception as auth_err:
                             logger.warning(f"SMTP Login skipped/failed: {auth_err}")
-                    server.sendmail(msg["From"], [email], msg.as_string())
+                    server.sendmail(from_email, [email], msg.as_string())
 
             logger.info(f"✅ Email successfully sent via smtplib to {email} with subject: '{subject}'")
             return True
