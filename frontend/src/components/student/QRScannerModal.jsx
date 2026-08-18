@@ -6,6 +6,7 @@ import { useToast } from '../../context/ToastContext'
 import studentService from '../../services/studentService'
 import eventsService from '../../services/eventsService'
 import { Html5Qrcode } from 'html5-qrcode'
+import CustomSelect from '../common/CustomSelect'
 
 export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed, user }) {
   const { dark, accentColor } = useTheme()
@@ -339,23 +340,19 @@ export default function QRScannerModal({ isOpen, onClose, onAttendanceConfirmed,
                   Loading your registered events...
                 </div>
               ) : (
-                <select
+                <CustomSelect
                   value={selectedEventId}
-                  onChange={e => setSelectedEventId(e.target.value)}
-                  className="w-full py-3 px-3.5 rounded-2xl text-xs font-bold border transition-colors outline-none cursor-pointer"
-                  style={{
-                    background: dark ? '#132035' : '#f8fafc',
-                    borderColor: dark ? '#1e3250' : '#cbd5e1',
-                    color: dark ? '#ffffff' : '#0f172a'
-                  }}
-                >
-                  <option value="">✨ Auto-Detect Event from QR Code</option>
-                  {eventsList.map(ev => (
-                    <option key={ev.id || ev.event_id} value={ev.id || ev.event_id}>
-                      {ev.title || ev.name || 'Campus Event'} {ev.date ? `(${ev.date})` : ''}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(e, val) => setSelectedEventId(val)}
+                  placeholder="✨ Auto-Detect Event from QR Code"
+                  options={[
+                    { value: '', label: '✨ Auto-Detect Event from QR Code' },
+                    ...eventsList.map(ev => ({
+                      value: ev.id || ev.event_id,
+                      label: `${ev.title || ev.name || 'Campus Event'} ${ev.date ? `(${ev.date})` : ''}`.trim()
+                    }))
+                  ]}
+                  dark={dark}
+                />
               )}
             </div>
 

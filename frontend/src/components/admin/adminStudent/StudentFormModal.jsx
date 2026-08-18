@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Loader2, Eye, EyeOff, User, Mail, Phone, Building, BookOpen, GraduationCap, Lock } from 'lucide-react'
+import CustomSelect from '../../common/CustomSelect'
 
 const evaluatePasswordStrength = (pass) => {
   if (!pass) return { label: '', colorClass: '', barColor: '', width: '0%' }
@@ -206,48 +207,36 @@ export default function StudentFormModal({
           {/* Department & Year of Study */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Department</label>
-              <select
+              <CustomSelect
+                label="Department"
                 value={form.department || deptOptions[0]}
-                onChange={e => setForm(p => ({ ...p, department: e.target.value }))}
-                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
-                style={inpStyle}
-              >
-                {deptOptions.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+                onChange={(e, val) => setForm(p => ({ ...p, department: val }))}
+                options={deptOptions.map(d => ({ value: d, label: d }))}
+                dark={tokens.dark ?? true}
+              />
             </div>
 
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Year of Study</label>
-              <select
+              <CustomSelect
+                label="Year of Study"
                 value={form.year || '1st'}
-                onChange={e => setForm(p => ({ ...p, year: e.target.value }))}
-                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer font-semibold"
-                style={inpStyle}
-              >
-                {yearOptions.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
-              </select>
+                onChange={(e, val) => setForm(p => ({ ...p, year: val }))}
+                options={yearOptions.map(y => ({ value: y, label: y }))}
+                dark={tokens.dark ?? true}
+              />
             </div>
           </div>
 
           {/* Gender & Roll Number */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Gender</label>
-              <select
+              <CustomSelect
+                label="Gender"
                 value={form.gender || 'Select Gender'}
-                onChange={e => setForm(p => ({ ...p, gender: e.target.value }))}
-                className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
-                style={inpStyle}
-              >
-                {genderOptions.map(g => (
-                  <option key={g} value={g}>{g}</option>
-                ))}
-              </select>
+                onChange={(e, val) => setForm(p => ({ ...p, gender: val }))}
+                options={genderOptions.map(g => ({ value: g, label: g }))}
+                dark={tokens.dark ?? true}
+              />
             </div>
 
             <div>

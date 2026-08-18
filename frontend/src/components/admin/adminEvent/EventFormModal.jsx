@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Loader2 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
+import CustomSelect from '../../common/CustomSelect'
 
 const getFieldBorderColor = (hasError, isFocused, dark, BRAND) => {
   if (hasError) return '#ef4444'
@@ -57,33 +58,14 @@ function EventFormBasicInfo({
       {/* Grid: Category & Venue */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
-          <label htmlFor="eventCategorySelect" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-            Category
-          </label>
-          <div className="relative">
-            <select
-              id="eventCategorySelect"
-              value={formState.category}
-              onChange={e => setFormState(p => ({ ...p, category: e.target.value }))}
-              className="w-full pl-4 pr-10 py-3 rounded-xl text-[13.5px] outline-none cursor-pointer border appearance-none transition-all duration-200"
-              style={{
-                ...inputStyle,
-                borderColor: getFieldBorderColor(false, categoryFocused, dark, BRAND),
-                boxShadow: categoryFocused ? `0 0 0 3px ${BRAND}20` : 'none'
-              }}
-              onFocus={() => setCategoryFocused(true)}
-              onBlur={() => setCategoryFocused(false)}
-            >
-              {categories.filter(c => c !== 'All').map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-                <path d="M1 1.5L5 4.5L9 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          </div>
+          <CustomSelect
+            id="eventCategorySelect"
+            label="Category"
+            value={formState.category}
+            onChange={(e, val) => setFormState(p => ({ ...p, category: val }))}
+            options={categories.filter(c => c !== 'All').map(c => ({ value: c, label: c }))}
+            dark={dark}
+          />
         </div>
 
         <div>
@@ -131,62 +113,32 @@ function EventFormTypesAndOrganizer({
       {/* Grid: Event Type & Participation Type */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
-          <label htmlFor="eventTypeSelect" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-            Event Type (Online / Offline)
-          </label>
-          <div className="relative">
-            <select
-              id="eventTypeSelect"
-              value={formState.eventType || 'offline'}
-              onChange={e => setFormState(p => ({ ...p, eventType: e.target.value }))}
-              className="w-full pl-4 pr-10 py-3 rounded-xl text-[13.5px] outline-none cursor-pointer border appearance-none transition-all duration-200 font-semibold"
-              style={{
-                ...inputStyle,
-                borderColor: getFieldBorderColor(false, typeFocused, dark, BRAND),
-                boxShadow: typeFocused ? `0 0 0 3px ${BRAND}20` : 'none'
-              }}
-              onFocus={() => setTypeFocused(true)}
-              onBlur={() => setTypeFocused(false)}
-            >
-              <option value="offline">Offline</option>
-              <option value="online">Online</option>
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-                <path d="M1 1.5L5 4.5L9 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          </div>
+          <CustomSelect
+            id="eventTypeSelect"
+            label="Event Type (Online / Offline)"
+            value={formState.eventType || 'offline'}
+            onChange={(e, val) => setFormState(p => ({ ...p, eventType: val }))}
+            options={[
+              { value: 'offline', label: 'Offline' },
+              { value: 'online', label: 'Online' },
+            ]}
+            dark={dark}
+          />
         </div>
 
         <div>
-          <label htmlFor="eventParticipationTypeSelect" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-            Participation Type
-          </label>
-          <div className="relative">
-            <select
-              id="eventParticipationTypeSelect"
-              value={formState.participationType || 'individual'}
-              onChange={e => setFormState(p => ({ ...p, participationType: e.target.value }))}
-              className="w-full pl-4 pr-10 py-3 rounded-xl text-[13.5px] outline-none cursor-pointer border appearance-none transition-all duration-200 font-semibold"
-              style={{
-                ...inputStyle,
-                borderColor: getFieldBorderColor(false, participationFocused, dark, BRAND),
-                boxShadow: participationFocused ? `0 0 0 3px ${BRAND}20` : 'none'
-              }}
-              onFocus={() => setParticipationFocused(true)}
-              onBlur={() => setParticipationFocused(false)}
-            >
-              <option value="individual">Individual</option>
-              <option value="team">Team</option>
-              <option value="both">Both</option>
-            </select>
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-              <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-                <path d="M1 1.5L5 4.5L9 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </div>
-          </div>
+          <CustomSelect
+            id="eventParticipationTypeSelect"
+            label="Participation Type"
+            value={formState.participationType || 'individual'}
+            onChange={(e, val) => setFormState(p => ({ ...p, participationType: val }))}
+            options={[
+              { value: 'individual', label: 'Individual' },
+              { value: 'team', label: 'Team' },
+              { value: 'both', label: 'Both' },
+            ]}
+            dark={dark}
+          />
         </div>
       </div>
 
@@ -258,6 +210,10 @@ function EventFormSchedulingDates({
   const [regFocused, setRegFocused] = useState(false)
   const [deadlineFocused, setDeadlineFocused] = useState(false)
 
+  // Get current local datetime up to minutes (YYYY-MM-DDThh:mm)
+  const currentDateTimeLocal = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+
   return (
     <>
       {/* Grid: Start Date & End Date Pickers */}
@@ -269,6 +225,7 @@ function EventFormSchedulingDates({
           <input
             id="eventStartDateTimeInput"
             type="datetime-local"
+            min={currentDateTimeLocal}
             value={formState.startDateTime}
             onChange={e => setFormState(p => ({ ...p, startDateTime: e.target.value }))}
             className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none border transition-all duration-200 cursor-pointer"
@@ -291,6 +248,7 @@ function EventFormSchedulingDates({
           <input
             id="eventEndDateTimeInput"
             type="datetime-local"
+            min={currentDateTimeLocal}
             value={formState.endDateTime}
             onChange={e => setFormState(p => ({ ...p, endDateTime: e.target.value }))}
             className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none border transition-all duration-200 cursor-pointer"
@@ -316,6 +274,7 @@ function EventFormSchedulingDates({
           <input
             id="eventRegDateTimeInput"
             type="datetime-local"
+            min={currentDateTimeLocal}
             value={formState.regDateTime}
             onChange={e => setFormState(p => ({ ...p, regDateTime: e.target.value }))}
             className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none border transition-all duration-200 cursor-pointer"
@@ -338,6 +297,7 @@ function EventFormSchedulingDates({
           <input
             id="eventRegistrationDeadlineInput"
             type="datetime-local"
+            min={currentDateTimeLocal}
             value={formState.registrationDeadline}
             onChange={e => setFormState(p => ({ ...p, registrationDeadline: e.target.value }))}
             className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none border transition-all duration-200 cursor-pointer"
@@ -464,7 +424,7 @@ function EventFormModalFooter({
 }
 
 export default function EventFormModal({
-  dark,
+  dark: darkProp,
   tokens,
   open,
   onClose,
@@ -498,13 +458,17 @@ export default function EventFormModal({
 
   if (!open) return null
 
+  const isDark = darkProp !== undefined 
+    ? darkProp 
+    : (tokens?.dark ?? (typeof document !== 'undefined' && document.documentElement.classList.contains('dark')))
+
   const BRAND = tokens?.brand || DEFAULT_BRAND
   const isOrganizerRole = window.location.pathname.includes('/organizer') || (sessionStorage.getItem('cc_role') || '').toLowerCase().includes('organizer')
 
   const inputStyle = {
-    border: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`,
-    color: dark ? '#e8f0fe' : '#0f172a',
-    background: dark ? '#060e1c' : '#f8fafc',
+    border: `1px solid ${isDark ? '#1a3050' : '#e2e8f0'}`,
+    color: isDark ? '#e8f0fe' : '#0f172a',
+    background: isDark ? '#060e1c' : '#f8fafc',
   }
 
   let modalTitle = 'Create New Event'
@@ -532,23 +496,23 @@ export default function EventFormModal({
         <div
           className={`pointer-events-auto rounded-[24px] w-full max-w-[650px] overflow-hidden transition-all duration-300 ${isClosing ? 'animate-modal-out' : 'animate-modal-in'}`}
           style={{
-            background: dark ? '#0c1829' : '#ffffff',
-            border: `1px solid ${dark ? '#1a3050' : '#e8edf5'}`,
+            background: isDark ? '#0c1829' : '#ffffff',
+            border: `1px solid ${isDark ? '#1a3050' : '#e8edf5'}`,
             boxShadow: '0 32px 80px rgba(0,0,0,0.45)',
           }}
         >
           {/* Modal Header */}
-          <div className="flex items-center justify-between px-8 py-5" style={{ borderBottom: `1px solid ${dark ? '#1a3050' : '#e8edf5'}` }}>
-            <h2 className="text-[19px] font-extrabold m-0" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+          <div className="flex items-center justify-between px-8 py-5" style={{ borderBottom: `1px solid ${isDark ? '#1a3050' : '#e8edf5'}` }}>
+            <h2 className="text-[19px] font-extrabold m-0" style={{ color: isDark ? '#e8f0fe' : '#0f172a' }}>
               {modalTitle}
             </h2>
             <button
               type="button"
               onClick={handleClose}
               className="w-8 h-8 rounded-full border-none bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150 p-0"
-              style={{ color: dark ? '#4a6a8a' : '#94a3b8' }}
-              onMouseEnter={e => { e.currentTarget.style.background = dark ? '#162640' : '#f1f5f9'; e.currentTarget.style.color = dark ? '#e8f0fe' : '#475569' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = dark ? '#4a6a8a' : '#94a3b8' }}
+              style={{ color: isDark ? '#4a6a8a' : '#94a3b8' }}
+              onMouseEnter={e => { e.currentTarget.style.background = isDark ? '#162640' : '#f1f5f9'; e.currentTarget.style.color = isDark ? '#e8f0fe' : '#475569' }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? '#4a6a8a' : '#94a3b8' }}
             >
               <X size={18} />
             </button>
@@ -557,7 +521,7 @@ export default function EventFormModal({
           {/* Modal Body */}
           <div className="px-8 py-6 flex flex-col gap-5 max-h-[75vh] overflow-y-auto">
             <EventFormBasicInfo
-              dark={dark}
+              dark={isDark}
               BRAND={BRAND}
               inputStyle={inputStyle}
               formState={formState}
@@ -567,7 +531,7 @@ export default function EventFormModal({
             />
 
             <EventFormTypesAndOrganizer
-              dark={dark}
+              dark={isDark}
               BRAND={BRAND}
               inputStyle={inputStyle}
               formState={formState}
@@ -577,7 +541,7 @@ export default function EventFormModal({
             />
 
             <EventFormSchedulingDates
-              dark={dark}
+              dark={isDark}
               BRAND={BRAND}
               inputStyle={inputStyle}
               formState={formState}
@@ -586,7 +550,7 @@ export default function EventFormModal({
             />
 
             <EventFormSchedulingCapacity
-              dark={dark}
+              dark={isDark}
               BRAND={BRAND}
               inputStyle={inputStyle}
               formState={formState}
@@ -597,7 +561,7 @@ export default function EventFormModal({
 
           {/* Modal Footer */}
           <EventFormModalFooter
-            dark={dark}
+            dark={isDark}
             BRAND={BRAND}
             submitting={submitting}
             handleClose={handleClose}

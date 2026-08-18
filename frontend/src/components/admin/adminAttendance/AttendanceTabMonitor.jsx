@@ -1,5 +1,6 @@
 import React from 'react'
 import { Search, X, FileText, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import CustomSelect from '../../common/CustomSelect'
 
 function getHeaderColor(headerName, BRAND, dark) {
   if (headerName === 'Check-In' || headerName === 'Attendance ID') return BRAND
@@ -286,24 +287,22 @@ function TableFooter({
 
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-semibold text-slate-400 dark:text-slate-500">Per page:</span>
-          <select
-            value={itemsPerPage}
-            onChange={e => {
-              setItemsPerPage(Number(e.target.value))
-              setCurrentPage(1)
-            }}
-            className="px-2.5 py-1 rounded-lg text-[12px] font-bold outline-none cursor-pointer border"
-            style={{
-              background: dark ? '#060e1c' : '#ffffff',
-              borderColor: dark ? '#1a3050' : '#cbd5e1',
-              color: dark ? '#e8f0fe' : '#334155'
-            }}
-          >
-            <option value={5}>5</option>
-            <option value={10}>10</option>
-            <option value={20}>20</option>
-            <option value={50}>50</option>
-          </select>
+          <div className="w-[85px]">
+            <CustomSelect
+              value={itemsPerPage}
+              onChange={(e, val) => {
+                setItemsPerPage(Number(val))
+                setCurrentPage(1)
+              }}
+              options={[
+                { value: 5, label: '5' },
+                { value: 10, label: '10' },
+                { value: 20, label: '20' },
+                { value: 50, label: '50' },
+              ]}
+              dark={dark}
+            />
+          </div>
         </div>
       </div>
 

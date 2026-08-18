@@ -5,6 +5,7 @@ import eventsService from '../../services/eventsService'
 import studentsService from '../../services/studentsService'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import { useToast } from '../../context/ToastContext'
+import CustomSelect from '../../components/common/CustomSelect'
 
 // Sub-components
 import ResultStats from '../../components/admin/adminResult/ResultStats'
@@ -327,25 +328,16 @@ export default function ResultsPage({ tokens }) {
         <span className="text-[13px] font-bold shrink-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
           Select Event:
         </span>
-        <select
-          value={selectedEventId}
-          onChange={e => setSelectedEventId(e.target.value)}
-          disabled={eventsLoading}
-          className="flex-1 min-w-[220px] max-w-[420px] px-3 py-2 rounded-xl text-[13px] font-semibold outline-none cursor-pointer"
-          style={inputStyle}
-        >
-          {eventsLoading ? (
-            <option>Loading events…</option>
-          ) : events.length === 0 ? (
-            <option value="">No events found</option>
-          ) : (
-            events.map(ev => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name}
-              </option>
-            ))
-          )}
-        </select>
+        <div className="flex-1 min-w-[220px] max-w-[420px]">
+          <CustomSelect
+            value={selectedEventId}
+            onChange={(e, val) => setSelectedEventId(val)}
+            disabled={eventsLoading || events.length === 0}
+            placeholder={eventsLoading ? 'Loading events…' : (events.length === 0 ? 'No events found' : 'Select an event')}
+            options={events.map(ev => ({ value: ev.id, label: ev.name }))}
+            dark={dark}
+          />
+        </div>
         {selectedEventObj && (
           <span
             className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider"

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { User, Mail, Phone, GraduationCap, Lock, Eye, EyeOff } from 'lucide-react'
 import { useToast } from '../context/ToastContext'
 import authService from '../services/authService'
+import CustomSelect from '../components/common/CustomSelect'
 
 export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOnlyEmail }) {
   const [name, setName] = useState('')
@@ -407,89 +408,68 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Course */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">
-              Course Name
-            </label>
-            <div className="relative">
-              <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <select
-                value={course}
-                onChange={e => setCourse(e.target.value)}
-                required
-                className="w-full pl-10 pr-8 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
-              >
-                <option value="" disabled>Select Course</option>
-                <option value="B.TECH">B.TECH</option>
-                <option value="M.TECH">M.TECH</option>
-                <option value="BCA">BCA</option>
-                <option value="MCA">MCA</option>
-                <option value="B.SC">B.SC</option>
-                <option value="M.SC">M.SC</option>
-                <option value="BBA">BBA</option>
-                <option value="MBA">MBA</option>
-                <option value="PH.D">PH.D</option>
-              </select>
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
-            </div>
+            <CustomSelect
+              label="Course Name"
+              value={course}
+              onChange={e => setCourse(e.target.value)}
+              placeholder="Select Course"
+              icon={GraduationCap}
+              options={[
+                { value: 'B.TECH', label: 'B.TECH' },
+                { value: 'M.TECH', label: 'M.TECH' },
+                { value: 'BCA', label: 'BCA' },
+                { value: 'MCA', label: 'MCA' },
+                { value: 'B.SC', label: 'B.SC' },
+                { value: 'M.SC', label: 'M.SC' },
+                { value: 'BBA', label: 'BBA' },
+                { value: 'MBA', label: 'MBA' },
+                { value: 'PH.D', label: 'PH.D' },
+              ]}
+              dark={false}
+            />
           </div>
 
           {/* Department */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">
-              Department
-            </label>
-            <div className="relative">
-              <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <select
-                value={department}
-                onChange={e => setDepartment(e.target.value)}
-                required
-                className="w-full pl-10 pr-8 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
-              >
-                <option value="" disabled>Select Department</option>
-                <option value="CSE">CSE</option>
-                <option value="ECE">ECE</option>
-                <option value="IT">IT</option>
-                <option value="ME">ME</option>
-                <option value="CE">CE</option>
-                <option value="EE">EE</option>
-                <option value="AIDS">AIDS</option>
-                <option value="MCA">MCA</option>
-                <option value="MBA">MBA</option>
-                <option value="SCIENCE">SCIENCE</option>
-              </select>
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
-            </div>
+            <CustomSelect
+              label="Department"
+              value={department}
+              onChange={e => setDepartment(e.target.value)}
+              placeholder="Select Department"
+              icon={GraduationCap}
+              options={[
+                { value: 'CSE', label: 'CSE' },
+                { value: 'ECE', label: 'ECE' },
+                { value: 'IT', label: 'IT' },
+                { value: 'ME', label: 'ME' },
+                { value: 'CE', label: 'CE' },
+                { value: 'EE', label: 'EE' },
+                { value: 'AIDS', label: 'AIDS' },
+                { value: 'MCA', label: 'MCA' },
+                { value: 'MBA', label: 'MBA' },
+                { value: 'SCIENCE', label: 'SCIENCE' },
+              ]}
+              dark={false}
+            />
           </div>
         </div>
-
-
 
         {/* Gender & Year of Study */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Gender */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">
-              Gender
-            </label>
-            <div className="relative">
-              <select
-                value={gender}
-                onChange={e => setGender(e.target.value)}
-                required
-                className={`w-full px-3.5 py-2 rounded-lg border text-sm text-slate-700 bg-white placeholder-slate-400
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer ${errors.gender ? 'border-red-500 bg-red-50/50' : 'border-slate-200'
-                  }`}
-              >
-                <option value="" disabled>Select Gender</option>
-                <option value="male">Male</option>
-                <option value="female">Female</option>
-                <option value="other">Other</option>
-              </select>
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
-            </div>
+            <CustomSelect
+              label="Gender"
+              value={gender}
+              onChange={e => setGender(e.target.value)}
+              placeholder="Select Gender"
+              options={[
+                { value: 'male', label: 'Male' },
+                { value: 'female', label: 'Female' },
+                { value: 'other', label: 'Other' },
+              ]}
+              dark={false}
+            />
             {errors.gender && (
               <p className="text-[11px] text-red-500 mt-1 font-semibold">{errors.gender}</p>
             )}
@@ -497,26 +477,15 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
 
           {/* Year of Study */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 mb-1 block">
-              Year of Study
-            </label>
-            <div className="relative">
-              <select
-                value={yearOfStudy}
-                onChange={e => setYearOfStudy(Number(e.target.value))}
-                required
-                className="w-full px-3.5 py-2 rounded-lg border border-slate-200 text-sm text-slate-700 bg-white
-                focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition appearance-none cursor-pointer"
-              >
-                {[1, 2, 3, 4, 5, 6].map(y => (
-                  <option key={y} value={y}>Year {y}</option>
-                ))}
-              </select>
-              <span className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">▼</span>
-            </div>
+            <CustomSelect
+              label="Year of Study"
+              value={yearOfStudy}
+              onChange={e => setYearOfStudy(Number(e.target.value))}
+              placeholder="Select Year"
+              options={[1, 2, 3, 4, 5, 6].map(y => ({ value: y, label: `Year ${y}` }))}
+              dark={false}
+            />
           </div>
-
-
         </div>
 
         {/* Password */}

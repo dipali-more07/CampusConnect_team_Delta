@@ -142,7 +142,7 @@ export default function EventsPage({ tokens: inputTokens }) {
     const dl = ev.registration_deadline || ev.registrationDeadline || ev.deadline || ev.registration_end
     if (dl) {
       const d = new Date(dl)
-      if (!isNaN(d.getTime())) return d
+      if (!Number.isNaN(d.getTime())) return d
     }
     return getEventStartDate(ev)
   }
@@ -151,7 +151,7 @@ export default function EventsPage({ tokens: inputTokens }) {
     const end = ev.end_datetime || ev.endDateTime
     if (end) {
       const d = new Date(end)
-      if (!isNaN(d.getTime())) return d
+      if (!Number.isNaN(d.getTime())) return d
     }
     const start = getEventStartDate(ev)
     if (start) {
@@ -161,7 +161,7 @@ export default function EventsPage({ tokens: inputTokens }) {
   }
 
   const formatSingleTime = (dateObj) => {
-    if (!dateObj || isNaN(dateObj.getTime())) return null
+    if (!dateObj || Number.isNaN(dateObj.getTime())) return null
     return dateObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
   }
 
@@ -396,7 +396,8 @@ export default function EventsPage({ tokens: inputTokens }) {
 
   const filtered = eventsList.filter(e => {
     if (filter === 'Registered') return e.registered
-    if (filter === 'Upcoming') return !e.registered
+    if (filter === 'Upcoming') return !e.registered && !isEventFinished(e)
+    if (filter === 'Completed') return isEventFinished(e)
     return true
   })
 
@@ -419,12 +420,13 @@ export default function EventsPage({ tokens: inputTokens }) {
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex items-center gap-2 p-1 rounded-xl border" style={{ background: tokens.dark ? '#162640' : '#f1f5f9', borderColor: tokens.border }}>
-          {['All', 'Registered', 'Upcoming'].map(tab => (
+        <div className="flex flex-wrap items-center gap-2 p-1 rounded-xl border w-full sm:w-auto" style={{ background: tokens.dark ? '#162640' : '#f1f5f9', borderColor: tokens.border }}>
+          {['All', 'Registered', 'Upcoming', 'Completed'].map(tab => (
             <button
+              type='button'
               key={tab}
               onClick={() => setFilter(tab)}
-              className="px-3.5 py-1.5 rounded-lg text-xs font-bold border-none cursor-pointer transition-all"
+              className="flex-1 sm:flex-none px-3.5 py-1.5 rounded-lg text-xs font-bold border-none cursor-pointer transition-all whitespace-nowrap"
               style={{ background: filter === tab ? BRAND : 'transparent', color: filter === tab ? '#fff' : tokens.txtSec }}
             >
               {tab}

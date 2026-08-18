@@ -9,6 +9,7 @@ import studentsService from '../../services/studentsService'
 import { ATTENDANCE_EVENTS } from '../../data/attendanceData'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import { useToast } from '../../context/ToastContext'
+import CustomSelect from '../../components/common/CustomSelect'
 
 // Sub-components
 import AttendanceStats from '../../components/admin/adminAttendance/AttendanceStats'
@@ -412,23 +413,18 @@ export default function AttendancePage({ tokens }) {
         {/* Global Event Select Dropdown */}
         <div className="flex items-center gap-2">
           <span className="text-[12px] font-bold uppercase tracking-wider" style={label}>Active Event:</span>
-          <select
-            value={selectedEvent}
-            onChange={e => {
-              setSelectedEvent(e.target.value)
-              setQrGenerated(false)
-            }}
-            className="px-4 py-2.5 rounded-xl text-[13px] outline-none cursor-pointer border font-bold transition-all hover:opacity-90"
-            style={{ ...inp, minWidth: '220px' }}
-          >
-            {eventsList.length === 0 ? (
-              <option value="">No Active Events</option>
-            ) : (
-              (eventsList || []).map(ev => (
-                <option key={ev.id} value={ev.id}>{ev.name}</option>
-              ))
-            )}
-          </select>
+          <div className="min-w-[220px]">
+            <CustomSelect
+              value={selectedEvent}
+              onChange={(e, val) => {
+                setSelectedEvent(val)
+                setQrGenerated(false)
+              }}
+              placeholder={eventsList.length === 0 ? 'No Active Events' : 'Select Event'}
+              options={(eventsList || []).map(ev => ({ value: ev.id, label: ev.name }))}
+              dark={dark}
+            />
+          </div>
         </div>
       </div>
 

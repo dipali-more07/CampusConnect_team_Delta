@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Award, ShieldCheck, Palette, Zap, Loader2
 } from 'lucide-react'
@@ -7,6 +7,7 @@ import certificatesService from '../../services/certificatesService'
 import registrationsService from '../../services/registrationsService'
 import eventsService from '../../services/eventsService'
 import studentsService from '../../services/studentsService'
+import resultsService from '../../services/resultsService'
 import { useToast } from '../../context/ToastContext'
 
 // Sub-components
@@ -27,8 +28,11 @@ export default function CertificatesPage({ tokens }) {
   const [allEvents, setAllEvents] = useState([])
   const [registrations, setRegistrations] = useState([])
   const [students, setStudents] = useState([])
+  const [eventResults, setEventResults] = useState([])
+  const [optimisticGenerated, setOptimisticGenerated] = useState(new Set())
   const [regsLoaded, setRegsLoaded] = useState(false)
   const [regsLoading, setRegsLoading] = useState(false)
+  const initialLoadDone = useRef(false)
 
   const [stats, setStats] = useState({ total: 0, pending: 0, generatedSent: 0 })
   const [loading, setLoading] = useState(true)
@@ -94,7 +98,17 @@ export default function CertificatesPage({ tokens }) {
       setStats({ total, pending, generatedSent })
     }
     if (eventRes.success) {
-      setAllEvents(eventRes.events || [])
+      const evs = eventRes.events || []
+      setAllEvents(evs)
+      if (!initialLoadDone.current && evs.length > 0) {
+        const sorted = [...evs].sort((a, b) => {
+          const dA = new Date(a.date || a.start_time || a.created_at || 0)
+          const dB = new Date(b.date || b.start_time || b.created_at || 0)
+          return dB - dA
+        })
+        setActiveEvent(sorted[0].name)
+        initialLoadDone.current = true
+      }
     }
     if (tmplRes?.success && tmplRes.templates?.length > 0) {
       const activeTmpl = tmplRes.templates.find(t => t.is_active) || tmplRes.templates[0]
@@ -134,12 +148,14 @@ export default function CertificatesPage({ tokens }) {
       const selectedEv = allEvents.find(e => e.name === activeEvent)
       const selectedEvId = selectedEv?.id || selectedEv?.event_id
       if (selectedEvId) {
-        const [regRes, stuRes] = await Promise.all([
+        const [regRes, stuRes, resRes] = await Promise.all([
           eventsService.fetchRegistrations(selectedEvId),
-          studentsService.fetchAll()
+          studentsService.fetchAll(),
+          resultsService.fetchByEventId(selectedEvId)
         ])
         if (regRes.success) setRegistrations(regRes.registrations || [])
         if (stuRes.success) setStudents(stuRes.students || [])
+        if (resRes?.success) setEventResults(resRes.results || resRes.data || [])
       }
       setRegsLoading(false)
     }
@@ -153,10 +169,16 @@ export default function CertificatesPage({ tokens }) {
   let displayList = []
 
   if (activeEvent === 'All') {
-    displayList = [...certs]
+    displayList = certs.map(c => {
+      const ev = allEvents.find(e => String(e.id || e.event_id) === String(c.eventId || c.event_id))
+      return { ...c, organizerName: ev?.organizer || 'Event Organizer', venue: ev?.venue, eventDate: ev?.date }
+    })
   } else {
     const selectedEv = allEvents.find(e => e.name === activeEvent)
     const selectedEvId = selectedEv?.id || selectedEv?.event_id
+    const orgName = selectedEv?.organizer || 'Event Organizer'
+    const venueName = selectedEv?.venue || 'Event Venue'
+    const eventDate = selectedEv?.date || ''
 
     registrations.forEach(reg => {
       const regEventId = reg.eventId || reg.event_id || selectedEvId
@@ -178,6 +200,21 @@ export default function CertificatesPage({ tokens }) {
         return matchEvent && matchUser
       })
 
+      const matchedResult = eventResults.find(r => 
+        (r.participantId && String(r.participantId) === String(resolvedUserId)) ||
+        (r.user_id && String(r.user_id) === String(resolvedUserId)) ||
+        (r.roll_no && String(r.roll_no) === String(regRollNo)) ||
+        (r.rollNo && String(r.rollNo) === String(regRollNo))
+      )
+      
+      let computedPosition = 'Participation'
+      if (matchedResult) {
+        if (matchedResult.rank === 1 || matchedResult.resultTitle?.includes('1st')) computedPosition = 'Winner (1st Place)'
+        else if (matchedResult.rank === 2 || matchedResult.resultTitle?.includes('2nd')) computedPosition = 'Runner Up (2nd Place)'
+        else if (matchedResult.rank === 3 || matchedResult.resultTitle?.includes('3rd')) computedPosition = 'Runner Up (3rd Place)'
+        else computedPosition = matchedResult.resultTitle || 'Participation'
+      }
+
       if (matchingCert) {
         displayList.push({
           ...matchingCert,
@@ -185,12 +222,19 @@ export default function CertificatesPage({ tokens }) {
           rollNo: regRollNo || matchingCert.rollNo,
           eventId: regEventId,
           eventName: activeEvent,
-          userId: regUserId
+          userId: regUserId,
+          organizerName: orgName,
+          venue: venueName,
+          eventDate: eventDate,
+          position: matchingCert.position || computedPosition
         })
       } else {
         const dept = reg.department || student?.department || 'N/A'
         const yr = reg.course || reg.year || student?.year || 'N/A'
         const email = reg.email || student?.email || ''
+
+        const optKey = `${regEventId}-${regUserId}`
+        const isGen = optimisticGenerated.has(optKey)
 
         displayList.push({
           id: `VIRT-${reg.id || reg.registration_id || Math.random()}`,
@@ -200,11 +244,15 @@ export default function CertificatesPage({ tokens }) {
           year: yr,
           eventId: regEventId,
           eventName: activeEvent,
-          issuedDate: 'N/A',
+          issuedDate: isGen ? new Date().toISOString().split('T')[0] : 'N/A',
           verifyCode: 'N/A',
-          status: 'Pending',
+          status: isGen ? 'Generated' : 'Pending',
           email: email,
-          userId: regUserId
+          userId: regUserId,
+          organizerName: orgName,
+          venue: venueName,
+          eventDate: eventDate,
+          position: computedPosition
         })
       }
     })
@@ -264,7 +312,13 @@ export default function CertificatesPage({ tokens }) {
         return {
           id: cert.id,
           eventId: cert.eventId || cert.event_id,
-          userId: cert.userId || cert.user_id || cert.rollNo || cert.id
+          userId: cert.userId || cert.user_id || cert.rollNo || cert.id,
+          studentName: cert.studentName,
+          rollNo: cert.rollNo,
+          eventName: cert.eventName,
+          position: cert.position,
+          venue: cert.venue,
+          organizerName: cert.organizerName
         }
       })
     } else {
@@ -272,21 +326,29 @@ export default function CertificatesPage({ tokens }) {
       listToGen = [{
         id: target.id,
         eventId: target.eventId || target.event_id,
-        userId: target.userId || target.user_id || target.rollNo || target.id
+        userId: target.userId || target.user_id || target.rollNo || target.id,
+        studentName: target.studentName,
+        rollNo: target.rollNo,
+        eventName: target.eventName,
+        position: target.position,
+        venue: target.venue,
+        organizerName: target.organizerName
       }]
     }
 
     if (listToGen.length === 0) return
 
-    let res
-    if (listToGen.length === 1) {
-      res = await certificatesService.generate(listToGen[0].eventId, listToGen[0].userId)
-    } else {
-      res = await certificatesService.generate(listToGen)
-    }
+    let res = await certificatesService.generate(listToGen)
 
     if (res.success) {
       showToast(res.message || 'Certificate(s) generated successfully.', 'success')
+      
+      setOptimisticGenerated(prev => {
+        const next = new Set(prev)
+        listToGen.forEach(item => next.add(`${item.eventId}-${item.userId}`))
+        return next
+      })
+
       setSelected([])
       setRefreshTrigger(prev => prev + 1)
       load()
@@ -359,15 +421,7 @@ export default function CertificatesPage({ tokens }) {
           >
             <ShieldCheck size={14} /> Verify
           </button>
-          <button
-            onClick={() => setDesignerOpen(true)}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-transparent transition-all duration-200"
-            style={{ border: `1px solid ${tokens.border}`, color: tokens.txtSec }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#a855f7'; e.currentTarget.style.color = '#a855f7' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = tokens.border; e.currentTarget.style.color = tokens.txtSec }}
-          >
-            <Palette size={14} /> Design Template
-          </button>
+
           <button
             onClick={() => setBulkGenerateOpen(true)}
             disabled={bulkLoading}
@@ -440,6 +494,7 @@ export default function CertificatesPage({ tokens }) {
         BRAND={BRAND}
         showToast={showToast}
         tmpl={tmpl}
+        allEvents={allEvents}
       />
 
       {/* ── Verify Modal ── */}

@@ -3,6 +3,7 @@ import { X, User, Building2, BookOpen, Mail, Phone, Calendar, Star, Info } from 
 import { useTheme } from '../../context/ThemeContext'
 import { useToast } from '../../context/ToastContext'
 import studentService from '../../services/studentService'
+import CustomSelect from '../common/CustomSelect'
 
 export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdated }) {
   const { dark, accentColor } = useTheme()
@@ -211,24 +212,19 @@ export default function EditProfileModal({ isOpen, onClose, user, onProfileUpdat
               </div>
 
               {/* Gender */}
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="edit-profile-gender" className="text-xs font-bold text-slate-700 dark:text-slate-300">Gender</label>
-                <div className="relative">
-                  <Star size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <select
-                    id="edit-profile-gender"
-                    name="gender"
-                    value={formData.gender}
-                    onChange={handleChange}
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-50 dark:bg-[#111f36] border border-slate-200 dark:border-[#1d304d] text-slate-900 dark:text-white outline-none focus:border-indigo-500 transition-colors appearance-none"
-                    style={{ backgroundPosition: 'calc(100% - 14px) 50%' }}
-                  >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
+              <div>
+                <CustomSelect
+                  label="Gender"
+                  name="gender"
+                  value={formData.gender}
+                  onChange={handleChange}
+                  options={[
+                    { value: 'male', label: 'Male' },
+                    { value: 'female', label: 'Female' },
+                    { value: 'other', label: 'Other' },
+                  ]}
+                  dark={dark}
+                />
               </div>
 
               {/* Department */}

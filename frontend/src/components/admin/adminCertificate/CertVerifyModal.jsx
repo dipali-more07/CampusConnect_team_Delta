@@ -121,7 +121,6 @@ export default function CertVerifyModal({
                       ['Roll No', verifyResult.certificate.rollNo || verifyResult.certificate.roll_no || verifyResult.certificate.username || ''],
                       ['Event', verifyResult.certificate.eventName || verifyResult.certificate.event_name || verifyResult.certificate.event?.name || ''],
                       ['Issued', verifyResult.certificate.issuedDate || verifyResult.certificate.issued_date || verifyResult.certificate.created_at || verifyResult.certificate.createdAt || ''],
-                      ['Status', verifyResult.certificate.status || ''],
                     ].map(([k, v]) => (
                       <div key={k} className="flex justify-between text-[12px]">
                         <span style={{ color: tokens.txtSec }}>{k}</span>

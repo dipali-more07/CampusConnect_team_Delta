@@ -53,25 +53,67 @@ async function mockGenerate(eventIdOrList, userId) {
   const certs = getMockCerts()
   
   if (Array.isArray(eventIdOrList)) {
+    let anyAdded = false
     const idsToGen = new Set(eventIdOrList.map(item => item.id))
     const updated = certs.map(c =>
       idsToGen.has(c.id) && c.status === 'Pending'
         ? { ...c, status: 'Generated', issuedDate: new Date().toISOString().split('T')[0] }
         : c
     )
+    eventIdOrList.forEach(item => {
+      if (!updated.find(c => c.id === item.id)) {
+        updated.push({
+          id: item.id,
+          eventId: item.eventId,
+          userId: item.userId,
+          studentName: item.studentName || 'Student',
+          rollNo: item.rollNo || item.userId || 'N/A',
+          eventName: item.eventName || 'Event',
+          position: item.position || '',
+          venue: item.venue || '',
+          organizerName: item.organizerName || '',
+          status: 'Generated',
+          issuedDate: new Date().toISOString().split('T')[0],
+          verifyCode: Math.random().toString(36).substring(2, 10).toUpperCase()
+        })
+      }
+    })
     saveMockCerts(updated)
     return { success: true, message: `${eventIdOrList.length} certificate(s) generated.` }
   }
 
   // Single
+  let found = false
   const updated = certs.map(c => {
     const matchEvent = c.eventId === eventIdOrList || !eventIdOrList
     const matchUser = c.id === userId || c.rollNo === userId || c.studentName === userId || !userId
     if (matchEvent && matchUser && c.status === 'Pending') {
+      found = true
       return { ...c, status: 'Generated', issuedDate: new Date().toISOString().split('T')[0] }
     }
     return c
   })
+  
+  if (!found && userId) {
+    // For single virtual generate, since we don't have full object, just append a basic one.
+    // Ideally the frontend passes full object in array mode. 
+    // Wait, the single generate passes (eventId, userId). 
+    updated.push({
+      id: `VIRT-${Math.random()}`,
+      eventId: eventIdOrList,
+      userId: userId,
+      studentName: 'Student',
+      rollNo: userId || 'N/A',
+      eventName: 'Event',
+      position: '',
+      venue: '',
+      organizerName: '',
+      status: 'Generated',
+      issuedDate: new Date().toISOString().split('T')[0],
+      verifyCode: Math.random().toString(36).substring(2, 10).toUpperCase()
+    })
+  }
+
   saveMockCerts(updated)
   return { success: true, message: `Certificate generated successfully.` }
 }

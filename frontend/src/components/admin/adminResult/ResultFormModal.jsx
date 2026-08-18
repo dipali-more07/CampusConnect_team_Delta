@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Trophy, X, Loader2, Users, User } from 'lucide-react'
 import eventsService from '../../../services/eventsService'
 import studentsService from '../../../services/studentsService'
+import CustomSelect from '../../common/CustomSelect'
 
 const getToggleBg = (active, dark, BRAND) => {
   if (active) return BRAND
@@ -38,21 +39,17 @@ function SoloSelection({ regsLoading, hasSoloRegistrations, soloRegistrations, p
 
   if (hasSoloRegistrations) {
     return (
-      <select
+      <CustomSelect
         id="resultParticipantSelect"
         value={participantId}
-        onChange={e => setParticipantId(e.target.value)}
-        className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none font-semibold cursor-pointer"
-        style={inputStyle}
-        required
-      >
-        <option value="">— Select registered participant —</option>
-        {soloRegistrations.map(r => (
-          <option key={r.id || r.user_id} value={getParticipantId(r)}>
-            {getParticipantLabel(r)}
-          </option>
-        ))}
-      </select>
+        onChange={(e, val) => setParticipantId(val)}
+        placeholder="— Select registered participant —"
+        options={soloRegistrations.map(r => ({
+          value: getParticipantId(r),
+          label: getParticipantLabel(r)
+        }))}
+        dark={dark}
+      />
     )
   }
 
@@ -86,21 +83,17 @@ function TeamSelection({ regsLoading, hasTeams, uniqueTeams, teamId, setTeamId, 
 
   if (hasTeams) {
     return (
-      <select
+      <CustomSelect
         id="resultTeamSelect"
         value={teamId}
-        onChange={e => setTeamId(e.target.value)}
-        className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none font-semibold cursor-pointer"
-        style={inputStyle}
-        required
-      >
-        <option value="">— Select registered team —</option>
-        {uniqueTeams.map(t => (
-          <option key={t.teamId} value={t.teamId}>
-            {t.teamName} ({t.teamId})
-          </option>
-        ))}
-      </select>
+        onChange={(e, val) => setTeamId(val)}
+        placeholder="— Select registered team —"
+        options={uniqueTeams.map(t => ({
+          value: t.teamId,
+          label: `${t.teamName} (${t.teamId})`
+        }))}
+        dark={dark}
+      />
     )
   }
 
@@ -278,28 +271,19 @@ export default function ResultFormModal({
 
             {/* Select Event */}
             <div>
-              <label htmlFor="resultEventSelect" className="text-[11.5px] font-bold uppercase block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                Select Event
-              </label>
-              <select
+              <CustomSelect
                 id="resultEventSelect"
+                label="Select Event"
                 value={localEventId}
-                onChange={e => {
-                  setLocalEventId(e.target.value)
+                onChange={(e, val) => {
+                  setLocalEventId(val)
                   setParticipantId('')
                   setTeamId('')
                 }}
-                className="w-full px-3 py-2.5 rounded-xl text-[13px] outline-none font-semibold cursor-pointer"
-                style={inputStyle}
-                required
-              >
-                <option value="">— Select Event —</option>
-                {events.map(ev => (
-                  <option key={ev.id} value={ev.id}>
-                    {ev.name}
-                  </option>
-                ))}
-              </select>
+                placeholder="— Select Event —"
+                options={events.map(ev => ({ value: ev.id, label: ev.name }))}
+                dark={dark}
+              />
             </div>
 
             {/* Solo / Team toggle */}

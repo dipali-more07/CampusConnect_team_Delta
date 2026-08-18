@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react'
-import { Trophy, Award, Search, CalendarDays, User, Users, Star, Medal, Sparkles } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Trophy, Award, Search, CalendarDays, User, Users, Star, Medal, Sparkles, ChevronDown, Check } from 'lucide-react'
 import resultsService from '../../services/resultsService'
 import eventsService from '../../services/eventsService'
 import studentsService from '../../services/studentsService'
+import CustomSelect from '../../components/common/CustomSelect'
 
 export default function ResultsPage({ tokens, user }) {
   const { dark } = tokens
@@ -20,6 +21,26 @@ export default function ResultsPage({ tokens, user }) {
   
   // Tabs: 'All' (Leaderboard), 'My' (My Placements only)
   const [viewTab, setViewTab] = useState('All') 
+
+  // Custom in-page dropdown state
+  const [isEventDropdownOpen, setIsEventDropdownOpen] = useState(false)
+  const dropdownRef = useRef(null)
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsEventDropdownOpen(false)
+      }
+    }
+    if (isEventDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('touchstart', handleClickOutside)
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [isEventDropdownOpen])
 
   // Load events and students list on mount
   useEffect(() => {
@@ -212,34 +233,28 @@ export default function ResultsPage({ tokens, user }) {
         </p>
       </div>
 
-      {/* ── EVENT SELECTOR ── */}
+      {/* ── EVENT SELECTOR (CUSTOM IN-PAGE DROPDOWN) ── */}
       <div
-        className="rounded-2xl p-5 mb-6 flex flex-wrap items-center gap-4"
+        className="rounded-2xl p-4 sm:p-5 mb-6 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 relative"
         style={cardStyle}
       >
-        <CalendarDays size={18} style={{ color: BRAND }} className="shrink-0" />
-        <span className="text-[13.5px] font-bold shrink-0" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-          Select Event to View Standings:
-        </span>
-        <select
-          value={selectedEventId}
-          onChange={e => setSelectedEventId(e.target.value)}
-          disabled={eventsLoading}
-          className="flex-1 min-w-[240px] max-w-[480px] px-3.5 py-2.5 rounded-xl text-[13.5px] font-semibold outline-none cursor-pointer"
-          style={inputStyle}
-        >
-          {eventsLoading ? (
-            <option>Loading events…</option>
-          ) : events.length === 0 ? (
-            <option value="">No events found</option>
-          ) : (
-            events.map(ev => (
-              <option key={ev.id} value={ev.id}>
-                {ev.name}
-              </option>
-            ))
-          )}
-        </select>
+        <div className="flex items-center gap-2 shrink-0">
+          <CalendarDays size={18} style={{ color: BRAND }} className="shrink-0" />
+          <span className="text-[13.5px] font-bold" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+            Select Event to View Standings:
+          </span>
+        </div>
+
+        <div className="flex-1 min-w-[240px] max-w-full sm:max-w-[480px]">
+          <CustomSelect
+            value={selectedEventId}
+            onChange={(e, val) => setSelectedEventId(val)}
+            disabled={eventsLoading || events.length === 0}
+            placeholder={eventsLoading ? 'Loading events…' : (events.length === 0 ? 'No events found' : 'Select an event')}
+            options={events.map(ev => ({ value: ev.id, label: ev.name }))}
+            dark={dark}
+          />
+        </div>
       </div>
 
       {/* ── FILTERS & TABS ROW ── */}

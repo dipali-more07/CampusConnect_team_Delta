@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { 
-  ChevronLeft, Search, ChevronRight, Clock, MapPin, Users, Loader2, XCircle, Award
+import {
+  ChevronLeft, Search, ChevronRight, Clock, MapPin, Users, Loader2, XCircle, Award, Check
 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 import eventsService from '../../../services/eventsService'
@@ -9,7 +9,7 @@ import analyticsService from '../../../services/analyticsService'
 import studentService from '../../../services/studentService'
 import certificatesService from '../../../services/certificatesService'
 
-export default function EventDetailView({ event, onBack, onEdit, tokens, showToast }) {
+export default function EventDetailView({ event, onBack, tokens, showToast }) {
   const { dark } = tokens
   const BRAND = tokens?.brand || DEFAULT_BRAND
   const [activeTab, setActiveTab] = useState('Overview')
@@ -70,7 +70,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
       const hours = Math.floor(diffMs / (1000 * 60 * 60))
       const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60))
       const seconds = Math.floor((diffMs % (1000 * 60)) / 1000)
-      
+
       setCountdownText(`${hours}h ${minutes}m ${seconds}s`)
     }
 
@@ -184,7 +184,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
           return r
         })
       )
-      
+
       let change = 0
       const oldReg = registrations.find(r => (r.id === regId) || (r.registration_id === regId))
       const oldStatus = oldReg?.registration_status || oldReg?.status
@@ -197,7 +197,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
       showToast(res.message || 'Failed to update registration status.', 'error')
     }
   }
-  
+
   // Custom status badge style
   const getStatusStyle = (status) => {
     switch (status) {
@@ -256,12 +256,12 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   // Filtered & Paginated Registrations
   const filteredRegs = registrations.map(r => {
     const student = students.find(s => s.id === r.userId || s.id === r.user_id || (r.user_email && s.email && r.user_email.toLowerCase() === s.email.toLowerCase()))
-    
+
     // Check payment status for paid events
     const pStatus = String(r.payment_status || r.paymentStatus || r.payment_state || '').trim().toLowerCase()
     const isPaidEvent = Number(event.fees || event.registration_fee || event.price || 0) > 0
     const isPaymentPending = isPaidEvent && (pStatus.includes('pend') || pStatus.includes('unpaid') || pStatus.includes('due') || pStatus === '' || pStatus === 'null')
-    
+
     let displayStatus = r.registrationStatus || r.registration_status || r.status || 'Pending'
     if (isPaymentPending) {
       displayStatus = 'Payment Pending'
@@ -301,15 +301,17 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
   // Filtered & Paginated Attendance
   const filteredAtt = attendance.map(a => {
     const reg = registrations.find(r => (r.id === a.registrationId) || (r.registration_id === a.registrationId))
-    const student = reg ? students.find(s => s.id === reg.userId || s.id === reg.user_id) : null
+    const student = students.find(s => s.id === (reg?.userId || reg?.user_id) || s.id === a.scannedBy) || null
+
+    let finalName = student?.name || student?.full_name || reg?.studentName || reg?.student_name || reg?.full_name || a.studentName || 'Student'
+    // If name is just an 8 char hex snippet (from fallback slice) and we found no name, keep it, but we prioritize the joined data.
+    
+    let finalRollNo = student?.rollNo || student?.roll_no || reg?.rollNo || reg?.roll_no || a.rollNo || 'N/A'
+
     return {
       ...a,
-      studentName: a.studentName && a.studentName !== 'Student' && a.studentName.length < 20
-        ? a.studentName
-        : (student?.name || reg?.studentName || reg?.student_name || reg?.full_name || a.studentName),
-      rollNo: a.rollNo && a.rollNo !== 'N/A'
-        ? a.rollNo
-        : (student?.rollNo || reg?.rollNo || reg?.roll_no || a.rollNo)
+      studentName: finalName,
+      rollNo: finalRollNo
     }
   }).filter(a => {
     const q = attSearch.toLowerCase().trim()
@@ -335,18 +337,19 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
   return (
     <div className="animate-fadeIn m-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
-      
+
       {/* ── TOP HEADER ROW ── */}
       <div className="flex items-center justify-between flex-wrap gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <button 
+          <button
+            type='button'
             onClick={() => {
               localStorage.removeItem('cc_event_detail_active_tab')
               onBack()
             }}
             className="w-9 h-9 rounded-xl border flex items-center justify-center cursor-pointer transition-all duration-200"
-            style={{ 
-              borderColor: dark ? '#1a3050' : '#e2e8f0', 
+            style={{
+              borderColor: dark ? '#1a3050' : '#e2e8f0',
               background: dark ? '#0f1e30' : '#ffffff',
               color: dark ? '#7a98bb' : '#64748b'
             }}
@@ -355,33 +358,32 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
           >
             <ChevronLeft size={18} />
           </button>
-          
+
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-[22px] font-extrabold m-0 leading-tight">
                 {event.name}
               </h1>
-              <span 
+              <span
                 className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider"
                 style={{ background: badge.bg, color: badge.text }}
               >
                 {event.status}
               </span>
-              <span 
+              <span
                 className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider"
-                style={{ 
-                  background: dark ? `${BRAND}25` : `${BRAND}15`, 
-                  color: BRAND 
+                style={{
+                  background: dark ? `${BRAND}25` : `${BRAND}15`,
+                  color: BRAND
                 }}
               >
                 {event.eventType || 'Individual'} Event
               </span>
-              <span 
-                className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
-                  (event.approvalStatus || 'Approved') === 'Approved'
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${(event.approvalStatus || 'Approved') === 'Approved'
                     ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
                     : 'bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400'
-                }`}
+                  }`}
               >
                 Admin {(event.approvalStatus || 'Approved')}
               </span>
@@ -396,11 +398,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
       </div>
 
       {/* ── BANNER CARD ── */}
-      <div 
+      <div
         className="rounded-[24px] p-8 md:p-10 mb-6 relative overflow-hidden flex flex-col justify-end min-h-[160px]"
-        style={{ 
+        style={{
           background: `linear-gradient(135deg, ${BRAND} 0%, #4c49d8 100%)`,
-          boxShadow: '0 12px 32px rgba(97,95,255,0.25)' 
+          boxShadow: '0 12px 32px rgba(97,95,255,0.25)'
         }}
       >
         <div className="absolute top-[-50px] right-[-50px] w-48 h-48 rounded-full bg-white/10 blur-xl pointer-events-none" />
@@ -423,37 +425,39 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
           </div>
         </div>
       </div>
-
-      {/* ── SUB-TABS BAR ── */}
+      {/* ── SUB-TABS BAR (iOS Segmented Style) ── */}
       <div 
-        className="rounded-2xl p-1 mb-6 border flex flex-wrap gap-1.5"
+        className="rounded-[18px] p-1.5 mb-6 flex gap-1 overflow-x-auto hide-scroll"
         style={{ 
-          borderColor: dark ? '#1a3050' : '#e2e8f0', 
-          background: dark ? '#0f1e30' : '#ffffff' 
+          background: dark ? '#162640' : '#f1f5f9',
+          border: `1px solid ${dark ? '#1e2d45' : '#e2e8f0'}`,
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
         }}
       >
-        {tabs.map(tab => {
-          const active = activeTab === tab
-          let tabTextColor = dark ? '#7a98bb' : '#5c6f84'
-          if (active) {
-            tabTextColor = '#ffffff'
-          }
+        <style>{`.hide-scroll::-webkit-scrollbar { display: none; }`}</style>
+        <div className="flex gap-1 hide-scroll w-full">
+          {tabs.map(tab => {
+            const active = activeTab === tab
 
-          return (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className="px-4 py-2.5 rounded-xl text-[13px] font-bold border-none cursor-pointer transition-all duration-200"
-              style={{
-                background: active ? BRAND : 'transparent',
-                color: tabTextColor,
-                boxShadow: active ? '0 3px 10px rgba(97,95,255,0.3)' : 'none'
-              }}
-            >
-              {tab}
-            </button>
-          )
-        })}
+            return (
+              <button
+                type='button'
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-5 py-2.5 rounded-[12px] text-[13.5px] font-bold border-none cursor-pointer transition-all duration-300 whitespace-nowrap shrink-0 ${active ? 'shadow-sm' : ''}`}
+                style={{
+                  background: active ? (dark ? '#0c1829' : '#ffffff') : 'transparent',
+                  color: active ? BRAND : (dark ? '#7a98bb' : '#64748b'),
+                }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.color = dark ? '#e8f0fe' : '#0f172a' }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.color = dark ? '#7a98bb' : '#64748b' }}
+              >
+                {tab}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* ── MAIN CONTENT AREA ── */}
@@ -462,13 +466,13 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left 2 Columns */}
             <div className="lg:col-span-2 flex flex-col gap-6">
-              
+
               {/* About card */}
-              <div 
+              <div
                 className="rounded-2xl p-6 border"
-                style={{ 
-                  borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                  background: dark ? '#0f1e30' : '#ffffff' 
+                style={{
+                  borderColor: dark ? '#1a3050' : '#e2e8f0',
+                  background: dark ? '#0f1e30' : '#ffffff'
                 }}
               >
                 <h3 className="text-[16px] font-extrabold m-0 mb-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
@@ -480,11 +484,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
               </div>
 
               {/* Feedbacks & Reviews Card */}
-              <div 
+              <div
                 className="rounded-2xl p-6 border"
-                style={{ 
-                  borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                  background: dark ? '#0f1e30' : '#ffffff' 
+                style={{
+                  borderColor: dark ? '#1a3050' : '#e2e8f0',
+                  background: dark ? '#0f1e30' : '#ffffff'
                 }}
               >
                 <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
@@ -497,7 +501,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span 
+                    <span
                       className="text-xs px-3 py-1 rounded-full font-extrabold border"
                       style={{
                         background: dark ? '#162640' : '#f1f5f9',
@@ -515,7 +519,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                     <Loader2 className="animate-spin text-slate-400" size={24} />
                   </div>
                 ) : feedbacks.length === 0 ? (
-                  <div 
+                  <div
                     className="py-10 text-center rounded-xl border border-dashed flex flex-col items-center justify-center"
                     style={{
                       borderColor: dark ? '#1a3050' : '#e2e8f0',
@@ -534,8 +538,8 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                     <div className="space-y-4">
                       <div className="space-y-3">
                         {currentFeedbacks.map((f, idx) => (
-                          <div 
-                            key={f.id || `feedback-${idx}`} 
+                          <div
+                            key={f.id || `feedback-${idx}`}
                             className="p-4 rounded-xl border space-y-2 transition-all hover:shadow-sm"
                             style={{
                               borderColor: dark ? '#16263e' : '#e2e8f0',
@@ -619,49 +623,59 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
 
             {/* Right Column */}
             <div className="flex flex-col gap-6">
-              
+
               {/* Event Details card */}
-              <div 
+              <div
                 className="rounded-2xl p-6 border"
-                style={{ 
-                  borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                  background: dark ? '#0f1e30' : '#ffffff' 
+                style={{
+                  borderColor: dark ? '#1a3050' : '#e2e8f0',
+                  background: dark ? '#0f1e30' : '#ffffff'
                 }}
               >
                 <h3 className="text-[16px] font-extrabold m-0 mb-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
                   Event Details
                 </h3>
                 <div className="flex flex-col gap-3.5">
-                  {[
-                    { label: 'Category', value: event.category },
-                    { label: 'Venue', value: event.venue },
-                    { label: 'Date', value: event.date },
-                    { label: 'Time', value: event.time },
-                    { label: 'Capacity', value: `${event.capacity} seats` },
-                    { label: 'Registered', value: `${regCount} students` },
-                    { label: 'Organizer', value: event.organizer },
-                    { label: 'QR Attendance', value: event.qrAttendance || 'Enabled' }
-                  ].map((row) => (
-                    <div key={row.label} className="flex items-center justify-between text-[13px] font-semibold">
-                      <span style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>{row.label}</span>
-                      <span style={{ color: dark ? '#e8f0fe' : '#334155' }} className="text-right">{row.value}</span>
-                    </div>
-                  ))}
+                  {(() => {
+                    const formatAmPm = (dStr) => {
+                      if (!dStr) return 'N/A';
+                      const d = new Date(dStr);
+                      if (isNaN(d.getTime())) return dStr;
+                      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
+                    };
+                    return [
+                      { label: 'Category', value: event.category },
+                      { label: 'Venue', value: event.venue },
+                      { label: 'Event Start', value: formatAmPm(event.start_datetime || event.startDateTime || event.date) },
+                      { label: 'Event End', value: formatAmPm(event.end_datetime || event.endDateTime) },
+                      { label: 'Reg. Start', value: formatAmPm(event.reg_start_datetime || event.regDateTime) },
+                      { label: 'Reg. End', value: formatAmPm(event.registration_deadline || event.registrationDeadline) },
+                      { label: 'Capacity', value: `${event.capacity} seats` },
+                      { label: 'Registered', value: `${regCount} students` },
+                      { label: 'Organizer', value: event.organizer },
+                      { label: 'QR Attendance', value: event.qrAttendance || 'Enabled' }
+                    ].map((row) => (
+                      <div key={row.label} className="flex items-center justify-between text-[13px] font-semibold">
+                        <span style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>{row.label}</span>
+                        <span style={{ color: dark ? '#e8f0fe' : '#334155' }} className="text-right">{row.value}</span>
+                      </div>
+                    ));
+                  })()}
                 </div>
               </div>
 
               {/* Registration Progress card */}
-              <div 
+              <div
                 className="rounded-2xl p-6 border"
-                style={{ 
-                  borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                  background: dark ? '#0f1e30' : '#ffffff' 
+                style={{
+                  borderColor: dark ? '#1a3050' : '#e2e8f0',
+                  background: dark ? '#0f1e30' : '#ffffff'
                 }}
               >
                 <h3 className="text-[16px] font-extrabold m-0 mb-4" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
                   Registration Progress
                 </h3>
-                
+
                 <div className="flex items-baseline gap-1.5 mb-2">
                   <span className="text-[34px] font-black leading-none" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
                     {regPercent}%
@@ -672,7 +686,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 </div>
 
                 <div className="h-2 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800 mb-3.5">
-                  <div 
+                  <div
                     className="h-full rounded-full transition-all duration-300"
                     style={{ width: `${regPercent}%`, background: BRAND }}
                   />
@@ -689,11 +703,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
         )}
 
         {activeTab === 'Registrations' && (
-          <div 
+          <div
             className="rounded-2xl p-6 border"
-            style={{ 
-              borderColor: dark ? '#1a3050' : '#e2e8f0', 
-              background: dark ? '#0f1e30' : '#ffffff' 
+            style={{
+              borderColor: dark ? '#1a3050' : '#e2e8f0',
+              background: dark ? '#0f1e30' : '#ffffff'
             }}
           >
             {/* Header controls with Search Bar */}
@@ -706,7 +720,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   {registrations.length} registrations total
                 </span>
               </div>
-              
+
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -755,15 +769,15 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
             ) : (
               <>
                 <div className="overflow-x-auto transition-height" style={{ minHeight: '325px' }}>
-                  <table className="w-full text-left border-collapse">
+                  <table className="w-full text-left border-collapse min-w-[700px]">
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}>
-                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STUDENT NAME</th>
-                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>ROLL NO</th>
-                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DEPARTMENT</th>
-                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>YEAR</th>
-                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DATE</th>
-                        <th className="py-3 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STATUS</th>
+                        <th className="py-3 px-4 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STUDENT NAME</th>
+                        <th className="py-3 px-4 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>ROLL NO</th>
+                        <th className="py-3 px-4 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DEPARTMENT</th>
+                        <th className="py-3 px-4 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>YEAR</th>
+                        <th className="py-3 px-4 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>DATE</th>
+                        <th className="py-3 px-4 text-[11px] font-bold tracking-wider" style={{ color: dark ? '#7a98bb' : '#64748b' }}>STATUS</th>
                       </tr>
                     </thead>
                     <tbody key={`${regPage}-${regSearch}`} className="divide-y" style={{ divideColor: dark ? '#1a3050' : '#e2e8f0' }}>
@@ -778,21 +792,21 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                           const statusBadge = getRegStatusStyle(att.status)
                           const regId = att.id || att.registration_id
                           return (
-                            <tr 
-                              key={regId} 
-                              className="animate-slide-up-fade" 
-                              style={{ 
+                            <tr
+                              key={regId}
+                              className="animate-slide-up-fade"
+                              style={{
                                 borderBottom: i < paginatedRegs.length - 1 ? `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` : 'none',
                                 animationDelay: `${i * 40}ms`
                               }}
                             >
-                              <td className="py-3.5 text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{att.studentName}</td>
-                              <td className="py-3.5 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.rollNo}</td>
-                              <td className="py-3.5 text-[13px] font-semibold text-slate-600 dark:text-[#7a98bb]">{att.department}</td>
-                              <td className="py-3.5 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.year}</td>
-                              <td className="py-3.5 text-[13px] font-medium text-slate-500 dark:text-[#7a98bb]">{att.date}</td>
-                              <td className="py-3.5 text-[13px]">
-                                <span 
+                              <td className="py-3.5 px-4 text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{att.studentName}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.rollNo}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-600 dark:text-[#7a98bb]">{att.department}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.year}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-medium text-slate-500 dark:text-[#7a98bb]">{att.date}</td>
+                              <td className="py-3.5 px-4 text-[13px]">
+                                <span
                                   className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
                                   style={{ background: statusBadge.bg, color: statusBadge.text }}
                                 >
@@ -808,7 +822,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 </div>
 
                 {/* ── Table Pagination Bar ── */}
-                <div 
+                <div
                   className="flex items-center justify-between flex-wrap gap-4 pt-5 mt-4"
                   style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}
                 >
@@ -907,11 +921,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
         {activeTab === 'Attendance' && (
           <div className="flex flex-col gap-6">
             {loadingAtt ? (
-              <div 
+              <div
                 className="rounded-2xl p-12 border text-center flex flex-col items-center justify-center gap-3"
-                style={{ 
-                  borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                  background: dark ? '#0f1e30' : '#ffffff' 
+                style={{
+                  borderColor: dark ? '#1a3050' : '#e2e8f0',
+                  background: dark ? '#0f1e30' : '#ffffff'
                 }}
               >
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: BRAND }} />
@@ -922,11 +936,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 {/* ── STATS ROW ── */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Card 1: Present */}
-                  <div 
+                  <div
                     className="rounded-2xl p-6 text-center border"
                     style={{
-                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                      background: dark ? '#0f1e30' : '#ffffff' 
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
+                      background: dark ? '#0f1e30' : '#ffffff'
                     }}
                   >
                     <div className="text-[32px] font-black text-emerald-500">
@@ -936,11 +950,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   </div>
 
                   {/* Card 2: Absent */}
-                  <div 
+                  <div
                     className="rounded-2xl p-6 text-center border"
                     style={{
-                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                      background: dark ? '#0f1e30' : '#ffffff' 
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
+                      background: dark ? '#0f1e30' : '#ffffff'
                     }}
                   >
                     <div className="text-[32px] font-black text-rose-500">
@@ -950,11 +964,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   </div>
 
                   {/* Card 3: Late */}
-                  <div 
+                  <div
                     className="rounded-2xl p-6 text-center border"
                     style={{
-                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                      background: dark ? '#0f1e30' : '#ffffff' 
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
+                      background: dark ? '#0f1e30' : '#ffffff'
                     }}
                   >
                     <div className="text-[32px] font-black text-amber-500">
@@ -964,20 +978,20 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   </div>
 
                   {/* Card 4: Attendance % */}
-                  <div 
+                  <div
                     className="rounded-2xl p-6 text-center border"
                     style={{
-                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                      background: dark ? '#0f1e30' : '#ffffff' 
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
+                      background: dark ? '#0f1e30' : '#ffffff'
                     }}
                   >
                     <div className="text-[32px] font-black text-indigo-500">
-                      {attendance.length > 0 
+                      {attendance.length > 0
                         ? Math.round(
-                            ((attendance.filter(a => a.status === 'Present').length + 
-                              attendance.filter(a => a.status === 'Late').length) / 
-                             attendance.length) * 100
-                          ) 
+                          ((attendance.filter(a => a.status === 'Present').length +
+                            attendance.filter(a => a.status === 'Late').length) /
+                            attendance.length) * 100
+                        )
                         : 0}%
                     </div>
                     <div className="text-[13px] font-bold text-slate-500 mt-1">Attendance %</div>
@@ -985,15 +999,15 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 </div>
 
                 {/* ── ATTENDANCE TABLE ── */}
-                <div 
+                <div
                   className="rounded-2xl border"
                   style={{
-                    borderColor: dark ? '#1a3050' : '#e2e8f0', 
-                    background: dark ? '#0f1e30' : '#ffffff' 
+                    borderColor: dark ? '#1a3050' : '#e2e8f0',
+                    background: dark ? '#0f1e30' : '#ffffff'
                   }}
                 >
                   {/* Table Header controls with Search Bar */}
-                  <div 
+                  <div
                     className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b"
                     style={{ borderColor: dark ? '#1a3050' : '#e2e8f0' }}
                   >
@@ -1083,10 +1097,10 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                             }
 
                             return (
-                              <tr 
-                                key={row.id} 
+                              <tr
+                                key={row.id}
                                 className="border-b last:border-b-0 transition-colors animate-slide-up-fade"
-                                style={{ 
+                                style={{
                                   borderColor: dark ? '#1a3050' : '#e2e8f0',
                                   animationDelay: `${i * 40}ms`
                                 }}
@@ -1100,7 +1114,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                                   </span>
                                 </td>
                                 <td className="p-4 text-[13.5px]">
-                                  <span 
+                                  <span
                                     className="px-2.5 py-0.5 rounded-full text-[11px] font-bold"
                                     style={{ background: statusColor.bg, color: statusColor.text }}
                                   >
@@ -1116,7 +1130,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   </div>
 
                   {/* ── Table Pagination Bar ── */}
-                  <div 
+                  <div
                     className="flex items-center justify-between flex-wrap gap-4 px-6 py-4"
                     style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}
                   >
@@ -1154,6 +1168,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                     {/* Pagination Page Controls */}
                     <div className="flex items-center gap-1.5">
                       <button
+                        type='buttton'
                         onClick={() => setAttPage(prev => Math.max(prev - 1, 1))}
                         disabled={currentAttPage === 1}
                         className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"
@@ -1169,7 +1184,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                         const active = page === currentAttPage
                         return (
                           <button
-                          type='button'
+                            type='button'
                             key={page}
                             onClick={() => setAttPage(page)}
                             className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"
@@ -1207,7 +1222,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
           const regs = analyticsData?.registrations || {}
           const att = analyticsData?.attendance || {}
           const certs = analyticsData?.certificates || {}
-          
+
           const regTotal = regs.total ?? registrations.length ?? 0
           const regConfirmed = regs.confirmed ?? registrations.filter(r => {
             const s = String(r.status || r.registrationStatus || r.registration_status || '').trim().toLowerCase()
@@ -1221,13 +1236,13 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
             const s = String(r.status || r.registrationStatus || r.registration_status || '').trim().toLowerCase()
             return s === 'rejected' || s === 'cancelled'
           }).length
-          
+
           const attPresent = att.present ?? attendance.filter(a => a.status === 'Present').length
           const attAbsent = att.absent ?? attendance.filter(a => a.status === 'Absent').length
           const attPercentage = att.percentage ?? (attPresent + attAbsent > 0 ? ((attPresent / (attPresent + attAbsent)) * 100).toFixed(1) : 0)
-          
+
           const certsGenerated = certs.generated ?? 0
-          
+
           return (
             <div className="flex flex-col gap-6 animate-fadeIn">
               {loadingAnalytics ? (
@@ -1236,12 +1251,12 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  
+
                   {/* Registrations Card */}
-                  <div 
+                  <div
                     className="rounded-2xl p-6 border flex flex-col justify-between transition-all hover:scale-[1.01] duration-300"
-                    style={{ 
-                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
+                    style={{
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
                       background: dark ? 'linear-gradient(145deg, #0f1e30 0%, #0b1524 100%)' : '#ffffff',
                       boxShadow: dark ? 'none' : '0 10px 25px rgba(0,0,0,0.03)'
                     }}
@@ -1255,7 +1270,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                         {regTotal}
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-2.5 border-t pt-4" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
                       <div className="flex items-center justify-between text-[13px] font-bold">
                         <span className="flex items-center gap-1.5 text-emerald-500">
@@ -1279,10 +1294,10 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   </div>
 
                   {/* Attendance Card */}
-                  <div 
+                  <div
                     className="rounded-2xl p-6 border flex flex-col justify-between transition-all hover:scale-[1.01] duration-300"
-                    style={{ 
-                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
+                    style={{
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
                       background: dark ? 'linear-gradient(145deg, #0f1e30 0%, #0b1524 100%)' : '#ffffff',
                       boxShadow: dark ? 'none' : '0 10px 25px rgba(0,0,0,0.03)'
                     }}
@@ -1297,7 +1312,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                         <span className="text-[12px] font-bold text-slate-400">ratio</span>
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-2.5 border-t pt-4" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
                       <div className="flex items-center justify-between text-[13px] font-bold">
                         <span className="flex items-center gap-1.5 text-emerald-500">
@@ -1315,10 +1330,10 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   </div>
 
                   {/* Certificates Card */}
-                  <div 
+                  <div
                     className="rounded-2xl p-6 border flex flex-col justify-between transition-all hover:scale-[1.01] duration-300"
-                    style={{ 
-                      borderColor: dark ? '#1a3050' : '#e2e8f0', 
+                    style={{
+                      borderColor: dark ? '#1a3050' : '#e2e8f0',
                       background: dark ? 'linear-gradient(145deg, #0f1e30 0%, #0b1524 100%)' : '#ffffff',
                       boxShadow: dark ? 'none' : '0 10px 25px rgba(0,0,0,0.03)'
                     }}
@@ -1332,7 +1347,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                         {certsGenerated}
                       </div>
                     </div>
-                    
+
                     <div className="flex flex-col gap-2 border-t pt-4" style={{ borderColor: dark ? '#1a3050' : '#f1f5f9' }}>
                       <p className="text-[12px] font-medium m-0 leading-relaxed" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
                         Digital certificates are automatically distributed upon verified event check-in and completion.
@@ -1347,11 +1362,11 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
         })()}
 
         {activeTab === 'Certificates' && (
-          <div 
+          <div
             className="rounded-2xl p-8 border text-center relative overflow-hidden"
-            style={{ 
-              borderColor: dark ? '#1a3050' : '#e2e8f0', 
-              background: dark ? '#0f1e30' : '#ffffff' 
+            style={{
+              borderColor: dark ? '#1a3050' : '#e2e8f0',
+              background: dark ? '#0f1e30' : '#ffffff'
             }}
           >
             <div className="max-w-md mx-auto">
@@ -1364,7 +1379,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
               </p>
 
               {!isEventEnded ? (
-                <div 
+                <div
                   className="p-5 rounded-2xl border mb-6 flex flex-col items-center gap-2"
                   style={{
                     borderColor: dark ? '#22385c' : '#fed7aa',
@@ -1383,7 +1398,7 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   </span>
                 </div>
               ) : (
-                <div 
+                <div
                   className="p-4 rounded-2xl border mb-6 flex items-center justify-center gap-2"
                   style={{
                     borderColor: dark ? 'rgba(16, 185, 129, 0.3)' : '#bbf7d0',
@@ -1406,9 +1421,9 @@ export default function EventDetailView({ event, onBack, onEdit, tokens, showToa
                   onClick={handleIssueCertificates}
                   disabled={!isEventEnded || issuingCerts}
                   className="w-full sm:w-auto px-8 py-3.5 rounded-xl text-[13.5px] font-extrabold text-white border-none transition-all duration-200 flex items-center justify-center gap-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-lg hover:opacity-90"
-                  style={{ 
-                    background: BRAND, 
-                    boxShadow: !isEventEnded ? 'none' : '0 4px 16px rgba(97,95,255,0.4)' 
+                  style={{
+                    background: BRAND,
+                    boxShadow: !isEventEnded ? 'none' : '0 4px 16px rgba(97,95,255,0.4)'
                   }}
                 >
                   {issuingCerts ? (

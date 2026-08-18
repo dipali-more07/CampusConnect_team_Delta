@@ -41,14 +41,14 @@ export default function AnalyticsCategoriesChart({
         </div>
       </div>
 
-      <div className="w-full pl-8 pr-2 relative" style={{ height: 240 + 30 }}>
+      <div className="w-full pl-8 pr-2 relative" style={{ height: 170 + 30 }}>
         {/* Grid lines and Y labels */}
         {gridVals.map(val => (
           <div
             key={val}
             className="absolute left-8 right-2 flex items-center"
             style={{
-              bottom: `${(val / yAxisMax) * 240 + 30}px`,
+              bottom: `${(val / yAxisMax) * 170 + 30}px`,
               borderBottom: dark ? '1px dashed rgba(255,255,255,0.08)' : '1px dashed rgba(0,0,0,0.08)',
             }}
           >
@@ -62,32 +62,32 @@ export default function AnalyticsCategoriesChart({
         ))}
 
         {/* Bars group container */}
-        <div className="absolute left-8 right-2 top-0 bottom-7.5 flex justify-around items-end">
+        <div className="absolute left-8 right-2 top-0 bottom-[30px] flex justify-around items-end">
           {categories.map((item, idx) => {
             const v1 = item.events !== undefined ? item.events : (item.workshops || 0)
             const v2 = item.registrations !== undefined ? item.registrations : (item.seminars || 0)
 
-            const wHeight = (v1 / yAxisMax) * 240
-            const sHeight = (v2 / yAxisMax) * 240
+            const wHeight = (v1 / yAxisMax) * 170
+            const sHeight = (v2 / yAxisMax) * 170
             const xLabel = item.name || item.month || ''
 
             return (
               <div key={item.id || item.name || item.month || `cat-${idx}`} className="flex-1 flex flex-col items-center h-full justify-end relative">
                 {/* Double bars */}
-                <div className="flex items-end gap-1.5">
+                <div className="flex items-end gap-1.5 absolute bottom-0">
                   <div
-                    className="w-2 rounded-t-[3px] transition-all duration-700 hover:opacity-85 cursor-pointer"
+                    className="w-4 rounded-t-[3px] transition-all duration-700 hover:opacity-85 cursor-pointer"
                     style={{ height: wHeight, background: '#615FFF' }}
                     title={`${legendLabel1}: ${v1}`}
                   />
                   <div
-                    className="w-6 rounded-t-md transition-all duration-700 hover:opacity-85 cursor-pointer"
+                    className="w-4 rounded-t-[3px] transition-all duration-700 hover:opacity-85 cursor-pointer"
                     style={{ height: sHeight, background: '#00BC7D' }}
                     title={`${legendLabel2}: ${v2}`}
                   />
                 </div>
                 {/* X-axis label */}
-                <span className="absolute bottom-6 text-[11px] font-semibold truncate max-w-20" style={label} title={xLabel}>
+                <span className="absolute -bottom-7 text-[11px] font-semibold truncate max-w-20" style={label} title={xLabel}>
                   {xLabel}
                 </span>
               </div>
