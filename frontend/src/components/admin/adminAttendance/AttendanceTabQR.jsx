@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Loader2, QrCode, Download, Share2, Printer, AlertCircle, RefreshCw } from 'lucide-react'
+import CustomSelect from '../../common/CustomSelect'
 
 /* ─── tiny QR placeholder SVG ─── */
 function QrPlaceholder({ size = 140, color = '#615FFF' }) {
@@ -22,29 +23,22 @@ function QrPlaceholder({ size = 140, color = '#615FFF' }) {
   )
 }
 
-function QrFormSection({ cardStyle, labelStyle, inputStyle, selectedEvent, setSelectedEvent, setQrGenerated, setImgFailed, handleGenerateQR, isBeforeStart, qrLoading, brandColor, eventsList }) {
+function QrFormSection({ cardStyle, labelStyle, inputStyle, selectedEvent, setSelectedEvent, setQrGenerated, setImgFailed, handleGenerateQR, isBeforeStart, qrLoading, brandColor, eventsList, dark = true }) {
   return (
     <div className="rounded-2xl p-6 border" style={cardStyle}>
       <h2 className="text-[17px] font-extrabold mb-5">QR Code Generator</h2>
 
-      <label htmlFor="qr-select-event" className="block text-[12px] font-bold uppercase tracking-wider mb-1.5" style={labelStyle}>
-        Select Event
-      </label>
-      <select
-        id="qr-select-event"
-        value={selectedEvent}
-        onChange={e => { setSelectedEvent(e.target.value); setQrGenerated(false) }}
-        className="w-full px-3 py-2.5 rounded-xl text-[13px] mb-6 outline-none cursor-pointer"
-        style={inputStyle}
-      >
-        {eventsList.length === 0 ? (
-          <option value="">No upcoming or ongoing events available</option>
-        ) : (
-          (eventsList || []).map(ev => (
-            <option key={ev.id} value={ev.id}>{ev.name}</option>
-          ))
-        )}
-      </select>
+      <div className="mb-6">
+        <CustomSelect
+          id="qr-select-event"
+          label="Select Event"
+          value={selectedEvent}
+          onChange={(e, val) => { setSelectedEvent(val); setQrGenerated(false) }}
+          placeholder={eventsList.length === 0 ? 'No upcoming or ongoing events available' : 'Select an event'}
+          options={(eventsList || []).map(ev => ({ value: ev.id, label: ev.name }))}
+          dark={dark}
+        />
+      </div>
 
       <button
         type="button"

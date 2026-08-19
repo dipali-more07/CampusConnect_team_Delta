@@ -3,58 +3,79 @@ import { useNavigate } from 'react-router-dom'
 import {
   Send, Loader2, Calendar, ChevronRight, User, Trash2,
   X, Award, Zap, ExternalLink, Mic, Volume2, VolumeX,
-  Sparkles, Square, SlidersHorizontal, Play
+  Sparkles, Square
 } from 'lucide-react'
 import aiService from '../../services/aiService'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useToast } from '../../context/ToastContext'
 import EmoBotCharacter from './EmoBotCharacter'
 
-/* ── Helper to find the best Cute Female Voice for Camy EMO AI ── */
-function getEmoFemaleVoice() {
-  if (!window.speechSynthesis) return null
-  const voices = window.speechSynthesis.getVoices()
-  if (!voices || voices.length === 0) return null
+/* ── Helper to find the best Indian Female Voice matching the sample audio ── */
+export function getNaturalHumanVoice() {
+  if (typeof window === 'undefined' || !window.speechSynthesis) return null
 
-  // Male voices blacklist
-  const isMale = (v) => /rishi|david|mark|george|male|guy|stefan|pavel|deepak|ravindra/i.test(v.name)
-  // High quality female voice names
-  const isFemaleName = (v) => /heera|veena|zira|samantha|karen|victoria|female|girl|neerja|swara|kalpana|ananya|google/i.test(v.name)
+  const voices = window.speechSynthesis.getVoices() || []
+  if (!voices.length) return null
 
-  // 1. Google High Quality Female Voices (Google English India, Google US/UK Female)
-  const googleFemale = voices.find(v => v.name.toLowerCase().includes('google') && !isMale(v))
-  if (googleFemale) return googleFemale
+  const maleExclude = /david|mark|george|rishi|deepak|ravindra|male|guy|stefan|pavel|christopher|eric|brian|ryan|heami|claude/i
+  const naturalRegex = /natural|neural|online/i
 
-  // 2. Microsoft / System Indian Female Voice (Microsoft Heera, Veena, Swara)
-  const indianFemale = voices.find(v =>
-    (v.lang === 'en-IN' || v.lang === 'en_IN' || v.lang === 'hi-IN' || v.lang.includes('IN') || v.lang.includes('in') || /india/i.test(v.name)) &&
-    isFemaleName(v) &&
-    !isMale(v)
+  // 1. Top Match: Microsoft Swara Online (Natural) - Hindi (India) (Exact match to sample audio)
+  const swaraVoice = voices.find(v =>
+    /swara/i.test(v.name) &&
+    !maleExclude.test(v.name)
   )
-  if (indianFemale) return indianFemale
+  if (swaraVoice) return swaraVoice
 
-  // 3. Microsoft Zira / Natural English Female Voice
-  const systemFemale = voices.find(v => isFemaleName(v) && !isMale(v))
-  if (systemFemale) return systemFemale
-
-  // 4. Any Indian voice that is not male
-  const anyIndianNonMale = voices.find(v =>
-    (v.lang === 'en-IN' || v.lang === 'en_IN' || v.lang === 'hi-IN' || v.lang.includes('IN') || /india/i.test(v.name)) &&
-    !isMale(v)
+  // 2. Top Match: Google हिन्दी (hi-IN) - Chrome High Quality Indian Female
+  const googleHindi = voices.find(v =>
+    /google/i.test(v.name) &&
+    (/hi-IN|hi|hindi|हिन्दी/i.test(v.lang) || /hindi|हिन्दी/i.test(v.name)) &&
+    !maleExclude.test(v.name)
   )
-  if (anyIndianNonMale) return anyIndianNonMale
+  if (googleHindi) return googleHindi
 
-  // 5. Fallback non-male English voice
-  return voices.find(v => v.lang.startsWith('en') && !isMale(v)) || voices[0] || null
-}
+  // 3. Top Match: Microsoft Neerja Online (Natural) - Indian English
+  const neerjaVoice = voices.find(v =>
+    /neerja/i.test(v.name) &&
+    !maleExclude.test(v.name)
+  )
+  if (neerjaVoice) return neerjaVoice
 
-/* ── Helper to list all available Female voices in browser ── */
-function getFemaleVoicesList() {
-  if (!window.speechSynthesis) return []
-  const voices = window.speechSynthesis.getVoices()
-  if (!voices || voices.length === 0) return []
-  const isMale = (v) => /rishi|david|mark|george|male|guy|stefan|pavel|deepak|ravindra/i.test(v.name)
-  return voices.filter(v => !isMale(v))
+  // 4. Any Natural Indian Female Voice (hi-IN or en-IN with natural tag)
+  const indianNatural = voices.find(v =>
+    naturalRegex.test(v.name) &&
+    (/en-IN|hi-IN|hi/i.test(v.lang) || /swara|neerja|heera|veena/i.test(v.name)) &&
+    !maleExclude.test(v.name)
+  )
+  if (indianNatural) return indianNatural
+
+  // 5. Any Indian English / Hindi Female Voice (Heera, Veena, Google Indian English)
+  const anyIndianFemale = voices.find(v =>
+    (/en-IN|hi-IN|hi/i.test(v.lang) || /heera|veena/i.test(v.name)) &&
+    !maleExclude.test(v.name)
+  )
+  if (anyIndianFemale) return anyIndianFemale
+
+  // 6. Natural Female (Jenny, Aria, Google Female)
+  const naturalFemale = voices.find(v =>
+    naturalRegex.test(v.name) &&
+    /jenny|aria|libby|natasha|sonia/i.test(v.name) &&
+    !maleExclude.test(v.name)
+  )
+  if (naturalFemale) return naturalFemale
+
+  // 7. General English Female
+  const generalFemale = voices.find(v =>
+    !/zira/i.test(v.name) &&
+    !maleExclude.test(v.name) &&
+    /^en(-|_)/i.test(v.lang)
+  )
+  if (generalFemale) return generalFemale
+
+  // 8. Fallback
+  return voices.find(v => /^en(-|_)/i.test(v.lang)) || voices[0]
 }
 
 /* ── Sentiment Analyzer for Camy's Dynamic EMO Expressions ── */
@@ -149,33 +170,47 @@ function SoundWaveIndicator() {
 }
 
 /* ── Typewriter Text Component ── */
-function TypewriterText({ text, speed = 20, onComplete, onNavigate }) {
+function TypewriterText({ text, speed = 20, onComplete, onNavigate, forceStop }) {
   const [displayed, setDisplayed] = useState('')
   const [done, setDone] = useState(false)
   const indexRef = useRef(0)
+  const displayedRef = useRef('')
+  const onCompleteRef = useRef(onComplete)
 
   useEffect(() => {
-    setDisplayed('')
-    indexRef.current = 0
-    setDone(false)
+    onCompleteRef.current = onComplete
+  }, [onComplete])
+
+  useEffect(() => {
+    if (forceStop && !done) {
+      setDone(true)
+      onCompleteRef.current?.(displayedRef.current)
+    }
+  }, [forceStop, done])
+
+  useEffect(() => {
+    if (done) return
 
     const interval = setInterval(() => {
       indexRef.current += 1
       if (indexRef.current >= text.length) {
         setDisplayed(text)
+        displayedRef.current = text
         setDone(true)
         clearInterval(interval)
-        onComplete?.()
+        onCompleteRef.current?.(text)
       } else {
-        setDisplayed(text.slice(0, indexRef.current))
+        const nextStr = text.slice(0, indexRef.current)
+        setDisplayed(nextStr)
+        displayedRef.current = nextStr
       }
     }, speed)
 
     return () => clearInterval(interval)
-  }, [text, speed, onComplete])
+  }, [text, speed, done])
 
   if (done) {
-    return <MarkdownRenderer content={text} onNavigate={onNavigate} />
+    return <MarkdownRenderer content={displayed} onNavigate={onNavigate} />
   }
 
   return (
@@ -202,55 +237,60 @@ function WidgetHeader({
   onClose
 }) {
   return (
-    <div className={`relative flex items-center justify-between px-4 py-3 shrink-0 ${dark
+    <div className={`relative flex flex-col shrink-0 ${dark
       ? 'bg-gradient-to-r from-[#0c1829] via-[#0e1f3a] to-[#0c1829] border-b border-cyan-900/30'
       : 'bg-gradient-to-r from-slate-50 via-white to-slate-50 border-b border-slate-200'
       }`}>
-      <div className="flex items-center gap-3 z-10">
-        <div className="shrink-0">
-          <EmoBotCharacter
-            size={42}
-            isTyping={loading}
-            isSpeaking={isSpeaking}
-            isListening={isListening}
-            isCelebrating={isCelebrating}
-            mood={currentMood}
-            onClick={() => { }}
-          />
-        </div>
-        <div>
-          <h3 className={`font-extrabold text-[15px] tracking-tight m-0 flex items-center gap-1.5 ${dark ? 'text-slate-100' : 'text-slate-800'}`}>
-            Camy AI
-            {isListening && <span className="text-[10px] font-semibold text-red-400 animate-pulse ml-1">🎙️ Recording</span>}
-            {isSpeaking && !isListening && <span className="text-[10px] font-semibold text-emerald-400 ml-1">Speaking...</span>}
-            {isCelebrating && <span className="text-[10px] font-semibold text-amber-400 animate-bounce ml-1">🎉 Celebrating!</span>}
-            {!isSpeaking && !isListening && !isCelebrating && <Sparkles className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400/30" />}
-          </h3>
-          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold mt-0.5 ${dark ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-800/50' : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
-            }`}>
-            <Award className="w-3 h-3" />
-            {currentBadge}
-          </span>
-        </div>
-      </div>
+      {/* Mobile Top Indicator Bar */}
+      <div className="w-8 h-1 rounded-full bg-slate-300 dark:bg-slate-700/80 mx-auto mt-1.5 mb-0.5 sm:hidden" />
 
-      <div className="flex items-center gap-1 z-10">
-        {isSpeaking ? (
-          <button type="button" onClick={stopSpeaking} title="Stop Voice (Pause Audio)" className="flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-red-500/20 hover:text-red-400 border border-emerald-400/40 text-xs font-bold transition-all cursor-pointer animate-pulse">
-            <Square className="w-3 h-3 fill-emerald-300" />
-            <span>Stop Audio</span>
+      <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3">
+        <div className="flex items-center gap-2.5 sm:gap-3 z-10">
+          <div className="shrink-0">
+            <EmoBotCharacter
+              size={38}
+              isTyping={loading}
+              isSpeaking={isSpeaking}
+              isListening={isListening}
+              isCelebrating={isCelebrating}
+              mood={currentMood}
+              onClick={() => { }}
+            />
+          </div>
+          <div>
+            <h3 className={`font-extrabold text-[14px] sm:text-[15px] tracking-tight m-0 flex items-center gap-1.5 ${dark ? 'text-slate-100' : 'text-slate-800'}`}>
+              Camy AI
+              {isListening && <span className="text-[9px] sm:text-[10px] font-semibold text-red-400 animate-pulse ml-1">🎙️ Recording</span>}
+              {isSpeaking && !isListening && <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-400 ml-1">Speaking...</span>}
+              {isCelebrating && <span className="text-[9px] sm:text-[10px] font-semibold text-amber-400 animate-bounce ml-1">🎉 Celebrating!</span>}
+              {!isSpeaking && !isListening && !isCelebrating && <Sparkles className="w-3.5 h-3.5 text-cyan-400 fill-cyan-400/30" />}
+            </h3>
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] sm:text-[10px] font-bold mt-0.5 ${dark ? 'bg-cyan-950/60 text-cyan-300 border border-cyan-800/50' : 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+              }`}>
+              <Award className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+              {currentBadge}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 z-10">
+          {isSpeaking ? (
+            <button type="button" onClick={stopSpeaking} title="Stop Voice (Pause Audio)" className="flex items-center gap-1 px-2 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 hover:bg-red-500/20 hover:text-red-400 border border-emerald-400/40 text-[11px] sm:text-xs font-bold transition-all cursor-pointer animate-pulse">
+              <Square className="w-3 h-3 fill-emerald-300" />
+              <span>Stop</span>
+            </button>
+          ) : (
+            <button type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} title={voiceEnabled ? 'Mute AI Voice' : 'Enable AI Voice'} className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${voiceEnabled ? (dark ? 'text-cyan-400 bg-cyan-950/50' : 'text-cyan-600 bg-cyan-50') : (dark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/5' : 'text-slate-400 hover:text-cyan-600 hover:bg-slate-100')}`}>
+              {voiceEnabled ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+            </button>
+          )}
+          <button type="button" onClick={handleClearChat} title="Clear Chat" className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${dark ? 'text-slate-400 hover:text-red-400 hover:bg-white/5' : 'text-slate-400 hover:text-red-500 hover:bg-slate-100'}`}>
+            <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
-        ) : (
-          <button type="button" onClick={() => setVoiceEnabled(!voiceEnabled)} title={voiceEnabled ? 'Mute AI Voice' : 'Enable AI Voice'} className={`p-2 rounded-xl transition-all cursor-pointer ${dark ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/5' : 'text-slate-400 hover:text-cyan-600 hover:bg-slate-100'}`}>
-            {voiceEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+          <button type="button" onClick={onClose} title="Close" className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${dark ? 'text-slate-400 hover:text-slate-200 hover:bg-white/5' : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'}`}>
+            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
-        )}
-        <button type="button" onClick={handleClearChat} title="Clear Chat" className={`p-2 rounded-xl transition-all cursor-pointer ${dark ? 'text-slate-400 hover:text-red-400 hover:bg-white/5' : 'text-slate-400 hover:text-red-500 hover:bg-slate-100'}`}>
-          <Trash2 className="w-4 h-4" />
-        </button>
-        <button type="button" onClick={onClose} title="Close" className={`p-2 rounded-xl transition-all cursor-pointer ${dark ? 'text-slate-400 hover:text-slate-200 hover:bg-white/5' : 'text-slate-400 hover:text-slate-800 hover:bg-slate-100'}`}>
-          <X className="w-4 h-4" />
-        </button>
+        </div>
       </div>
     </div>
   )
@@ -273,11 +313,28 @@ export default function CampusBotWidget() {
   const [userBadge, setUserBadge] = useState(null)
   const [currentMood, setCurrentMood] = useState(null)
   const [isWaving, setIsWaving] = useState(false)
+  
+  const showToast = useToast()
   const [isCelebrating, setIsCelebrating] = useState(false)
 
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
+
+  const [globalForceStop, setGlobalForceStop] = useState(false)
+
+  const stopBotTyping = () => {
+    setGlobalForceStop(true)
+    setTimeout(() => setGlobalForceStop(false), 100)
+    if (audioRef.current || (typeof window !== 'undefined' && window.speechSynthesis)) {
+      if (audioRef.current) {
+        try { audioRef.current.pause(); audioRef.current.currentTime = 0 } catch { }
+        audioRef.current = null
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel()
+      setIsSpeaking(false)
+    }
+  }
 
   const wasVoiceUsedRef = useRef(false)
   const isRecordingActiveRef = useRef(false)
@@ -294,38 +351,128 @@ export default function CampusBotWidget() {
   else if (user?.role === 'organizer') defaultBadge = '⚡ Event Organizer'
   const currentBadge = userBadge || user?.badge || defaultBadge
 
-  const speakReply = useCallback((text) => {
-    if (!voiceEnabled || !window.speechSynthesis) return
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.getVoices()
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices()
+      }
+    }
+  }, [])
+
+  const audioRef = useRef(null)
+
+  const stopSpeaking = () => {
+    if (audioRef.current) {
+      try {
+        audioRef.current.pause()
+        audioRef.current.currentTime = 0
+      } catch { }
+      audioRef.current = null
+    }
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      window.speechSynthesis.cancel()
+    }
+    setIsSpeaking(false)
+  }
+
+  const speakWithSynthesis = useCallback((clean) => {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return
     window.speechSynthesis.cancel()
 
-    // Clean text: strip emojis, markdown formatting, and extra whitespace for natural speech
+    const utterance = new SpeechSynthesisUtterance(clean)
+    const naturalVoice = getNaturalHumanVoice()
+
+    if (naturalVoice) {
+      utterance.voice = naturalVoice
+      utterance.lang = naturalVoice.lang
+    } else {
+      utterance.lang = 'hi-IN'
+    }
+
+    /*
+     * 🎙️ INDIAN NATURAL FEMALE VOICE ACOUSTIC PROFILE:
+     * - pitch = 1.14 (Youthful, sweet, natural Indian female voice pitch matching sample)
+     * - rate = 1.02 (Clear, fluent, expressive conversational speed)
+     * - volume = 1.0
+     */
+    utterance.rate = 1.02
+    utterance.pitch = 1.14
+    utterance.volume = 1.0
+
+    utterance.onstart = () => {
+      setIsSpeaking(true)
+    }
+
+    utterance.onend = () => {
+      setIsSpeaking(false)
+    }
+
+    utterance.onerror = () => {
+      setIsSpeaking(false)
+    }
+
+    window.speechSynthesis.speak(utterance)
+  }, [])
+
+  const speakReply = useCallback((text) => {
+    if (!voiceEnabled) return
+
+    stopSpeaking()
+
+    // Clean text for natural human flow (removes markdown symbols, URLs, bullet points)
     const clean = text
-      .replaceAll(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F1E6}-\u{1F1FF}]/gu, '')
-      .replaceAll(/[*_#`[\]()]/g, '')
-      .replaceAll('\n', '. ')
-      .replaceAll(/\s+/g, ' ')
+      .replace(/[\u{1F300}-\u{1F9FF}]/gu, '')
+      .replace(/[\u{2600}-\u{26FF}]/gu, '')
+      .replace(/[\u{2700}-\u{27BF}]/gu, '')
+      .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, '')
+      .replace(/\*\*/g, '')
+      .replace(/[*_#`]/g, '')
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      .replace(/https?:\/\/\S+/g, '')
+      .replace(/```[\s\S]*?```/g, '')
+      .replace(/\n+/g, '. ')
+      .replace(/:\s*/g, '. ')
+      .replace(/;\s*/g, '. ')
+      .replace(/\s+/g, ' ')
       .trim()
 
     if (!clean) return
 
-    const utterance = new SpeechSynthesisUtterance(clean)
-    const femaleVoice = getEmoFemaleVoice()
-    if (femaleVoice) {
-      utterance.voice = femaleVoice
-      utterance.lang = femaleVoice.lang || 'en-IN'
-    } else {
-      utterance.lang = 'en-IN'
+    // Priority 1: High-Definition Sweet Neural Indian Female Voice (Matches the user's sample audio 100%)
+    try {
+      const isHindi = /[\u0900-\u097F]/.test(clean) || /namaste|aap|karein|hai|kaise|kya|bhai|dost|events/i.test(clean)
+      const langCode = isHindi ? 'hi' : 'hi'
+
+      const shortClean = clean.length > 200 ? clean.slice(0, 196) + '.' : clean
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${langCode}&client=tw-ob&q=${encodeURIComponent(shortClean)}`
+
+      const audio = new Audio(audioUrl)
+      audioRef.current = audio
+      audio.playbackRate = 1.05
+
+      audio.onplay = () => {
+        setIsSpeaking(true)
+      }
+
+      audio.onended = () => {
+        setIsSpeaking(false)
+        audioRef.current = null
+      }
+
+      audio.onerror = () => {
+        speakWithSynthesis(clean)
+      }
+
+      audio.play().catch(() => {
+        speakWithSynthesis(clean)
+      })
+    } catch {
+      speakWithSynthesis(clean)
     }
+  }, [voiceEnabled, speakWithSynthesis])
 
-    utterance.rate = 1.05
-    utterance.pitch = 1.35 // Cute EMO Robot Female Pitch
 
-    utterance.onstart = () => setIsSpeaking(true)
-    utterance.onend = () => setIsSpeaking(false)
-    utterance.onerror = () => setIsSpeaking(false)
-
-    window.speechSynthesis.speak(utterance)
-  }, [voiceEnabled])
 
   const triggerCelebration = useCallback(() => {
     setIsCelebrating(true)
@@ -440,7 +587,7 @@ export default function CampusBotWidget() {
     if (SR) {
       const recognition = new SR()
       recognition.lang = 'en-IN'
-      recognition.continuous = true
+      recognition.continuous = false
       recognition.interimResults = true
 
       recognition.onresult = (e) => {
@@ -457,6 +604,11 @@ export default function CampusBotWidget() {
           return
         }
         if (e.error !== 'aborted') {
+          if (e.error === 'not-allowed') {
+            showToast('Microphone access denied. Please allow it in your browser settings.', 'error')
+          } else if (e.error === 'network') {
+            showToast('Speech recognition unavailable. Please check your connection or use text input.', 'error')
+          }
           isRecordingActiveRef.current = false
           setIsListening(false)
         }
@@ -478,11 +630,6 @@ export default function CampusBotWidget() {
       recognitionRef.current = recognition
     }
   }, [])
-
-  const stopSpeaking = () => {
-    window.speechSynthesis?.cancel()
-    setIsSpeaking(false)
-  }
 
   const startRecording = () => {
     if (!recognitionRef.current) return
@@ -591,7 +738,7 @@ export default function CampusBotWidget() {
       setMessages(prev => [...prev, botMsg])
 
       if (voiceEnabled || isVoiceInput) {
-        speakReply(res.data.reply)
+        speakReply(res.data.speech_text || res.data.reply)
       }
 
       if (res.data.user_context?.badge) setUserBadge(res.data.user_context.badge)
@@ -624,9 +771,11 @@ export default function CampusBotWidget() {
     }])
   }
 
-  const markTyped = (index) => {
-    setMessages(prev => prev.map((m, i) => i === index ? { ...m, typed: true } : m))
+  const markTyped = (index, truncatedText = null) => {
+    setMessages(prev => prev.map((m, i) => i === index ? { ...m, typed: true, reply: truncatedText || m.reply } : m))
   }
+
+  const isBotTyping = messages.some(m => m.role === 'assistant' && !m.typed)
 
   let inputStyle = dark ? 'bg-[#111d35] text-slate-100 border-cyan-900/40 focus:border-cyan-500 placeholder-slate-500' : 'bg-slate-100 text-slate-900 border-slate-200 focus:border-cyan-500 placeholder-slate-400'
   if (isListening) {
@@ -639,30 +788,33 @@ export default function CampusBotWidget() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 font-[Inter,Manrope,sans-serif]">
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/35 backdrop-blur-[6px] z-40 transition-all duration-300 pointer-events-auto"
+          onClick={() => { stopSpeaking(); stopRecording(); setIsOpen(false) }}
+        />
+      )}
+      <div className="fixed bottom-3 right-3 sm:bottom-5 sm:right-5 z-50 font-[Inter,Manrope,sans-serif] max-w-[calc(100vw-24px)]">
 
       {!isOpen && (
-        <button
-          type="button"
-          onClick={() => { setIsWaving(false); setIsOpen(true) }}
-          className="bg-transparent border-none p-0 outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 rounded-full cursor-pointer"
-        >
+        <div className="hover:scale-105 active:scale-95 transition-transform">
           <EmoBotCharacter
-            onClick={() => { }}
+            onClick={() => { setIsWaving(false); setIsOpen(true) }}
             isTyping={loading}
             isSpeaking={isSpeaking}
             isListening={isListening}
             isWaving={isWaving}
             isCelebrating={isCelebrating}
             mood={currentMood}
-            size={65}
+            size={window.innerWidth < 640 ? 56 : 64}
           />
-        </button>
+        </div>
       )}
 
       {isOpen && (
         <div
-          className={`flex flex-col w-[380px] sm:w-[420px] h-[600px] max-h-[85vh] rounded-[24px] shadow-2xl border overflow-hidden backdrop-blur-xl transition-all duration-300 ${dark
+          className={`flex flex-col w-[calc(100vw-24px)] sm:w-[400px] h-[520px] max-h-[76vh] sm:h-[580px] sm:max-h-[82vh] rounded-[22px] sm:rounded-[26px] shadow-2xl border overflow-hidden backdrop-blur-xl transition-all duration-300 ${dark
             ? 'bg-[#0a0f1e]/95 text-slate-100 border-cyan-900/40 shadow-[0_8px_40px_rgba(8,145,178,0.15)]'
             : 'bg-white/98 text-slate-900 border-slate-200 shadow-[0_8px_40px_rgba(0,0,0,0.12)]'
             }`}
@@ -722,7 +874,7 @@ export default function CampusBotWidget() {
                             if (isSpeaking) {
                               stopSpeaking()
                             } else {
-                              speakReply(msg.reply)
+                              speakReply(msg.speech_text || msg.reply)
                             }
                           }}
                           title={isSpeaking ? "Stop Voice" : "Listen to Response"}
@@ -736,8 +888,9 @@ export default function CampusBotWidget() {
                         <TypewriterText
                           text={msg.reply}
                           speed={18}
-                          onComplete={() => markTyped(i)}
+                          onComplete={(truncatedText) => markTyped(i, truncatedText)}
                           onNavigate={(p) => navigate(p)}
+                          forceStop={globalForceStop}
                         />
                       ) : (
                         <MarkdownRenderer content={msg.reply} onNavigate={(p) => navigate(p)} />
@@ -827,12 +980,12 @@ export default function CampusBotWidget() {
           </div>
 
           {quickChips?.length > 0 && (
-            <div className={`px-3 py-2 shrink-0 border-t ${dark ? 'bg-[#0c1424] border-cyan-900/20' : 'bg-slate-50/80 border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+            <div className={`px-2.5 sm:px-3 py-1.5 shrink-0 border-t ${dark ? 'bg-[#0c1424] border-cyan-900/20' : 'bg-slate-50/80 border-slate-200'}`}>
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
                 {quickChips.map((chip, idx) => (
-                  <button type="button" key={chip.id || `chip-${idx}`} onClick={() => handleSendMessage(chip.prompt || chip.label, false)} disabled={loading} className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 ${dark ? 'bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-200 border-cyan-800/50' : 'bg-white hover:bg-cyan-50 text-cyan-700 border-cyan-200'
+                  <button type="button" key={chip.id || `chip-${idx}`} onClick={() => handleSendMessage(chip.prompt || chip.label, false)} disabled={loading} className={`shrink-0 flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-semibold border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 ${dark ? 'bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-200 border-cyan-800/50' : 'bg-white hover:bg-cyan-50 text-cyan-700 border-cyan-200'
                     }`}>
-                    <Zap className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400 shrink-0" />
                     <span>{chip.label || chip.prompt}</span>
                   </button>
                 ))}
@@ -840,13 +993,22 @@ export default function CampusBotWidget() {
             </div>
           )}
 
-          <div className={`p-3 shrink-0 border-t ${dark ? 'bg-[#080d1a] border-cyan-900/30' : 'bg-white border-slate-200'}`}>
+          <div className={`p-2.5 sm:p-3 shrink-0 border-t flex flex-col items-center relative ${dark ? 'bg-[#080d1a] border-cyan-900/30' : 'bg-white border-slate-200'}`}>
+            {isBotTyping && (
+              <button
+                type="button"
+                onClick={stopBotTyping}
+                className={`absolute -top-11 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-lg transition-all border ${dark ? 'bg-[#111d35] text-red-400 border-red-900/30 hover:bg-red-950/30' : 'bg-white text-red-500 border-slate-200 hover:bg-slate-50'}`}
+              >
+                <Square className="w-3 h-3 fill-current" /> Stop generating
+              </button>
+            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault()
                 handleSendMessage(null, wasVoiceUsedRef.current)
               }}
-              className="flex items-center gap-2"
+              className="flex items-center gap-1.5 sm:gap-2"
             >
               <input
                 ref={inputRef}
@@ -856,9 +1018,9 @@ export default function CampusBotWidget() {
                   setInputText(e.target.value)
                   if (!isListening) wasVoiceUsedRef.current = false
                 }}
-                placeholder={isListening ? '🎙️ Recording voice... speak now' : 'Ask Camy anything...'}
+                placeholder={isListening ? '🎙️ Recording voice...' : 'Ask Camy anything...'}
                 disabled={loading}
-                className={`flex-1 px-4 py-2.5 rounded-2xl text-[13px] outline-none border transition-all ${inputStyle}`}
+                className={`flex-1 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl text-[12.5px] sm:text-[13px] outline-none border transition-all ${inputStyle}`}
               />
 
               {(isListening || (inputText.trim() && isListening)) && (
@@ -866,9 +1028,9 @@ export default function CampusBotWidget() {
                   type="button"
                   onClick={cancelRecording}
                   title="Cancel & Discard Recording"
-                  className="w-9 h-9 rounded-2xl bg-slate-800 hover:bg-red-600/80 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer border border-slate-700"
+                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-slate-800 hover:bg-red-600/80 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer border border-slate-700"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
               )}
 
@@ -877,9 +1039,9 @@ export default function CampusBotWidget() {
                   type="button"
                   onClick={toggleMic}
                   title={isListening ? 'Pause / Stop Recording' : 'Start Voice Recording'}
-                  className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer border ${micButtonStyle}`}
+                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer border ${micButtonStyle}`}
                 >
-                  {isListening ? <Square className="w-4 h-4 fill-white" /> : <Mic className="w-4 h-4" />}
+                  {isListening ? <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" /> : <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                 </button>
               )}
 
@@ -887,9 +1049,9 @@ export default function CampusBotWidget() {
                 type="submit"
                 disabled={!inputText.trim() || loading}
                 title="Send Message to Camy"
-                className="w-10 h-10 rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white flex items-center justify-center shrink-0 hover:from-cyan-500 hover:to-teal-500 active:scale-95 disabled:opacity-30 transition-all cursor-pointer shadow-md"
+                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white flex items-center justify-center shrink-0 hover:from-cyan-500 hover:to-teal-500 active:scale-95 disabled:opacity-30 transition-all cursor-pointer shadow-md"
               >
-                {loading ? <Loader2 className="w-4.5 h-4.5 animate-spin" /> : <Send className="w-4 h-4 ml-0.5" />}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />}
               </button>
             </form>
           </div>
@@ -898,7 +1060,7 @@ export default function CampusBotWidget() {
 
       <style>{`
         @keyframes cbPop {
-          from { opacity: 0; transform: scale(0.92) translateY(16px); }
+          from { opacity: 0; transform: scale(0.95) translateY(14px); }
           to { opacity: 1; transform: scale(1) translateY(0); }
         }
         @keyframes soundWave {
@@ -923,5 +1085,6 @@ export default function CampusBotWidget() {
         }
       `}</style>
     </div>
+    </>
   )
 }

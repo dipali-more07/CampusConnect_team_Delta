@@ -25,11 +25,30 @@ import SettingsPage from './SettingsPage'
 import NotificationPanel from '../../components/admin/adminDashboard/NotificationPanel'
 import PageTransition from '../../components/common/PageTransition'
 
+let sharedAudioCtx = null;
+
+const initAudioContext = () => {
+  if (!sharedAudioCtx) {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (AudioContext) {
+      sharedAudioCtx = new AudioContext();
+    }
+  }
+  if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
+    sharedAudioCtx.resume().catch(() => {});
+  }
+  return sharedAudioCtx;
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('click', initAudioContext, { passive: true });
+  window.addEventListener('keydown', initAudioContext, { passive: true });
+}
+
 const playNotificationSound = () => {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext
-    if (!AudioContext) return
-    const ctx = new AudioContext()
+    const ctx = initAudioContext();
+    if (!ctx) return;
     
     // First chime (ding)
     const osc1 = ctx.createOscillator()

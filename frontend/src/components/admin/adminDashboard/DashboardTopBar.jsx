@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Moon, Sun, Bell, ChevronRight, ChevronDown, User, Settings, Key, LogOut, GraduationCap } from 'lucide-react'
+import { Moon, Sun, Bell, ChevronRight, ChevronDown, ChevronUp, User, Settings, Key, LogOut, GraduationCap } from 'lucide-react'
 import { useTheme } from '../../../context/ThemeContext'
 
 const getUserInitials = (user) => {
@@ -193,7 +193,7 @@ export default function DashboardTopBar({
               />
             </div>
             <span
-              className="text-[14.5px] font-extrabold leading-none"
+              className="text-[14.5px] font-extrabold leading-none text-slate-900 dark:text-[#e8f0fe]"
               style={{
                 color: logoHover ? BRAND : undefined,
                 transition: 'color 0.25s ease',
@@ -257,13 +257,17 @@ export default function DashboardTopBar({
           <button
             type="button"
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex items-center gap-1.5 pl-1.5 pr-1.5 sm:pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#1a3050] bg-transparent cursor-pointer hover:bg-slate-50 dark:hover:bg-[#162640] transition-all duration-150"
+            className="flex items-center gap-1.5 pl-1.5 pr-2 sm:pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-[#1a3050] bg-transparent cursor-pointer hover:bg-slate-50 dark:hover:bg-[#162640] transition-all duration-150"
           >
             <DropdownAvatar user={user} />
             <span className="hidden sm:inline text-[13px] font-semibold text-slate-800 dark:text-[#e8f0fe] max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap">
               {user?.name || 'Dr. Priya Sharma'}
             </span>
-            <ChevronDown size={14} className="hidden sm:block text-slate-400 dark:text-[#3d5470]" />
+            {dropdownOpen ? (
+              <ChevronUp size={14} className="text-slate-400 dark:text-[#7a98bb] transition-transform shrink-0" />
+            ) : (
+              <ChevronDown size={14} className="text-slate-400 dark:text-[#7a98bb] transition-transform shrink-0" />
+            )}
           </button>
 
           {/* Profile Dropdown Menu */}

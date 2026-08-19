@@ -1,5 +1,6 @@
 import React from 'react'
 import { Loader2 } from 'lucide-react'
+import CustomSelect from '../../common/CustomSelect'
 
 export default function SettingsProfileTab({
   profileForm,
@@ -20,29 +21,29 @@ export default function SettingsProfileTab({
       {/* Initials Avatar */}
       <div className="flex items-center gap-4">
         <div
-          className="w-14 h-14 rounded-full flex items-center justify-center font-extrabold text-white text-[18px] shrink-0"
-          style={{ background: profileForm.avatarColor || BRAND }}
+          className="w-14 h-14 rounded-2xl flex items-center justify-center text-[20px] font-black text-white shrink-0"
+          style={{ background: BRAND, boxShadow: `0 6px 20px ${BRAND}40` }}
         >
-          {profileForm.name ? profileForm.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'CC'}
+          {(profileForm.name || 'AU').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
         </div>
         <div>
-          <p className="text-[13px] font-bold m-0" style={{ color: tokens.txtPri }}>{profileForm.name || 'User'}</p>
-          <p className="text-[11.5px] m-0 mt-0.5" style={{ color: tokens.txtSec }}>{profileForm.email || ''}</p>
+          <p className="text-[14px] font-bold m-0" style={{ color: tokens.txtPri }}>{profileForm.name || 'Admin User'}</p>
+          <p className="text-[12px] m-0" style={{ color: tokens.txtMuted }}>{profileForm.email || 'admin@campusconnect.com'}</p>
         </div>
       </div>
 
-      {/* Profile Form fields */}
-      <div className="space-y-4 max-w-[500px]">
+      <form onSubmit={handleSaveProfile} className="space-y-4 max-w-[500px]">
         <div>
           <label htmlFor="profileName" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Full Name</label>
           <input
             id="profileName"
-            value={profileForm.name}
+            value={profileForm.name || ''}
             onChange={e => setProfileForm(p => ({ ...p, name: e.target.value }))}
             className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
             style={inputStyle}
             onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
             onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
+            required
           />
         </div>
 
@@ -50,12 +51,14 @@ export default function SettingsProfileTab({
           <label htmlFor="profileEmail" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Email</label>
           <input
             id="profileEmail"
-            value={profileForm.email}
+            type="email"
+            value={profileForm.email || ''}
             onChange={e => setProfileForm(p => ({ ...p, email: e.target.value }))}
             className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all"
             style={inputStyle}
             onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
             onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
+            required
           />
         </div>
 
@@ -73,21 +76,20 @@ export default function SettingsProfileTab({
         </div>
 
         <div>
-          <label htmlFor="profileGender" className="text-[11.5px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Gender</label>
-          <select
+          <CustomSelect
             id="profileGender"
+            label="Gender"
             value={profileForm.gender || ''}
-            onChange={e => setProfileForm(p => ({ ...p, gender: e.target.value }))}
-            className="w-full px-3.5 py-2.5 rounded-xl text-[13px] outline-none border transition-all cursor-pointer"
-            style={inputStyle}
-            onFocus={e => { e.target.style.borderColor = BRAND; e.target.style.boxShadow = `0 0 0 3px ${BRAND}20` }}
-            onBlur={e => { e.target.style.borderColor = tokens.border; e.target.style.boxShadow = 'none' }}
-          >
-            <option value="" style={{ background: tokens.card }}>Select Gender</option>
-            <option value="male" style={{ background: tokens.card }}>Male</option>
-            <option value="female" style={{ background: tokens.card }}>Female</option>
-            <option value="other" style={{ background: tokens.card }}>Other</option>
-          </select>
+            onChange={(e, val) => setProfileForm(p => ({ ...p, gender: val }))}
+            placeholder="Select Gender"
+            options={[
+              { value: '', label: 'Select Gender' },
+              { value: 'male', label: 'Male' },
+              { value: 'female', label: 'Female' },
+              { value: 'other', label: 'Other' },
+            ]}
+            dark={tokens.dark ?? true}
+          />
         </div>
 
         <div>
@@ -117,7 +119,7 @@ export default function SettingsProfileTab({
             Save Changes
           </button>
         </div>
-      </div>
+      </form>
     </div>
   )
 }

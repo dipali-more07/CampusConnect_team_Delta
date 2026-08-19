@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { X, Loader2, Eye, EyeOff } from 'lucide-react'
+import CustomSelect from '../../common/CustomSelect'
 
 const evaluatePasswordStrength = (pass) => {
   if (!pass) return { label: '', colorClass: '', barColor: '', width: '0%' }

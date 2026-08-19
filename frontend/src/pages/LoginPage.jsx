@@ -641,6 +641,7 @@ export default function LoginPage() {
                 <KeyRound size={20} />
               </div>
               <button
+                type='button'
                 onClick={() => setForgotOpen(false)}
                 className="w-8 h-8 rounded-lg border-none bg-transparent hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center cursor-pointer transition-colors"
               >

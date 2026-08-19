@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import {
-  MapPin, Clock, ExternalLink,
+  MapPin, Clock, ExternalLink, Users,
   UserPlus, CheckSquare, Calendar, Award, Send, XCircle, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { UPCOMING_EVENTS, RECENT_ACTIVITY, BRAND } from '../../../data/dashboardData'
@@ -10,14 +10,14 @@ import eventsService from '../../../services/eventsService'
 const resolveActivityIcon = (type, text) => {
   const t = (type || '').toLowerCase()
   const txt = (text || '').toLowerCase()
-  
+
   if (t === 'registration' || txt.includes('register')) return { icon: UserPlus, color: '#4f46e5' }
   if (t === 'attendance' || txt.includes('attendance')) return { icon: CheckSquare, color: '#16a34a' }
   if (t === 'publish' || t === 'event' || txt.includes('publish') || txt.includes('event') || txt.includes('create')) return { icon: Calendar, color: '#0284c7' }
   if (t === 'certificate' || txt.includes('certificate')) return { icon: Award, color: '#d97706' }
   if (t === 'notification' || txt.includes('notification')) return { icon: Send, color: '#7c3aed' }
   if (t === 'cancel' || txt.includes('cancel')) return { icon: XCircle, color: '#ef4444' }
-  
+
   return { icon: Calendar, color: '#615FFF' } // Default fallback
 }
 
@@ -87,7 +87,7 @@ export default function BottomRow({ dark }) {
                 monthStr = dObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
                 dayStr = String(dObj.getDate())
               }
-            } catch {}
+            } catch { }
           }
           return {
             ...ev,
@@ -130,52 +130,65 @@ export default function BottomRow({ dark }) {
               return (
                 <div
                   key={ev.id}
-                  className="flex flex-wrap sm:flex-nowrap items-center gap-3.5 px-4 py-3.5 rounded-2xl border cursor-pointer transition-all duration-200"
+                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all duration-200 hover:-translate-y-0.5"
                   style={{
                     borderColor: dark ? '#1a3050' : '#e2e8f0',
                     background: dark ? '#060e1c' : '#f8fafc',
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = ev.color; e.currentTarget.style.boxShadow = `0 0 0 3px ${ev.color}25` }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = ev.color || BRAND; e.currentTarget.style.boxShadow = `0 0 0 3px ${(ev.color || BRAND)}25` }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = dark ? '#1a3050' : '#e2e8f0'; e.currentTarget.style.boxShadow = 'none' }}
                 >
-                  {/* Date badge */}
-                  <div
-                    className="min-w-[48px] h-[54px] rounded-xl flex flex-col items-center justify-center text-white shrink-0"
-                    style={{ background: ev.color }}
-                  >
-                    <span className="text-[9px] font-bold tracking-widest opacity-90 uppercase">{ev.month}</span>
-                    <span className="text-[20px] font-black leading-[1.1]">{ev.day}</span>
-                  </div>
+                  {/* Event Details (Date + Title + Metadata) */}
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    {/* Date badge */}
+                    <div
+                      className="w-[46px] h-[52px] rounded-xl flex flex-col items-center justify-center text-white shrink-0 shadow-xs"
+                      style={{ background: ev.color || BRAND }}
+                    >
+                      <span className="text-[9px] font-bold tracking-widest opacity-90 uppercase">{ev.month}</span>
+                      <span className="text-[19px] font-black leading-tight">{ev.day}</span>
+                    </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-bold text-slate-900 dark:text-[#e8f0fe] m-0 whitespace-nowrap overflow-hidden text-ellipsis">{eventTitle}</p>
-                    <div className="flex gap-3 mt-1">
-                      <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
-                        <MapPin size={10} /> {ev.venue}
-                      </span>
-                      <span className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
-                        <Clock size={10} /> {formatTo12Hr(ev.time)}
-                      </span>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13.5px] font-bold text-slate-900 dark:text-[#e8f0fe] m-0 truncate" title={eventTitle}>
+                        {eventTitle}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-slate-500 dark:text-[#7a98bb]">
+                        {ev.venue && (
+                          <span className="flex items-center gap-1 truncate max-w-[140px] sm:max-w-[120px]">
+                            <MapPin size={11} className="shrink-0 text-slate-400" />
+                            <span className="truncate">{ev.venue}</span>
+                          </span>
+                        )}
+                        {ev.time && (
+                          <span className="flex items-center gap-1 shrink-0">
+                            <Clock size={11} className="shrink-0 text-slate-400" />
+                            <span>{formatTo12Hr(ev.time)}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Count + progress */}
-                  <div className="w-full sm:w-auto shrink-0 sm:min-w-[160px] flex items-center gap-3 mt-2 sm:mt-0 justify-between sm:justify-start pl-16 sm:pl-0">
-                    <div className="text-right min-w-[70px]">
-                      <p className="text-[13px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0">
+                  {/* Count + Progress Bar */}
+                  <div className="w-full sm:w-44 lg:w-48 shrink-0 flex flex-col justify-center pt-2.5 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 dark:border-slate-800/80">
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span className="text-[11px] font-medium text-slate-500 dark:text-[#7a98bb] flex items-center gap-1 sm:hidden">
+                        <Users size={11} className="text-slate-400" />
+                        <span>Registered</span>
+                      </span>
+                      <p className="text-[12px] sm:text-[13px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0 ml-auto text-right">
                         {ev.registered.toLocaleString()}
                         <span className="text-[11px] font-medium text-slate-400 dark:text-[#3d5470]">/{ev.capacity.toLocaleString()}</span>
+                        
                       </p>
-                      <p className="text-[10px] text-slate-400 dark:text-[#3d5470] mt-0.5 font-medium">registered</p>
                     </div>
-                    <div className="flex-1 min-w-[70px]">
-                      <div className="h-1.5 rounded-full overflow-hidden bg-slate-200 dark:bg-[#162640]">
-                        <div
-                          className="h-full rounded-full transition-[width] duration-500 ease-in-out"
-                          style={{ width: `${pct}%`, background: ev.color }}
-                        />
-                      </div>
+                    <div className="h-1.5 w-full rounded-full overflow-hidden bg-slate-200 dark:bg-[#162640]">
+                      <div
+                        className="h-full rounded-full transition-[width] duration-500 ease-in-out"
+                        style={{ width: `${Math.min(pct, 100)}%`, background: ev.color || BRAND }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -257,7 +270,7 @@ export default function BottomRow({ dark }) {
 
                 <div className="flex items-center gap-1">
                   <button
-                  type='button'
+                    type='button'
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
                     className="w-7 h-7 rounded-lg flex items-center justify-center border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-[#7a98bb] disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#162640] transition-colors cursor-pointer"
@@ -271,11 +284,10 @@ export default function BottomRow({ dark }) {
                       type='button'
                       key={page}
                       onClick={() => setCurrentPage(page)}
-                      className={`w-7 h-7 rounded-lg text-[11.5px] font-extrabold transition-colors cursor-pointer ${
-                        currentPage === page
+                      className={`w-7 h-7 rounded-lg text-[11.5px] font-extrabold transition-colors cursor-pointer ${currentPage === page
                           ? 'bg-[#615FFF] text-white shadow-xs'
                           : 'text-slate-600 dark:text-[#7a98bb] hover:bg-slate-100 dark:hover:bg-[#162640]'
-                      }`}
+                        }`}
                     >
                       {page}
                     </button>

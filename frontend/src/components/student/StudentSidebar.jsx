@@ -102,7 +102,7 @@ function SidebarLogoHeader({ isCollapsedView, isMobile, collapsed, brandColor, l
           >
             CampusConnect
           </span>
-          <span className="text-[11px] font-medium leading-none text-slate-400 dark:text-[#4a6a8a]">
+          <span className="text-[11px] font-medium leading-none text-slate-400 dark:text-[#7a98bb]">
             Student Portal
           </span>
         </div>

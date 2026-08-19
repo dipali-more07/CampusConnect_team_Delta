@@ -5,6 +5,7 @@ import {
   ResponsiveContainer, PieChart, Pie,
 } from 'recharts'
 import analyticsService from '../../../services/analyticsService'
+import CustomSelect from '../../common/CustomSelect'
 
 function CustomTooltip({ active, payload, label, dark }) {
   if (!active || !payload?.length) return null
@@ -113,19 +114,18 @@ export default function ChartsRow({ dark, tokens }) {
             <h2 className="text-[15px] font-extrabold text-slate-900 dark:text-[#e8f0fe] m-0">Event &amp; Registration Growth</h2>
             <p className="text-[12px] text-[#7a98bb] mt-0.5">{isGrowthApi ? "Last 30 Days" : `January — August ${selectedYear}`}</p>
           </div>
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="text-[12px] border rounded-lg px-3 py-1.5 text-slate-500 dark:text-[#7a98bb] outline-none cursor-pointer"
-            style={{
-              borderColor: border,
-              background: inputBg,
-            }}
-          >
-            <option value={2026}>2026</option>
-            <option value={2025}>2025</option>
-            <option value={2024}>2024</option>
-          </select>
+          <div className="w-[100px]">
+            <CustomSelect
+              value={selectedYear}
+              onChange={(e, val) => setSelectedYear(Number(val))}
+              options={[
+                { value: 2026, label: '2026' },
+                { value: 2025, label: '2025' },
+                { value: 2024, label: '2024' },
+              ]}
+              dark={dark}
+            />
+          </div>
         </div>
         <ResponsiveContainer width="100%" height={220}>
           <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>

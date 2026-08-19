@@ -8,6 +8,16 @@ export default function StudentCertificatesView({ tokens, user }) {
   const BRAND = accentColor || '#615FFF'
   const [selectedCert, setSelectedCert] = useState(null)
 
+  const formatPosition = (pos) => {
+    if (!pos) return 'Certificate of Participation'
+    const p = String(pos).trim()
+    if (p === '1') return '1st Place'
+    if (p === '2') return '2nd Place'
+    if (p === '3') return '3rd Place'
+    if (!isNaN(p)) return `Rank ${p}`
+    return p
+  }
+
   const CERTIFICATES = [
     { id: 'CERT-001-4706', event: 'TechFest 2K25', issueDate: '2025-08-15', category: 'Technical', position: 'Winner (1st Place)', verifyCode: 'CERT-001-4706' },
     { id: 'CERT-002-6193', event: 'Annual Cultural Fest', issueDate: '2025-07-22', category: 'Cultural', position: 'Participant', verifyCode: 'CERT-002-6193' },
@@ -70,20 +80,32 @@ export default function StudentCertificatesView({ tokens, user }) {
               </div>
 
               <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                {cert.position || 'Certificate of Participation'}
+                {formatPosition(cert.position)}
               </span>
 
               <h3 className="text-xl font-extrabold text-slate-900 dark:text-white mt-2 mb-1 tracking-tight">
                 {cert.event || cert.event_name || cert.title || 'Campus Event'}
               </h3>
-              <p className="text-xs font-medium text-slate-500 dark:text-[#7a98bb] m-0">
-                Issued on: {cert.issueDate || cert.generated_at || 'N/A'} • Department: {user?.department || 'Computer Science'}
-              </p>
+              <div className="mt-3 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-500 dark:text-[#7a98bb]">Category</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{cert.category || 'General'}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-500 dark:text-[#7a98bb]">Issued On</span>
+                  <span className="font-bold text-slate-900 dark:text-white">{cert.issueDate || cert.generated_at || 'N/A'}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-slate-500 dark:text-[#7a98bb]">Department</span>
+                  <span className="font-bold text-slate-900 dark:text-white truncate max-w-[140px]" title={user?.department || 'Computer Science'}>{user?.department || 'Computer Science'}</span>
+                </div>
+              </div>
             </div>
 
             {/* Actions */}
             <div className="mt-5 pt-4 border-t border-slate-100 dark:border-[#1a3050] flex items-center gap-2">
               <button
+                type='button'
                 onClick={() => downloadCertificatePDF({ ...cert, userName: user?.name })}
                 className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap transition-all hover:opacity-90 active:scale-95 shadow-sm"
                 style={{ background: BRAND }}
@@ -91,6 +113,7 @@ export default function StudentCertificatesView({ tokens, user }) {
                 <Download size={14} className="shrink-0" /> Download PDF
               </button>
               <button
+                type='button'
                 onClick={() => setSelectedCert(cert)}
                 className="px-3 py-2.5 rounded-xl font-bold text-xs border border-slate-200 dark:border-[#1e2d45] text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-[#162640] hover:bg-slate-100 dark:hover:bg-[#1e2d45] cursor-pointer transition-colors flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 active:scale-95"
               >
@@ -115,18 +138,20 @@ export default function StudentCertificatesView({ tokens, user }) {
             <div className="p-6 rounded-2xl bg-slate-50 dark:bg-[#162640] border border-slate-200 dark:border-[#1a3050] text-left text-xs space-y-2 mb-6">
               <p><strong className="text-slate-900 dark:text-white">Awarded to:</strong> {user?.name || 'Arjun Sharma'}</p>
               <p><strong className="text-slate-900 dark:text-white">Event:</strong> {selectedCert.event}</p>
-              <p><strong className="text-slate-900 dark:text-white">Achievement:</strong> {selectedCert.position}</p>
+              <p><strong className="text-slate-900 dark:text-white">Achievement:</strong> {formatPosition(selectedCert.position)}</p>
               <p><strong className="text-slate-900 dark:text-white">Verification Code:</strong> {selectedCert.verifyCode}</p>
             </div>
 
             <div className="flex gap-3">
               <button
+                type='button'
                 onClick={() => setSelectedCert(null)}
                 className="flex-1 py-2.5 rounded-xl font-bold text-xs border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer"
               >
                 Close
               </button>
               <button
+                type='button'
                 onClick={() => downloadCertificatePDF({ ...selectedCert, userName: user?.name })}
                 className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer"
                 style={{ background: BRAND }}

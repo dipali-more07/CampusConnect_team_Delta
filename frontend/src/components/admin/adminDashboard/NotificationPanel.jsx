@@ -24,14 +24,21 @@ function NotificationItem({ n, idx, total, markRead, deleteNotif, dark, BRAND })
   }
 
   return (
-    <button
-      type="button"
-      className="w-full text-left flex gap-3 px-4 py-3.5 relative cursor-pointer transition-colors duration-200 group border-none"
+    <div
+      role="button"
+      tabIndex={0}
+      className="w-full text-left flex gap-3 px-4 py-3.5 relative cursor-pointer transition-colors duration-200 group border-none select-none outline-none"
       style={{
         borderBottom,
         background: itemBg,
       }}
       onClick={() => markRead(n.id)}
+      onKeyDown={e => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          markRead(n.id)
+        }
+      }}
       onMouseEnter={e => { if (!n.unread) e.currentTarget.style.background = dark ? '#162640' : '#f8fafc' }}
       onMouseLeave={e => { if (!n.unread) e.currentTarget.style.background = 'transparent' }}
     >
@@ -74,7 +81,7 @@ function NotificationItem({ n, idx, total, markRead, deleteNotif, dark, BRAND })
       >
         <X size={12} />
       </button>
-    </button>
+    </div>
   )
 }
 

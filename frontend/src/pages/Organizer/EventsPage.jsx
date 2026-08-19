@@ -649,6 +649,7 @@ export default function EventsPage({ tokens }) {
             categories={categories}
             eventTypes={eventTypes}
             tokens={tokens}
+            dark={dark}
           />
 
           {/* Delete Confirmation Modal */}

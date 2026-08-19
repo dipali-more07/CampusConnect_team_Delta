@@ -1,6 +1,7 @@
 import React from 'react'
 import { Search, Plus, Upload, Download } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
+import CustomSelect from '../../common/CustomSelect'
 
 export default function EventsHeader({
   dark,
@@ -73,7 +74,7 @@ export default function EventsHeader({
       <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
         
         {/* Search */}
-        <div className="relative w-full max-w-[280px]">
+        <div className="relative w-full sm:max-w-[280px]">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2" style={{ color: dark ? '#7a98bb' : '#94a3b8' }} />
           <input
             type="text"
@@ -98,28 +99,19 @@ export default function EventsHeader({
           />
         </div>
 
-        {/* Tab & Dropdown filters */}
-        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-          
-          {/* Status Tabs */}
-          <div 
-            className="flex items-center rounded-xl p-1 border h-[42px] box-border overflow-x-auto max-w-full flex-nowrap"
-            style={{
-              borderColor: dark ? '#1a3050' : '#e2e8f0',
-              background: dark ? '#0f1e30' : '#ffffff',
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-            }}
-          >
+        {/* Filters Group */}
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Status Pills */}
+          <div className="flex items-center gap-1 p-1 rounded-xl border overflow-x-auto" style={{ background: dark ? '#0f1e30' : '#f8fafc', borderColor: dark ? '#1a3050' : '#e2e8f0' }}>
             {statuses.map(st => {
               const active = activeStatus === st
               const inactiveColor = dark ? '#7a98bb' : '#64748b'
               return (
                 <button
-                  type="button"
                   key={st}
+                  type="button"
                   onClick={() => setActiveStatus(st)}
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-bold border-none cursor-pointer transition-all duration-150 whitespace-nowrap"
+                  className="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer border-none whitespace-nowrap"
                   style={{
                     background: active ? BRAND : 'transparent',
                     color: active ? '#ffffff' : inactiveColor,
@@ -132,21 +124,17 @@ export default function EventsHeader({
           </div>
 
           {/* Category Filter */}
-          <select
-            value={activeCategory}
-            onChange={e => setActiveCategory(e.target.value)}
-            className="h-[42px] px-3.5 rounded-xl text-[12.5px] font-semibold outline-none cursor-pointer border"
-            style={{
-              borderColor: dark ? '#1a3050' : '#e2e8f0',
-              color: dark ? '#e8f0fe' : '#475569',
-              background: dark ? '#0f1e30' : '#ffffff',
-            }}
-          >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat === 'All' ? 'All Categories' : cat}</option>
-            ))}
-          </select>
-
+          <div className="min-w-[150px]">
+            <CustomSelect
+              value={activeCategory}
+              onChange={(e, val) => setActiveCategory(val)}
+              options={categories.map(cat => ({
+                value: cat,
+                label: cat === 'All' ? 'All Categories' : cat
+              }))}
+              dark={dark}
+            />
+          </div>
         </div>
       </div>
     </>

@@ -1,5 +1,6 @@
 import React from 'react'
 import { Search, X } from 'lucide-react'
+import CustomSelect from '../../common/CustomSelect'
 
 export default function CertificateFilters({
   searchQuery,
@@ -20,6 +21,8 @@ export default function CertificateFilters({
   tokens,
   BRAND
 }) {
+  const uniqueEvents = Array.from(new Set(events || []))
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="relative w-full max-w-[280px]">
@@ -67,22 +70,13 @@ export default function CertificateFilters({
         </div>
 
         {/* Event filter */}
-        <div className="relative">
-          <select
+        <div className="min-w-[150px]">
+          <CustomSelect
             value={activeEvent}
-            onChange={e => setActiveEvent(e.target.value)}
-            className="pl-4 pr-9 h-[42px] rounded-full text-[12.5px] outline-none cursor-pointer border appearance-none font-bold"
-            style={{ background: tokens.card, borderColor: tokens.border, color: tokens.txtPri }}
-          >
-            {events.map(ev => (
-              <option key={ev} value={ev}>{ev}</option>
-            ))}
-          </select>
-          <div className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: tokens.txtSec }}>
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-              <path d="M1 1.5L5 4.5L9 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
+            onChange={(e, val) => setActiveEvent(val)}
+            options={uniqueEvents.map(ev => ({ value: ev, label: ev }))}
+            dark={tokens.dark ?? true}
+          />
         </div>
 
         {/* Bulk actions */}

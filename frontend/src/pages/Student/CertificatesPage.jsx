@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Award, Download, ExternalLink, ShieldCheck, Loader2 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import studentService from '../../services/studentService'
 import certificatesService from '../../services/certificatesService'
-import { downloadCertificatePDF } from '../../utils/pdfGenerator'
+import { downloadCertificatePDF, renderCertificateCanvas } from '../../utils/pdfGenerator'
 
 export default function CertificatesPage({ tokens, user }) {
   const { accentColor } = useTheme()
@@ -42,24 +43,86 @@ export default function CertificatesPage({ tokens, user }) {
       const active = templates.find(t => t.is_active) || templates[0]
       if (active) {
         setActiveTmpl({
-          org:         active.organisation_name  || 'State University',
-          title:       active.certificate_title  || 'Certificate of Participation',
-          subtitle:    'This is to certify that',
-          body:        'has successfully participated in',
-          footer:      'campusconnect.university.edu/verify',
-          gradFrom:    active.background_gradient_from || active.background_image || '#1a1060',
-          gradMid:     active.background_gradient_mid  || '#0f0a45',
-          gradTo:      active.background_gradient_to   || '#0a0838',
-          accentColor: active.accent_color  || active.font_color || '#615FFF',
-          borderStyle: active.border_style  || 'none',
-          fontFamily:  active.font_family   || 'Manrope, sans-serif',
-          showLogo:        active.show_logo       !== false,
-          showSignatures:  active.show_signatures !== false,
+          org: active.organisation_name || 'State University',
+          title: active.certificate_title || 'Certificate of Participation',
+          subtitle: 'This is to certify that',
+          body: 'has successfully participated in',
+          footer: 'campusconnect.university.edu/verify',
+          gradFrom: active.background_gradient_from || active.background_image || '#1a1060',
+          gradMid: active.background_gradient_mid || '#0f0a45',
+          gradTo: active.background_gradient_to || '#0a0838',
+          accentColor: active.accent_color || active.font_color || '#615FFF',
+          borderStyle: active.border_style || 'none',
+          fontFamily: active.font_family || 'Manrope, sans-serif',
+          showLogo: active.show_logo !== false,
+          showSignatures: active.show_signatures !== false,
         })
       }
     })
     return () => { cancelled = true }
   }, [])
+
+  const [imgSrc, setImgSrc] = useState(null)
+  const [eventsList, setEventsList] = useState([])
+
+  useEffect(() => {
+    studentService.fetchEventsData().then(res => {
+      if (res.success) setEventsList(res.data)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (selectedCert) {
+      const position = selectedCert.position || selectedCert.certificate_type || selectedCert.rank || '';
+      const certType = (selectedCert.certificate_type || '').toLowerCase();
+      const certTitle = selectedCert.certificate_title || '';
+      const rankVal = Number(selectedCert.rank || 0);
+
+      const isAchievement = (certType && certType !== 'participation' && certType !== 'participant') ||
+        (position &&
+          !position.toLowerCase().includes('participant') &&
+          !position.toLowerCase().includes('participation') &&
+          !position.toLowerCase().includes('completed') &&
+          !position.toLowerCase().includes('n/a'));
+
+      const template = { ...activeTmpl };
+
+      if (isAchievement) {
+        template.title = certTitle || 'Certificate of Merit';
+        if (certType === 'winner_1st' || rankVal === 1) {
+          template.body = 'has achieved 1st Place (Winner) in';
+        } else if (certType === 'runner_up_2nd' || rankVal === 2) {
+          template.body = 'has achieved 2nd Place (Runner Up) in';
+        } else if (certType === 'runner_up_3rd' || rankVal === 3) {
+          template.body = 'has achieved 3rd Place (Runner Up) in';
+        } else {
+          template.body = `has achieved ${position} in`;
+        }
+      } else if (certTitle) {
+        template.title = certTitle;
+      }
+
+      // Try to find matching event for venue and date
+      const matchedEv = eventsList.find(e => e.title === selectedCert.event || e.id === selectedCert.eventId) || {};
+
+      const certData = {
+        userName: user?.name || user?.full_name || selectedCert.studentName || selectedCert.name || 'Student',
+        eventName: selectedCert.eventName || selectedCert.event,
+        certCode: selectedCert.verifyCode || selectedCert.certificate_number || selectedCert.id,
+        issueDate: selectedCert.issuedDate || selectedCert.date || selectedCert.issueDate,
+        position: position,
+        certificate_number: selectedCert.certificate_number || selectedCert.verifyCode,
+        organizerName: selectedCert.organizerName || selectedCert.organizer || matchedEv.organizer,
+        venue: selectedCert.venue || matchedEv.venue,
+        eventDate: selectedCert.eventDate || matchedEv.date || selectedCert.date || selectedCert.issueDate
+      }
+
+      const dataUrl = renderCertificateCanvas(certData, template)
+      setImgSrc(dataUrl)
+    } else {
+      setImgSrc(null)
+    }
+  }, [selectedCert, activeTmpl, user, eventsList])
 
   return (
     <div className="p-6 flex flex-col gap-6" style={{ fontFamily: 'Manrope, sans-serif' }}>
@@ -125,6 +188,7 @@ export default function CertificatesPage({ tokens, user }) {
 
                 <div className="mt-6 pt-4 border-t flex items-center gap-3" style={{ borderColor: tokens.dark ? '#1a3050' : '#f1f5f9' }}>
                   <button
+                    type='button'
                     onClick={() => handleDownload(cert)}
                     disabled={downloadingId !== null}
                     className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 transition-all hover:opacity-90 disabled:opacity-50"
@@ -133,6 +197,7 @@ export default function CertificatesPage({ tokens, user }) {
                     {downloadingId === cert.id ? <><Loader2 size={14} className="animate-spin" /> Downloading...</> : <><Download size={14} /> Download PDF</>}
                   </button>
                   <button
+                    type='button'
                     onClick={() => setSelectedCert(cert)}
                     className="px-3.5 py-2.5 rounded-xl font-bold text-xs border cursor-pointer transition-colors flex items-center gap-1.5"
                     style={{ background: tokens.dark ? '#162640' : '#f8fafc', borderColor: tokens.dark ? '#1e2d45' : '#e2e8f0', color: tokens.txtPri }}
@@ -147,33 +212,51 @@ export default function CertificatesPage({ tokens, user }) {
       </div>
 
       {/* Preview Modal */}
-      {selectedCert && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white dark:bg-[#0c1829] border border-slate-200 dark:border-[#1a3050] rounded-3xl p-8 max-w-md w-full text-center shadow-2xl">
-            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-white mb-4 shadow-lg" style={{ background: BRAND }}>
-              <Award size={32} />
-            </div>
-            <h3 className="text-xl font-black text-slate-900 dark:text-white m-0">Certificate of Achievement</h3>
-            <p className="text-xs text-slate-400 mt-1 mb-6">Verified by CampusConnect University Platform</p>
-            <div className="p-5 rounded-2xl text-left text-xs space-y-2 mb-6 border" style={{ background: tokens.dark ? '#162640' : '#f8fafc', borderColor: tokens.dark ? '#1a3050' : '#e2e8f0' }}>
-              <p><strong className="text-slate-900 dark:text-white">Awarded to:</strong> {user?.name || 'Student'}</p>
-              <p><strong className="text-slate-900 dark:text-white">Event:</strong> {selectedCert.event || selectedCert.event_name || 'Campus Event'}</p>
-              <p><strong className="text-slate-900 dark:text-white">Achievement:</strong> {selectedCert.position || selectedCert.certificate_type || 'Participation'}</p>
-              <p><strong className="text-slate-900 dark:text-white">Verification Code:</strong> {selectedCert.verifyCode || selectedCert.certificate_number || selectedCert.id}</p>
-            </div>
-            <div className="flex gap-3">
-              <button onClick={() => setSelectedCert(null)} className="flex-1 py-2.5 rounded-xl font-bold text-xs border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer">Close</button>
+      {selectedCert && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedCert(null)}>
+          <div 
+            role="button" 
+            tabIndex={0} aria-label="Close modal" className="bg-white dark:bg-[#0c1829] border border-slate-200 dark:border-[#1a3050] rounded-[20px] max-w-[600px] w-full text-center shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 shrink-0 border-b border-slate-200 dark:border-[#1a3050]">
+              <h2 className="text-[16px] font-extrabold m-0 text-slate-900 dark:text-white">Certificate Preview</h2>
               <button
+                type="button"
+                onClick={() => setSelectedCert(null)}
+                className="w-8 h-8 rounded-full border-none bg-transparent cursor-pointer flex items-center justify-center transition-all duration-150 p-0 text-slate-500 hover:bg-slate-100 dark:hover:bg-[#1a3050]"
+              ><ExternalLink size={17} style={{ transform: 'rotate(45deg)' }} /></button>
+            </div>
+
+            {/* Certificate Visual Preview */}
+            <div className="p-5 flex-1 overflow-y-auto flex items-center justify-center bg-slate-50 dark:bg-black/20">
+              {imgSrc ? (
+                <img
+                  src={imgSrc}
+                  alt="Certificate Preview"
+                  className="w-full h-auto object-contain rounded shadow-lg border border-slate-200 dark:border-[#1a3050]"
+                  style={{ maxHeight: '60vh' }}
+                />
+              ) : (
+                <div className="w-full aspect-[1.414] animate-pulse rounded bg-slate-200 dark:bg-slate-800" />
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="px-5 py-4 border-t border-slate-200 dark:border-[#1a3050] flex gap-3">
+              <button type='button' onClick={() => setSelectedCert(null)} className="flex-1 py-3 rounded-xl font-bold text-xs border border-slate-200 dark:border-[#1a3050] text-slate-600 dark:text-slate-300 bg-transparent cursor-pointer hover:bg-slate-50 dark:hover:bg-[#162640] transition-colors">Close</button>
+              <button
+                type='button'
                 onClick={() => handleDownload(selectedCert)}
                 disabled={downloadingId !== null}
-                className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                style={{ background: BRAND }}
+                className="flex-1 py-3 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 transition-transform hover:-translate-y-px"
+                style={{ background: BRAND, boxShadow: '0 4px 14px rgba(97,95,255,0.4)' }}
               >
-                {downloadingId === selectedCert.id ? <><Loader2 size={14} className="animate-spin" /> Downloading...</> : 'Download Certificate'}
+                {downloadingId === selectedCert.id ? <><Loader2 size={14} className="animate-spin" /> Downloading...</> : <><Download size={14} /> Download PDF</>}
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

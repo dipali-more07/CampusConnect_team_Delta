@@ -12,15 +12,18 @@ export default function AnalyticsDeptChart({
       <div className="mb-6">
         <h3 className="text-[15px] font-extrabold m-0 text-slate-900 dark:text-slate-100">Department Distribution</h3>
       </div>
-      <div className="flex items-center justify-center flex-1" style={{ minHeight: 310 }}>
+      <div className="flex items-center justify-center flex-1" style={{ minHeight: 200 }}>
         {depts.length > 0 && (() => {
           let accum = 0
-          const R_PIE = 56
+          const R_PIE = 85
           const cxPie = 200
-          const cyPie = 150
+          const cyPie = 110
+
+          let prevRightY = -9999
+          let prevLeftY = 9999
 
           return (
-            <svg viewBox="0 0 400 300" width="100%" height="100%" className="overflow-visible w-full max-w-[600px]">
+            <svg viewBox="0 0 400 220" width="100%" height="100%" className="overflow-visible w-full max-w-[600px]">
               {depts.map((item) => {
                 const pctVal = item.percentage
                 const startAngle = (accum / 100) * 2 * Math.PI - Math.PI / 2
@@ -35,29 +38,39 @@ export default function AnalyticsDeptChart({
                 const midAngle = (startAngle + endAngle) / 2
                 const lx1 = cxPie + (R_PIE + 2) * Math.cos(midAngle)
                 const ly1 = cyPie + (R_PIE + 2) * Math.sin(midAngle)
-                const lx2 = cxPie + (R_PIE + 16) * Math.cos(midAngle)
-                const ly2 = cyPie + (R_PIE + 16) * Math.sin(midAngle)
+                
+                let lx2 = cxPie + (R_PIE + 16) * Math.cos(midAngle)
+                let ly2 = cyPie + (R_PIE + 16) * Math.sin(midAngle)
 
-                const right = Math.cos(midAngle) > 0.1
-                const left = Math.cos(midAngle) < -0.1
+                const right = Math.cos(midAngle) >= -0.01
+                const left = !right
+
+                if (right) {
+                  if (ly2 < prevRightY + 14) ly2 = prevRightY + 14
+                  prevRightY = ly2
+                } else {
+                  if (ly2 > prevLeftY - 14 && prevLeftY !== 9999) ly2 = prevLeftY - 14
+                  if (prevLeftY === 9999) prevLeftY = ly2
+                  else prevLeftY = ly2
+                }
 
                 let lx3 = lx2
                 if (right) {
-                  lx3 = lx2 + 12
+                  lx3 = lx2 + 16
                 } else if (left) {
-                  lx3 = lx2 - 12
+                  lx3 = lx2 - 16
                 }
 
                 const ly3 = ly2
 
                 let tx = lx3
                 if (right) {
-                  tx = lx3 + 4
+                  tx = lx3 + 5
                 } else if (left) {
-                  tx = lx3 - 4
+                  tx = lx3 - 5
                 }
 
-                const ty = ly3 + 3
+                const ty = ly3 + 4
 
                 let anchor = 'middle'
                 if (right) {

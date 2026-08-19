@@ -127,13 +127,13 @@ function SidebarHeader({ collapsed, isMobile, setCollapsed, setSidebarOpen, logo
         {!collapsed || isMobile ? (
           <div className="flex flex-col gap-0.5 overflow-hidden whitespace-nowrap">
             <span
-              className="text-[15px] font-extrabold leading-none text-[#0F172A]"
+              className="text-[15px] font-extrabold leading-none text-slate-900 dark:text-[#e8f0fe]"
               style={{
                 color: logoHover ? BRAND : undefined,
                 transition: 'color 0.25s ease',
               }}
             >CampusConnect</span>
-            <span className="text-[11px] font-medium leading-none text-slate-400 dark:text-[#4a6a8a]">
+            <span className="text-[11px] font-medium leading-none text-slate-400 dark:text-[#7a98bb]">
               {portalName}
             </span>
           </div>

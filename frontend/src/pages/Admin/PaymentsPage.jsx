@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import paymentsService from '../../services/paymentsService'
 import eventsService from '../../services/eventsService'
+import CustomSelect from '../../components/common/CustomSelect'
 import { useToast } from '../../context/ToastContext'
 import { useAuth } from '../../context/AuthContext'
 
@@ -444,34 +445,26 @@ export default function PaymentsPage({ tokens }) {
                 </div>
 
                 {/* Status Filter */}
-                <div className="relative shrink-0">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                    <Filter size={12} />
-                  </span>
-                  <select
+                <div className="shrink-0 min-w-[140px]">
+                  <CustomSelect
                     value={statusFilter}
-                    onChange={e => setStatusFilter(e.target.value)}
-                    className="pl-8 pr-8 py-2 border rounded-xl text-xs bg-white dark:bg-[#0c1829] focus:outline-none appearance-none cursor-pointer"
-                    style={inputStyle}
-                  >
-                    <option value="All">All Statuses</option>
-                    <option value="Success">Success</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Failed">Failed</option>
-                  </select>
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[9px]">▼</span>
+                    onChange={(e, val) => setStatusFilter(val)}
+                    options={[
+                      { value: 'All', label: 'All Statuses' },
+                      { value: 'Success', label: 'Success' },
+                      { value: 'Pending', label: 'Pending' },
+                      { value: 'Failed', label: 'Failed' },
+                    ]}
+                    dark={dark}
+                  />
                 </div>
 
                 {/* Event Filter — uses real events from API */}
                 {(user?.role !== 'organizer' || eventsList.length > 1) && (
-                  <div className="relative shrink-0">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                      <Filter size={12} />
-                    </span>
-                    <select
+                  <div className="shrink-0 min-w-[160px] max-w-[200px]">
+                    <CustomSelect
                       value={eventFilter === 'All' ? 'All' : eventFilter.id}
-                      onChange={e => {
-                        const val = e.target.value
+                      onChange={(e, val) => {
                         if (val === 'All') {
                           setEventFilter('All')
                         } else {
@@ -479,15 +472,12 @@ export default function PaymentsPage({ tokens }) {
                           setEventFilter(found || 'All')
                         }
                       }}
-                      className="pl-8 pr-8 py-2 border rounded-xl text-xs bg-white dark:bg-[#0c1829] max-w-[180px] truncate focus:outline-none appearance-none cursor-pointer"
-                      style={inputStyle}
-                    >
-                      <option value="All">All Events</option>
-                      {eventsList.map(ev => (
-                        <option key={ev.id} value={ev.id}>{ev.name}</option>
-                      ))}
-                    </select>
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[9px]">▼</span>
+                      options={[
+                        { value: 'All', label: 'All Events' },
+                        ...eventsList.map(ev => ({ value: ev.id, label: ev.name }))
+                      ]}
+                      dark={dark}
+                    />
                   </div>
                 )}
 
