@@ -20,6 +20,7 @@ import CertificatesPage from './CertificatesPage'
 import PaymentsPage from './PaymentsPage'
 import PageTransition from '../../components/common/PageTransition'
 import SuspendedAccountModal from '../../components/common/SuspendedAccountModal'
+import NotFoundPage from '../NotFoundPage'
 
 export default function StudentDashboard() {
   const { user, logout } = useAuth()
@@ -43,17 +44,22 @@ export default function StudentDashboard() {
       case 'payments':
         return 'Payments'
       case 'dashboard':
-      default:
         return 'Dashboard'
+      default:
+        return null
     }
   }
 
   const activeNav = getActiveNavFromPath(location.pathname)
 
+  if (activeNav === null) {
+    return <NotFoundPage />
+  }
+
   const setActiveNav = (label) => {
     navigate(`/student/${label.toLowerCase()}`)
   }
-  
+
   const [showLogoutModal, setShowLogoutModal] = useState(false)
   const [isSuspended, setIsSuspended] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
@@ -69,8 +75,8 @@ export default function StudentDashboard() {
         const localStudents = localStorage.getItem('cc_students_v1')
         if (localStudents) {
           const list = JSON.parse(localStudents)
-          const currentStudent = list.find(s => 
-            String(s.id) === String(user.id) || 
+          const currentStudent = list.find(s =>
+            String(s.id) === String(user.id) ||
             (s.email && user.email && s.email.toLowerCase() === user.email.toLowerCase())
           )
           if (currentStudent && currentStudent.status === 'Suspended') {
@@ -81,20 +87,20 @@ export default function StudentDashboard() {
         if (user.status === 'Suspended' || user.is_active === false) {
           setIsSuspended(true)
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     const checkRealtimeSuspension = async () => {
       try {
         const res = await fetchWithAuth(`${import.meta.env.VITE_API_BASE_URL}/auth/me`)
-        
+
         if (res.ok) {
           const data = await res.json().catch(() => ({}))
           const profile = data.data?.user || data.user || data.data || data
           if (profile && (
-            profile.status === 'Suspended' || 
-            profile.status === 'suspended' || 
-            profile.is_active === false || 
+            profile.status === 'Suspended' ||
+            profile.status === 'suspended' ||
+            profile.is_active === false ||
             profile.is_active === 'false'
           )) {
             setIsSuspended(true)
@@ -130,10 +136,10 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-        let cancelled = false
+    let cancelled = false
     setLoading(true)
     studentService.fetchDashboardOverview().then(res => {
-            if (cancelled) return
+      if (cancelled) return
       if (res.success) {
         setDashboardData(res.data)
       }
@@ -324,6 +330,7 @@ export default function StudentDashboard() {
 
               <div className="flex gap-3 w-full">
                 <button
+                  type='button'
                   onClick={cancelLogout}
                   className="flex-1 py-2.5 rounded-xl text-[13px] font-bold border cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-[#162640]"
                   style={{
@@ -335,6 +342,7 @@ export default function StudentDashboard() {
                   Cancel
                 </button>
                 <button
+                  type='button'
                   onClick={confirmLogout}
                   className="flex-1 py-2.5 rounded-xl text-[13px] font-bold border-none cursor-pointer text-white transition-all duration-150 hover:opacity-90 hover:-translate-y-px"
                   style={{

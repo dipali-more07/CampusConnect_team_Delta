@@ -1,4 +1,4 @@
- 
+
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
@@ -25,6 +25,7 @@ import OrganizersPage from '../Admin/OrganizersPage'
 import SettingsPage from '../Admin/SettingsPage'
 import NotificationPanel from '../../components/admin/adminDashboard/NotificationPanel'
 import PageTransition from '../../components/common/PageTransition'
+import NotFoundPage from '../NotFoundPage'
 
 let sharedAudioCtx = null;
 
@@ -36,7 +37,7 @@ const initAudioContext = () => {
     }
   }
   if (sharedAudioCtx && sharedAudioCtx.state === 'suspended') {
-    sharedAudioCtx.resume().catch(() => {});
+    sharedAudioCtx.resume().catch(() => { });
   }
   return sharedAudioCtx;
 };
@@ -50,32 +51,32 @@ const playNotificationSound = () => {
   try {
     const ctx = initAudioContext();
     if (!ctx) return;
-    
+
     // First chime (ding)
     const osc1 = ctx.createOscillator()
     const gain1 = ctx.createGain()
     osc1.connect(gain1)
     gain1.connect(ctx.destination)
-    
+
     osc1.type = 'sine'
     osc1.frequency.setValueAtTime(587.33, ctx.currentTime) // D5 note
     gain1.gain.setValueAtTime(0.15, ctx.currentTime)
     gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4)
-    
+
     osc1.start(ctx.currentTime)
     osc1.stop(ctx.currentTime + 0.4)
-    
+
     // Second chime (higher ding, slightly offset)
     const osc2 = ctx.createOscillator()
     const gain2 = ctx.createGain()
     osc2.connect(gain2)
     gain2.connect(ctx.destination)
-    
+
     osc2.type = 'sine'
     osc2.frequency.setValueAtTime(880, ctx.currentTime + 0.08) // A5 note
     gain2.gain.setValueAtTime(0.15, ctx.currentTime + 0.08)
     gain2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.48)
-    
+
     osc2.start(ctx.currentTime + 0.08)
     osc2.stop(ctx.currentTime + 0.48)
   } catch {
@@ -87,7 +88,7 @@ export default function AdminDashboard() {
   const { user, logout } = useAuth()
   const showToast = useToast()
   const { dark, toggleDark, accentColor } = useTheme()
-  
+
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -115,14 +116,19 @@ export default function AdminDashboard() {
       case 'notifications':
         return 'Notifications'
       case 'dashboard':
-      default:
         return 'Dashboard'
+      default:
+        return null
     }
   }
 
   const activeNav = getActiveNavFromPath(location.pathname)
 
-  const setActiveNav = (label) => {
+  if (activeNav === null) {
+    return <NotFoundPage />
+  }
+
+  const setActiveNav = (label) => { 
     navigate(`/admin/${label.toLowerCase()}`)
   }
 
@@ -420,7 +426,7 @@ export default function AdminDashboard() {
                     >
                       <Plus size={15} /> Create Event
                     </button>
-                    
+
                     <button
                       onClick={() => setActiveNav('Attendance')}
                       className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-white dark:bg-[#1a2236] text-slate-800 dark:text-slate-100 border border-slate-200 dark:border-[#1e2d45] cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-[#1e2d45]"

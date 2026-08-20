@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Moon, Sun, Bell, ChevronRight, ChevronDown, ChevronUp, User, Settings, Key, LogOut, GraduationCap } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Moon, Sun, Bell, ChevronRight, ChevronDown, ChevronUp, User, Settings, Key, LogOut, GraduationCap, HelpCircle } from 'lucide-react'
 import { useTheme } from '../../../context/ThemeContext'
 
 const getUserInitials = (user) => {
@@ -25,86 +26,103 @@ function DropdownAvatar({ user }) {
   )
 }
 
-function ProfileDropdown({ user, tokens, dark, handleNavClick, onLogout, setDropdownOpen }) {
+function ProfileDropdown({ user, tokens, handleNavClick, onLogout, setDropdownOpen }) {
   return (
-    <div
-      className="absolute right-0 mt-2 w-[220px] rounded-2xl overflow-hidden border z-50"
-      style={{
-        background: tokens.card,
-        borderColor: tokens.border,
-        boxShadow: dark ? '0 10px 40px rgba(0,0,0,0.5)' : '0 10px 30px rgba(0,0,0,0.08)',
-        animation: 'slideUp 0.18s cubic-bezier(0.4, 0, 0.2, 1)'
-      }}
-    >
-      {/* Header inside dropdown */}
-      <div className="px-4 py-3.5 border-b" style={{ borderColor: tokens.border }}>
-        <p className="text-[13.5px] font-extrabold m-0" style={{ color: tokens.txtPri }}>
-          {user?.name || 'Dr. Priya Sharma'}
-        </p>
-        <p className="text-[11px] font-medium m-0 mt-0.5 truncate" style={{ color: tokens.txtSec }}>
-          {user?.email || 'admin@university.edu'}
-        </p>
+    <>
+      <button
+        type="button"
+        aria-label="Close user menu"
+        className="fixed inset-0 z-40 bg-black/25 backdrop-blur-none border-none p-0 cursor-default transition-all duration-200"
+        onClick={() => setDropdownOpen(false)}
+      />
+      <div
+        className="absolute right-0 mt-3 w-64 rounded-3xl bg-white dark:bg-[#0d1627] border border-slate-200 dark:border-[#182842] shadow-2xl z-50 p-3 text-slate-700 dark:text-slate-200"
+        style={{ 
+          boxShadow: '0 10px 40px rgba(0,0,0,0.4)',
+          animation: 'slideUp 0.18s cubic-bezier(0.4, 0, 0.2, 1)'
+        }}
+      >
+      {/* Dropdown Indicator Pointer */}
+      <div className="absolute -top-2 right-8 w-4 h-4 bg-white dark:bg-[#0d1627] border-t border-l border-slate-200 dark:border-[#182842] transform rotate-45 z-0 rounded-tl-sm" />
+
+      {/* User Profile Header Card */}
+      <div className="relative z-10 flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-[#121f36] mb-2">
+        <div
+          className="w-12 h-12 rounded-full flex items-center justify-center text-white text-base font-black shrink-0 shadow-md overflow-hidden"
+          style={{ background: tokens?.brand || '#8b5cf6' }}
+        >
+          {user?.avatarUrl || user?.profile_image || (typeof user?.avatar === 'string' && (user.avatar.startsWith('data:') || user.avatar.startsWith('http') || user.avatar.startsWith('/'))) ? (
+            <img src={user?.avatarUrl || user?.profile_image || user?.avatar} alt="Avatar" className="w-full h-full object-cover" />
+          ) : (
+            getUserInitials(user)
+          )}
+        </div>
+        <div className="min-w-0">
+          <h4 className="text-sm font-extrabold text-slate-900 dark:text-white m-0 truncate">
+            {user?.name || 'Dr. Priya Sharma'}
+          </h4>
+          <p className="text-xs font-semibold text-slate-500 dark:text-[#6c85a8] m-0 truncate">
+            {user?.email || 'admin@university.edu'}
+          </p>
+        </div>
       </div>
 
-      {/* Items */}
-      <div className="p-1.5 space-y-0.5">
+      <div className="h-px bg-slate-100 dark:bg-[#182842] my-2" />
+
+      {/* Dropdown Menu Items */}
+      <div className="flex flex-col gap-1">
         <button
           type="button"
           onClick={() => handleNavClick('Profile')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-bold border-none bg-transparent cursor-pointer text-left transition-all duration-150"
-          style={{ color: tokens.txtPri }}
-          onMouseEnter={e => e.currentTarget.style.background = tokens.hoverBg}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-[#e8f0fe] hover:bg-slate-100 dark:hover:bg-[#15243e] border-none bg-transparent cursor-pointer transition-colors"
         >
-          <User size={14} style={{ color: tokens.txtMuted }} />
-          Profile
+          <User size={16} className="text-slate-400 dark:text-[#7a98bb]" />
+          <span>Profile</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleNavClick('Appearance')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-bold border-none bg-transparent cursor-pointer text-left transition-all duration-150"
-          style={{ color: tokens.txtPri }}
-          onMouseEnter={e => e.currentTarget.style.background = tokens.hoverBg}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-[#e8f0fe] hover:bg-slate-100 dark:hover:bg-[#15243e] border-none bg-transparent cursor-pointer transition-colors"
         >
-          <Settings size={14} style={{ color: tokens.txtMuted }} />
-          Settings
+          <Settings size={16} className="text-slate-400 dark:text-[#7a98bb]" />
+          <span>Settings</span>
         </button>
 
         <button
           type="button"
           onClick={() => handleNavClick('Security')}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-bold border-none bg-transparent cursor-pointer text-left transition-all duration-150"
-          style={{ color: tokens.txtPri }}
-          onMouseEnter={e => e.currentTarget.style.background = tokens.hoverBg}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-[#e8f0fe] hover:bg-slate-100 dark:hover:bg-[#15243e] border-none bg-transparent cursor-pointer transition-colors"
         >
-          <Key size={14} style={{ color: tokens.txtMuted }} />
-          Security
+          <Key size={16} className="text-slate-400 dark:text-[#7a98bb]" />
+          <span>Security</span>
         </button>
-      </div>
 
-      {/* Sign out */}
-      <div className="p-1.5 border-t" style={{ borderColor: tokens.border }}>
+        <Link
+          to="/faq"
+          onClick={() => setDropdownOpen(false)}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-[#e8f0fe] hover:bg-slate-100 dark:hover:bg-[#15243e] border-none bg-transparent cursor-pointer transition-colors no-underline"
+        >
+          <HelpCircle size={16} className="text-slate-400 dark:text-[#7a98bb]" />
+          <span>FAQ & Help</span>
+        </Link>
+
+        <div className="h-px bg-slate-100 dark:bg-[#182842] my-1" />
+
         <button
           type="button"
           onClick={() => {
             setDropdownOpen(false)
             if (onLogout) onLogout()
           }}
-          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] font-bold border-none bg-transparent cursor-pointer text-left transition-all duration-150"
-          style={{ color: '#ef4444' }}
-          onMouseEnter={e => {
-            e.currentTarget.style.background = dark ? 'rgba(239, 68, 68, 0.15)' : '#fef2f2'
-          }}
-          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 border-none bg-transparent cursor-pointer transition-colors"
         >
-          <LogOut size={14} />
-          Sign out
+          <LogOut size={16} />
+          <span>Sign Out</span>
         </button>
       </div>
     </div>
+    </>
   )
 }
 

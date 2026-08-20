@@ -24,6 +24,7 @@ import StudentsPage from './StudentsPage'
 import SettingsPage from './SettingsPage'
 import NotificationPanel from '../../components/admin/adminDashboard/NotificationPanel'
 import PageTransition from '../../components/common/PageTransition'
+import NotFoundPage from '../NotFoundPage'
 
 let sharedAudioCtx = null;
 
@@ -112,12 +113,17 @@ export default function OrganizerDashboard() {
       case 'notifications':
         return 'Notifications'
       case 'dashboard':
-      default:
         return 'Dashboard'
+      default:
+        return null
     }
   }
 
   const activeNav = getActiveNavFromPath(location.pathname)
+
+  if (activeNav === null) {
+    return <NotFoundPage />
+  }
 
   const setActiveNav = (label) => {
     navigate(`/organizer/${label.toLowerCase()}`)
