@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Sun, Moon, Bell, LogOut, Pencil, Lock, ChevronDown, ChevronUp, CheckCheck, Trash2,
-  GraduationCap, ChevronRight
+  GraduationCap, ChevronRight, HelpCircle
 } from 'lucide-react'
 import { useTheme } from '../../context/ThemeContext'
 import { useAuth } from '../../context/AuthContext'
@@ -93,7 +94,7 @@ const playNotificationSound = () => {
   }
 }
 
-function NotificationDropdown({ notifications, unreadCount, dark, brandColor, handleMarkAllAsRead, handleMarkAsRead, handleDeleteNotification, isClosing, onClose }) {
+function NotificationDropdown({ notifications, unreadCount, dark, handleMarkAllAsRead, handleMarkAsRead, handleDeleteNotification, isClosing, onClose }) {
   const markAllStyle = getMarkAllStyle(unreadCount, dark)
 
   return (
@@ -101,16 +102,23 @@ function NotificationDropdown({ notifications, unreadCount, dark, brandColor, ha
       <button
         type="button"
         aria-label="Close notifications"
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm border-none p-0 cursor-default transition-all duration-200"
+        className="fixed inset-0 z-40 bg-black/25 backdrop-blur-none border-none p-0 cursor-default transition-all duration-200"
         onClick={onClose}
       />
       <div
-        className={`fixed sm:absolute top-16 sm:top-auto left-4 sm:left-auto right-4 sm:right-0 sm:mt-3 w-auto sm:w-96 max-w-[calc(100vw-32px)] rounded-2xl bg-white dark:bg-[#0b1424] border border-slate-200 dark:border-[#182842] shadow-2xl z-50 overflow-hidden text-slate-700 dark:text-slate-200 ${
+        className={`absolute -right-[50px] sm:right-0 mt-3 w-[320px] sm:w-96 max-w-[calc(100vw-32px)] z-50 text-slate-700 dark:text-slate-200 ${
           isClosing ? 'animate-dropdown-out' : 'animate-dropdown-in'
         }`}
-        style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}
       >
-        {/* Header */}
+        {/* Dropdown Indicator Pointer */}
+        <div className="absolute -top-2 right-[62px] sm:right-3 w-4 h-4 bg-white dark:bg-[#0b1424] border-t border-l border-slate-200 dark:border-[#182842] transform rotate-45 z-0 rounded-tl-sm" />
+
+        {/* Inner Container */}
+        <div 
+          className="relative z-10 w-full rounded-2xl bg-white dark:bg-[#0b1424] border border-slate-200 dark:border-[#182842] overflow-hidden"
+          style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}
+        >
+          {/* Header */}
         <div className="px-4 py-3.5 border-b border-slate-100 dark:border-[#16263e] flex items-center justify-between bg-slate-50/50 dark:bg-[#0f1b30]">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-extrabold m-0 text-slate-900 dark:text-white">
@@ -198,6 +206,7 @@ function NotificationDropdown({ notifications, unreadCount, dark, brandColor, ha
           )}
         </div>
       </div>
+      </div>
       <style>{`
         @keyframes dropdownIn {
           from {
@@ -240,7 +249,7 @@ function UserMenuDropdown({ profileData, brandColor, isClosing, onClose, setEdit
       <button
         type="button"
         aria-label="Close user menu"
-        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-xs sm:bg-black/25 sm:backdrop-blur-none border-none p-0 cursor-default transition-all duration-200"
+        className="fixed inset-0 z-40 bg-black/25 backdrop-blur-none border-none p-0 cursor-default transition-all duration-200"
         onClick={onClose}
       />
       <div
@@ -249,8 +258,11 @@ function UserMenuDropdown({ profileData, brandColor, isClosing, onClose, setEdit
         }`}
         style={{ boxShadow: '0 10px 40px rgba(0,0,0,0.4)' }}
       >
+        {/* Dropdown Indicator Pointer */}
+        <div className="absolute -top-2 right-8 w-4 h-4 bg-white dark:bg-[#0d1627] border-t border-l border-slate-200 dark:border-[#182842] transform rotate-45 z-0 rounded-tl-sm" />
+
         {/* User Profile Header Card */}
-        <div className="flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-[#121f36] mb-2">
+        <div className="relative z-10 flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 dark:bg-[#121f36] mb-2">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center text-white text-base font-black shrink-0 shadow-md overflow-hidden"
             style={{ background: brandColor }}
@@ -298,6 +310,15 @@ function UserMenuDropdown({ profileData, brandColor, isClosing, onClose, setEdit
             <Lock size={16} className="text-slate-400 dark:text-[#7a98bb]" />
             <span>Change Password</span>
           </button>
+
+          <Link
+            to="/faq"
+            onClick={() => onClose()}
+            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-[#e8f0fe] hover:bg-slate-100 dark:hover:bg-[#15243e] border-none bg-transparent cursor-pointer transition-colors no-underline"
+          >
+            <HelpCircle size={16} className="text-slate-400 dark:text-[#7a98bb]" />
+            <span>FAQ & Help</span>
+          </Link>
 
           <div className="h-px bg-slate-100 dark:bg-[#182842] my-1" />
 

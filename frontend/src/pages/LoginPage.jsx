@@ -455,7 +455,7 @@ export default function LoginPage() {
         </div>
 
         <div
-          className="flex-1 flex items-center justify-center px-6 py-12 relative overflow-hidden transition-all duration-300"
+          className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-12 relative overflow-hidden transition-all duration-300"
           style={{
             background: isNarrow
               ? 'linear-gradient(135deg, #4338ca 0%, #6d28d9 45%, #7c3aed 100%)'
@@ -473,13 +473,24 @@ export default function LoginPage() {
             </>
           )}
 
+          {/* Mobile Logo (Visible only on small screens) */}
+          <div className="lg:hidden flex flex-col items-center gap-2 mb-6 relative z-10 select-none">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shadow-lg border border-white/20">
+              <GraduationCap size={24} className="text-white" />
+            </div>
+            <div className="text-center">
+              <h2 className="text-white font-black text-2xl tracking-tight drop-shadow-md">CampusConnect</h2>
+              <p className="text-white/70 text-[10px] font-bold uppercase tracking-widest mt-0.5">University Platform</p>
+            </div>
+          </div>
+
           {/* Form Card Container */}
           <div className="w-full max-w-[430px] relative z-10 bg-white rounded-3xl border border-slate-200/80 shadow-[0_20px_60px_-15px_rgba(0,0,0,0.06)] overflow-hidden transition-all duration-300 hover:shadow-[0_25px_70px_-15px_rgba(99,102,241,0.1)]">
 
             {/* Top Gradient Decorative Accent Bar */}
-            <div className="h-1.5 w-full bg-linear-to-r from-indigo-600 via-purple-600 to-pink-500" />
+            <div className="h-1.5 w-full bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-500" />
 
-            <div className="p-8 sm:p-10">
+            <div className="p-6 sm:p-10">
               <div
                 key={isSignUp ? 'signup-view' : 'signin-view'}
                 style={{ animation: 'formSwapIn 0.38s cubic-bezier(0.16, 1, 0.3, 1)' }}

@@ -795,7 +795,7 @@ export default function CampusBotWidget() {
           onClick={() => { stopSpeaking(); stopRecording(); setIsOpen(false) }}
         />
       )}
-      <div className="fixed bottom-3 right-3 sm:bottom-5 sm:right-5 z-50 font-[Inter,Manrope,sans-serif] max-w-[calc(100vw-24px)]">
+      <div id="global-campus-bot" className="fixed bottom-3 right-3 sm:bottom-5 sm:right-5 z-50 font-[Inter,Manrope,sans-serif] max-w-[calc(100vw-24px)]">
 
       {!isOpen && (
         <div className="hover:scale-105 active:scale-95 transition-transform">
