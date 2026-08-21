@@ -159,17 +159,59 @@ class RegistrationService:
             if not data.team_name:
                 raise BadRequestException("Team name is required for team registration")
 
-            # Look up teammate users by email
+            # Look up teammate users by email (auto-create unverified account for unregistered teammates)
             teammates = []
             if data.team_members:
-                from app.models.user import User as UserModel
+                from app.models.user import User as UserModel, UserProfile
                 from sqlalchemy import select
+                from app.core.security import hash_password
+                from app.core.constants import UserRole
+                import random
+
                 for email in data.team_members:
+                    email_clean = email.strip().lower()
+                    if not email_clean:
+                        continue
+
                     teammate = self.db.execute(
-                        select(UserModel).where(UserModel.email == email)
+                        select(UserModel).where(UserModel.email == email_clean)
                     ).scalar_one_or_none()
+
                     if not teammate:
-                        raise BadRequestException(f"Teammate with email {email} is not registered.")
+                        # Auto-create unverified account for unregistered teammate!
+                        temp_password = f"CampusConnect@{random.randint(1000, 9999)}"
+                        password_hash = hash_password(temp_password)
+
+                        teammate = UserModel(
+                            email=email_clean,
+                            password_hash=password_hash,
+                            role=UserRole.PARTICIPANT,
+                            is_active=True,
+                            is_email_verified=False,
+                            full_name=email_clean.split("@")[0].title(),
+                            college_name=current_user.college_name or "University",
+                        )
+                        self.db.add(teammate)
+                        self.db.flush()
+
+                        profile = UserProfile(
+                            user_id=teammate.user_id,
+                            full_name=teammate.full_name,
+                        )
+                        self.db.add(profile)
+                        self.db.flush()
+
+                        # Send Team Invitation Email
+                        try:
+                            await email_service.send_team_invitation_email(
+                                email=email_clean,
+                                team_name=data.team_name,
+                                event_title=event.title,
+                                leader_name=current_user.full_name or current_user.email,
+                            )
+                        except Exception:
+                            pass
+
                     teammates.append(teammate)
 
             all_members = [current_user] + teammates

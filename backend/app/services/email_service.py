@@ -384,6 +384,30 @@ class EmailService:
         plain_body = f"{name_str}\nYour account ({email}) has been reactivated."
         return await self._send(email, subject, plain_body, html_body=html_body)
 
+    async def send_team_invitation_email(
+        self, email: str, team_name: str, event_title: str, leader_name: str
+    ) -> bool:
+        """Send team invitation email to unregistered teammate."""
+        subject = f"🚀 Team Invitation: Join '{team_name}' for {event_title}"
+        content_html = f"""
+        <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-top: 0;">Hello!</p>
+        <p><strong>{leader_name}</strong> has added you to their team <strong>'{team_name}'</strong> for the event <strong>'{event_title}'</strong> on CampusConnect!</p>
+        <div style="background: #f8fafc; border-left: 4px solid #8b5cf6; padding: 16px; margin: 20px 0; border-radius: 6px;">
+            <p style="margin: 0; font-size: 14px; color: #475569;"><strong>Team Name:</strong> {team_name}</p>
+            <p style="margin: 6px 0 0 0; font-size: 14px; color: #475569;"><strong>Event:</strong> {event_title}</p>
+            <p style="margin: 6px 0 0 0; font-size: 14px; color: #475569;"><strong>Team Leader:</strong> {leader_name}</p>
+        </div>
+        <p>An account has been created for you. Please sign in to CampusConnect to verify your email, view your team ticket, and access your event participation status.</p>
+        """
+        html_body = build_email_template(
+            title="Team Invitation!",
+            subtitle="CampusConnect Team Registration",
+            content_html=content_html,
+            footer_text="Sign in or reset your password on CampusConnect to manage your team profile."
+        )
+        plain_body = f"You have been added to team '{team_name}' by {leader_name} for event '{event_title}'."
+        return await self._send(email, subject, plain_body, html_body=html_body)
+
 
 # Single instance used across the app (singleton)
 email_service = EmailService()

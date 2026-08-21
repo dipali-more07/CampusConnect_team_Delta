@@ -87,7 +87,7 @@ class TestEventRegistration:
         assert data["data"]["title"] == test_event.title
 
 
-    def test_team_registration_fails_unregistered_member(self, client, participant_user, participant_token, test_event):
+    def test_team_registration_success_with_unregistered_teammate(self, client, participant_user, participant_token, test_event):
         response = client.post(
             "/api/v1/registrations/",
             json={
@@ -98,7 +98,8 @@ class TestEventRegistration:
             },
             headers=auth_headers(participant_token)
         )
-        assert response.status_code == 400
+        assert response.status_code == 201
         data = response.json()
-        assert data["success"] is False
-        assert "not registered" in data["message"]
+        assert data["success"] is True
+        assert data["data"]["registration_type"] == "team"
+        assert data["data"]["team_id"] is not None
