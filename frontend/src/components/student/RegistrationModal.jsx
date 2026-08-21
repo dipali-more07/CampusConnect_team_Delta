@@ -25,9 +25,28 @@ export default function RegistrationModal({ event, onClose, onSuccess, initialRe
   }
 
   // participation_type: "individual" | "team" | "both"
-  const rawMode = (event.mode || 'Solo').toLowerCase()
-  const defaultType = initialRegType || (event.registered ? 'team' : (rawMode === 'team' ? 'team' : 'individual'))
-  const [regType, setRegType] = useState(defaultType)
+  const rawMode = String(
+    event.mode ||
+    event.participationType ||
+    event.participation_type ||
+    event.type ||
+    'Solo'
+  ).toLowerCase()
+
+  const isTeamOnly = rawMode === 'team' || rawMode === 'group'
+  const isBoth = rawMode === 'both' || rawMode.includes('both') || rawMode.includes('solo / team') || rawMode.includes('solo/team') || rawMode.includes('solo & team')
+
+  const computeDefaultType = () => {
+    if (isTeamOnly) return 'team'
+    if (initialRegType === 'team' || initialRegType === 'individual') {
+      if (!isBoth && initialRegType === 'team' && !isTeamOnly) return 'individual'
+      return initialRegType
+    }
+    if (event.registered) return 'team'
+    return 'individual'
+  }
+
+  const [regType, setRegType] = useState(computeDefaultType)
 
   const [step, setStep] = useState(STEPS.FORM)
   const [loading, setLoading] = useState(false)
@@ -384,7 +403,7 @@ export default function RegistrationModal({ event, onClose, onSuccess, initialRe
             )}
 
             {/* ── Type picker for Both events ── */}
-            {event.mode === 'Both' && (
+            {isBoth && (
               <div>
                 <label style={labelStyle}>Participation Type</label>
                 <div className="flex gap-2">

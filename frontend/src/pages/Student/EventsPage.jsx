@@ -331,12 +331,15 @@ export default function EventsPage({ tokens: inputTokens }) {
     return filled >= capacity
   }
 
-  const handleRegisterClick = (event, type = 'individual') => {
+  const handleRegisterClick = (event, explicitType = null) => {
     if (isDeadlinePassed(event)) return
     if (isEventFull(event)) {
       setEventFullPopup(event)
       return
     }
+    const rawMode = String(event.mode || event.participationType || event.participation_type || 'Solo').toLowerCase()
+    const isTeam = rawMode === 'team' || rawMode === 'group'
+    const type = explicitType || (isTeam ? 'team' : 'individual')
     setSelectedEvent(event)
     setInitialRegType(type)
   }
@@ -596,32 +599,21 @@ export default function EventsPage({ tokens: inputTokens }) {
                       )}
                     </button>
                   ) : (
-                    <div className="flex-1 flex items-center gap-2">
-                      {(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) && (
-                        <button
-                          onClick={() => handleRegisterClick(event, 'team')}
-                          className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
-                          style={{ background: BRAND, boxShadow: `0 4px 14px ${BRAND}40` }}
-                        >
-                          <Users size={14} /> Register Team
-                        </button>
+                    <button
+                      onClick={() => setCancelConfirmEvent(event)}
+                      disabled={cancellingEventId === event.id}
+                      className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.18)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)' }}
+                      title="Cancel Registration"
+                    >
+                      {cancellingEventId === event.id ? (
+                        <><Loader2 size={14} className="animate-spin" /> Cancelling...</>
+                      ) : (
+                        <><XCircle size={14} /> Cancel Registration</>
                       )}
-                      <button
-                        onClick={() => setCancelConfirmEvent(event)}
-                        disabled={cancellingEventId === event.id}
-                        className={`${(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) ? 'px-3' : 'flex-1'} py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed`}
-                        style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.18)' }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'rgba(239,68,68,0.1)' }}
-                        title="Cancel Registration"
-                      >
-                        {cancellingEventId === event.id ? (
-                          <><Loader2 size={14} className="animate-spin" /></>
-                        ) : (
-                          <><XCircle size={14} /> <span className={(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) ? 'hidden sm:inline' : ''}>Cancel</span></>
-                        )}
-                      </button>
-                    </div>
+                    </button>
                   )
                 ) : isEventFull(event) ? (
                   <button
@@ -1001,24 +993,13 @@ function EventDetailModal({ event, onClose, tokens, BRAND, onRegisterClick, hasP
                   <CreditCard size={13} /> Pay Now (₹{event.fees})
                 </button>
               ) : (
-                <div className="flex-1 flex items-center gap-2">
-                  {(event.mode === 'Both' || event.mode === 'Solo / Team' || (event.mode || '').toLowerCase().includes('both') || (event.mode || '').toLowerCase().includes('team')) && (
-                    <button
-                      onClick={() => handleClose(() => onRegisterClick(event, 'team'))}
-                      className="flex-1 py-2.5 rounded-xl font-bold text-xs text-white border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90 shadow-md"
-                      style={{ background: BRAND }}
-                    >
-                      <Users size={13} /> Register Team
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleClose(() => onCancelRegistration && onCancelRegistration(event))}
-                    className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90"
-                    style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
-                  >
-                    <XCircle size={13} /> Cancel Registration
-                  </button>
-                </div>
+                <button
+                  onClick={() => handleClose(() => onCancelRegistration && onCancelRegistration(event))}
+                  className="flex-1 py-2.5 rounded-xl font-bold text-xs border-none cursor-pointer flex items-center justify-center gap-1.5 transition-all hover:opacity-90"
+                  style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}
+                >
+                  <XCircle size={13} /> Cancel Registration
+                </button>
               )
             ) : (
               <button

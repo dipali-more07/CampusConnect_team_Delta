@@ -167,13 +167,50 @@ async function mockDownload(certificateNumber) {
   return { success: true, message: 'PDF download started', url: blobUrl }
 }
 
+function mapCertificateRecord(c) {
+  if (!c) return null
+  const fmtDate = (d) => {
+    if (!d) return 'N/A'
+    try {
+      return new Date(d).toISOString().split('T')[0]
+    } catch {
+      return String(d)
+    }
+  }
+
+  const rawStatus = c.status || c.certificate_status || 'Generated'
+  const normalizedStatus = String(rawStatus).toLowerCase().includes('sent') ? 'Sent' :
+                           String(rawStatus).toLowerCase().includes('pending') ? 'Pending' :
+                           String(rawStatus).toLowerCase().includes('revoke') ? 'Revoked' : 'Generated'
+
+  return {
+    id: c.certificate_id || c.id || `cert-${Date.now()}-${Math.random()}`,
+    eventId: c.event_id || c.eventId || '',
+    userId: c.user_id || c.userId || c.student_id || c.participant_id || '',
+    studentName: c.student_name || c.studentName || c.full_name || c.name || 'Student',
+    rollNo: c.roll_no || c.rollNo || c.college_id || 'N/A',
+    department: c.department || c.dept || '',
+    eventName: c.event_name || c.eventName || c.event_title || c.title || '',
+    issuedDate: fmtDate(c.issued_date || c.issue_date || c.created_at || c.issuedDate),
+    verifyCode: c.certificate_number || c.certificate_code || c.verify_code || c.verifyCode || c.verification_code || c.id || 'N/A',
+    status: normalizedStatus,
+    position: c.position || c.certificate_type || c.rank || 'Participation',
+    venue: c.venue || c.event_venue || '',
+    organizerName: c.organizer_name || c.organizer || '',
+    email: c.email || c.student_email || '',
+    certificate_number: c.certificate_number || c.certificate_code || c.verify_code || c.verifyCode || c.id,
+  }
+}
+
 /* ── REAL API FUNCTIONS ────────────────────────────────────────── */
 async function apiFetchAll() {
   try {
     const res = await fetch(`${API_BASE}/certificates`, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch certificates.' }
-    return { success: true, certificates: data.certificates || [], stats: data.stats || {} }
+    const rawList = Array.isArray(data) ? data : (data.certificates || data.data || data.items || [])
+    const mapped = Array.isArray(rawList) ? rawList.map(mapCertificateRecord).filter(Boolean) : []
+    return { success: true, certificates: mapped, stats: data.stats || {} }
   } catch {
     return { success: false, message: 'Server unreachable.' }
   }

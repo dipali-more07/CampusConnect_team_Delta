@@ -29,7 +29,14 @@ export default function CertificatesPage({ tokens }) {
   const [registrations, setRegistrations] = useState([])
   const [students, setStudents] = useState([])
   const [eventResults, setEventResults] = useState([])
-  const [optimisticGenerated, setOptimisticGenerated] = useState(new Set())
+  const [optimisticGenerated, setOptimisticGenerated] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cc_generated_certs')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
   const [regsLoaded, setRegsLoaded] = useState(false)
   const [regsLoading, setRegsLoading] = useState(false)
   const initialLoadDone = useRef(false)
@@ -49,6 +56,7 @@ export default function CertificatesPage({ tokens }) {
   const [previewCert, setPreviewCert] = useState(null)
   const [designerOpen, setDesignerOpen] = useState(false)
   const [bulkGenerateOpen, setBulkGenerateOpen] = useState(false)
+  const [generatingId, setGeneratingId] = useState(null)
   const [tmpl, setTmpl] = useState({
     org: 'State University',
     title: 'Certificate of Participation',
@@ -233,8 +241,14 @@ export default function CertificatesPage({ tokens }) {
         const yr = reg.course || reg.year || student?.year || 'N/A'
         const email = reg.email || student?.email || ''
 
-        const optKey = `${regEventId}-${regUserId}`
-        const isGen = optimisticGenerated.has(optKey)
+        const optKey1 = `${regEventId}-${regUserId}`
+        const optKey2 = `${regEventId}-${regRollNo}`
+        const optKey3 = `${regEventId}-${regStudentName}`
+        const isGen = optimisticGenerated.has(optKey1) ||
+                      optimisticGenerated.has(optKey2) ||
+                      optimisticGenerated.has(optKey3) ||
+                      optimisticGenerated.has(String(reg.id)) ||
+                      optimisticGenerated.has(String(reg.registration_id))
 
         displayList.push({
           id: `VIRT-${reg.id || reg.registration_id || Math.random()}`,
@@ -291,12 +305,26 @@ export default function CertificatesPage({ tokens }) {
     setBulkLoading(true)
     const res = await certificatesService.bulkGenerate(eventId)
     if (res.success) {
-      showToast(res.message, 'success')
+      showToast(res.message || 'Bulk generation completed.', 'success')
+      setOptimisticGenerated(prev => {
+        const next = new Set(prev)
+        registrations.forEach(reg => {
+          const uId = reg.user_id || reg.student_id || reg.userId || reg.id
+          if (eventId && uId) next.add(`${eventId}-${uId}`)
+          if (eventId && reg.rollNo) next.add(`${eventId}-${reg.rollNo}`)
+          if (eventId && (reg.studentName || reg.name)) next.add(`${eventId}-${reg.studentName || reg.name}`)
+          if (reg.id) next.add(String(reg.id))
+        })
+        try {
+          localStorage.setItem('cc_generated_certs', JSON.stringify([...next]))
+        } catch {}
+        return next
+      })
       setSelected([])
       setRefreshTrigger(prev => prev + 1)
-      load()
+      await load()
     } else {
-      showToast(res.message, 'error')
+      showToast(res.message || 'Failed to bulk generate.', 'error')
     }
     setBulkLoading(false)
   }
@@ -305,8 +333,10 @@ export default function CertificatesPage({ tokens }) {
     if (!target) return
     
     let listToGen = []
+    let genKey = null
     if (Array.isArray(target)) {
       // It's an array of certificate IDs (bulk selection)
+      genKey = 'bulk'
       listToGen = target.map(id => {
         const cert = displayList.find(c => c.id === id)
         return {
@@ -323,6 +353,7 @@ export default function CertificatesPage({ tokens }) {
       })
     } else {
       // It's a single certificate object
+      genKey = target.id
       listToGen = [{
         id: target.id,
         eventId: target.eventId || target.event_id,
@@ -338,22 +369,37 @@ export default function CertificatesPage({ tokens }) {
 
     if (listToGen.length === 0) return
 
-    let res = await certificatesService.generate(listToGen)
+    setGeneratingId(genKey)
+    try {
+      let res = await certificatesService.generate(listToGen)
 
-    if (res.success) {
-      showToast(res.message || 'Certificate(s) generated successfully.', 'success')
-      
-      setOptimisticGenerated(prev => {
-        const next = new Set(prev)
-        listToGen.forEach(item => next.add(`${item.eventId}-${item.userId}`))
-        return next
-      })
+      if (res.success) {
+        showToast(res.message || 'Certificate(s) generated successfully.', 'success')
+        
+        setOptimisticGenerated(prev => {
+          const next = new Set(prev)
+          listToGen.forEach(item => {
+            if (item.eventId && item.userId) next.add(`${item.eventId}-${item.userId}`)
+            if (item.eventId && item.rollNo) next.add(`${item.eventId}-${item.rollNo}`)
+            if (item.eventId && item.studentName) next.add(`${item.eventId}-${item.studentName}`)
+            if (item.id) next.add(String(item.id))
+          })
+          try {
+            localStorage.setItem('cc_generated_certs', JSON.stringify([...next]))
+          } catch {}
+          return next
+        })
 
-      setSelected([])
-      setRefreshTrigger(prev => prev + 1)
-      load()
-    } else {
-      showToast(res.message || 'Failed to generate certificate(s).', 'error')
+        setSelected([])
+        setRefreshTrigger(prev => prev + 1)
+        await load()
+      } else {
+        showToast(res.message || 'Failed to generate certificate(s).', 'error')
+      }
+    } catch {
+      showToast('Failed to generate certificate(s).', 'error')
+    } finally {
+      setGeneratingId(null)
     }
   }
 
@@ -515,6 +561,7 @@ export default function CertificatesPage({ tokens }) {
         handleSend={handleSend}
         handleRevoke={handleRevoke}
         setPreviewCert={setPreviewCert}
+        generatingId={generatingId}
         load={load}
         badgeStyle={badgeStyle}
         tokens={tokens}

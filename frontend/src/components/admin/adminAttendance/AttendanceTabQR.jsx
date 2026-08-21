@@ -23,7 +23,7 @@ function QrPlaceholder({ size = 140, color = '#615FFF' }) {
   )
 }
 
-function QrFormSection({ cardStyle, labelStyle, inputStyle, selectedEvent, setSelectedEvent, setQrGenerated, setImgFailed, handleGenerateQR, isBeforeStart, qrLoading, brandColor, eventsList, dark = true }) {
+function QrFormSection({ cardStyle, labelStyle, inputStyle, selectedEvent, setSelectedEvent, setQrGenerated, setImgFailed, handleGenerateQR, isBeforeStart, qrLoading, brandColor, eventsList, dark }) {
   return (
     <div className="rounded-2xl p-6 border" style={cardStyle}>
       <h2 className="text-[17px] font-extrabold mb-5">QR Code Generator</h2>
@@ -292,6 +292,7 @@ export default function AttendanceTabQR({
         qrLoading={qrLoading}
         brandColor={BRAND}
         eventsList={eventsList}
+        dark={dark}
       />
 
       {/* right: preview */}

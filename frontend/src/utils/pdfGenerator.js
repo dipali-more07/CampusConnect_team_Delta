@@ -65,13 +65,13 @@ export function renderCertificateCanvas(certData, tmpl) {
   ctx.shadowBlur = 8;
   ctx.shadowOffsetX = 4;
   ctx.shadowOffsetY = 4;
-  
+
   ctx.strokeStyle = goldGrad;
   ctx.lineWidth = 14;
   ctx.strokeRect(m3, m3, W - m3 * 2, H - m3 * 2);
-  
+
   ctx.shadowColor = 'transparent'; // Reset shadow
-  
+
   ctx.strokeStyle = goldDark;
   ctx.lineWidth = 1.5;
   ctx.strokeRect(m3 - 6, m3 - 6, W - m3 * 2 + 12, H - m3 * 2 + 12);
@@ -94,14 +94,14 @@ export function renderCertificateCanvas(certData, tmpl) {
 
     ctx.strokeStyle = goldGrad;
     ctx.lineCap = 'round';
-    
+
     // Large Ribbon Sweeps
     ctx.lineWidth = 12;
     ctx.shadowColor = 'rgba(0,0,0,0.5)';
     ctx.shadowBlur = 6;
     ctx.shadowOffsetX = 3;
     ctx.shadowOffsetY = 3;
-    
+
     ctx.beginPath();
     ctx.arc(0, 0, 70, 0, Math.PI / 2);
     ctx.stroke();
@@ -122,11 +122,11 @@ export function renderCertificateCanvas(certData, tmpl) {
     ctx.arc(0, 0, 20, 0, Math.PI * 2);
     ctx.fillStyle = paper;
     ctx.fill();
-    
+
     ctx.lineWidth = 2.5;
     ctx.strokeStyle = goldGrad;
     ctx.stroke();
-    
+
     ctx.beginPath();
     ctx.arc(0, 0, 14, 0, Math.PI * 2);
     ctx.lineWidth = 1;
@@ -146,94 +146,102 @@ export function renderCertificateCanvas(certData, tmpl) {
   drawCornerRibbon(W - m3, H - m3, Math.PI); // BR
   drawCornerRibbon(m3, H - m3, -Math.PI / 2); // BL
 
-  // 3. Logo Shield with Laurels
+  // 3. Official Graduation Cap Logo Badge
   const cx = W / 2;
-  let y = 110;
+  let y = 105;
 
   ctx.save();
-  const shieldX = cx - 180;
-  const shieldY = y - 20;
+  ctx.font = 'bold 30px ' + FONT_SERIF;
+  const campusW = ctx.measureText('CAMPUS').width;
+  const connectW = ctx.measureText('CONNECT').width;
+  const iconSize = 46;
+  const gap = 12;
+  const totalW = iconSize + gap + campusW + connectW;
+  const startX = cx - (totalW / 2);
+  const iconX = startX;
+  const iconY = y - 22;
 
-  // Laurel branches
-  const drawLaurel = (sx, sy, flip) => {
-    ctx.save();
-    ctx.translate(sx, sy);
-    if (flip) ctx.scale(-1, 1);
-    ctx.strokeStyle = goldGrad;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.moveTo(0, 30);
-    ctx.quadraticCurveTo(-40, 10, -25, -35);
-    ctx.stroke();
-    // Leaves
-    ctx.fillStyle = goldGrad;
-    for(let i=0; i<5; i++) {
-      ctx.beginPath();
-      ctx.ellipse(-12 - i*4, 5 - i*11, 7, 4, Math.PI/4 - i*0.15, 0, Math.PI*2);
-      ctx.fill();
-    }
-    ctx.restore();
-  };
-  drawLaurel(shieldX - 30, shieldY, false);
-  drawLaurel(shieldX + 30, shieldY, true);
-
-  // Split Shield (Left Gold, Right Navy)
+  // Draw rounded square with vibrant brand color #615FFF
+  const radius = 13;
+  ctx.save();
   ctx.beginPath();
-  ctx.moveTo(shieldX, shieldY);
-  ctx.lineTo(shieldX, shieldY + 35);
-  ctx.bezierCurveTo(shieldX, shieldY + 45, shieldX - 20, shieldY + 35, shieldX - 20, shieldY + 20);
-  ctx.lineTo(shieldX - 20, shieldY);
+  ctx.moveTo(iconX + radius, iconY);
+  ctx.lineTo(iconX + iconSize - radius, iconY);
+  ctx.quadraticCurveTo(iconX + iconSize, iconY, iconX + iconSize, iconY + radius);
+  ctx.lineTo(iconX + iconSize, iconY + iconSize - radius);
+  ctx.quadraticCurveTo(iconX + iconSize, iconY + iconSize, iconX + iconSize - radius, iconY + iconSize);
+  ctx.lineTo(iconX + radius, iconY + iconSize);
+  ctx.quadraticCurveTo(iconX, iconY + iconSize, iconX, iconY + iconSize - radius);
+  ctx.lineTo(iconX, iconY + radius);
+  ctx.quadraticCurveTo(iconX, iconY, iconX + radius, iconY);
   ctx.closePath();
-  ctx.fillStyle = goldGrad;
+  ctx.fillStyle = '#615FFF';
+  ctx.shadowColor = 'rgba(97, 95, 255, 0.35)';
+  ctx.shadowBlur = 8;
+  ctx.shadowOffsetY = 3;
   ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(shieldX, shieldY);
-  ctx.lineTo(shieldX, shieldY + 35);
-  ctx.bezierCurveTo(shieldX, shieldY + 45, shieldX + 20, shieldY + 35, shieldX + 20, shieldY + 20);
-  ctx.lineTo(shieldX + 20, shieldY);
-  ctx.closePath();
-  ctx.fillStyle = navy;
-  ctx.fill();
-
-  // Shield Border
-  ctx.beginPath();
-  ctx.moveTo(shieldX, shieldY);
-  ctx.bezierCurveTo(shieldX + 20, shieldY, shieldX + 20, shieldY + 20, shieldX + 20, shieldY + 30);
-  ctx.bezierCurveTo(shieldX + 20, shieldY + 40, shieldX, shieldY + 50, shieldX, shieldY + 50);
-  ctx.bezierCurveTo(shieldX, shieldY + 50, shieldX - 20, shieldY + 40, shieldX - 20, shieldY + 30);
-  ctx.bezierCurveTo(shieldX - 20, shieldY + 20, shieldX - 20, shieldY, shieldX, shieldY);
-  ctx.closePath();
-  ctx.strokeStyle = goldGrad;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // Inner C
-  ctx.font = 'bold 26px ' + FONT_SERIF;
-  ctx.textAlign = 'center';
-  ctx.fillStyle = paper;
-  ctx.shadowColor = 'rgba(0,0,0,0.5)';
-  ctx.shadowBlur = 4;
-  ctx.fillText('C', shieldX, shieldY + 26);
   ctx.shadowColor = 'transparent';
 
-  // CAMPUSCONNECT Text
+  // Draw Lucide Graduation Cap Icon
+  ctx.save();
+  ctx.translate(iconX + 7, iconY + 7);
+  ctx.scale(1.33, 1.33);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (typeof Path2D !== 'undefined') {
+    const p1 = new Path2D("M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.084a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z");
+    const p2 = new Path2D("M6 12.5v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-3");
+    const p3 = new Path2D("M18 12.5v5a1.5 1.5 0 0 0 3 0v-5");
+    ctx.stroke(p1);
+    ctx.stroke(p2);
+    ctx.stroke(p3);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(12, 4.5);
+    ctx.lineTo(21.4, 9);
+    ctx.lineTo(12, 13.5);
+    ctx.lineTo(2.6, 9);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(6, 12.5);
+    ctx.lineTo(6, 15.5);
+    ctx.quadraticCurveTo(6, 18.5, 12, 18.5);
+    ctx.quadraticCurveTo(18, 18.5, 18, 15.5);
+    ctx.lineTo(18, 12.5);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(18, 12.5);
+    ctx.lineTo(18, 17.5);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+
+  // Draw CAMPUSCONNECT Text
+  const textY = y + 11;
+  const textX = iconX + iconSize + gap;
   ctx.font = 'bold 30px ' + FONT_SERIF;
   ctx.textAlign = 'left';
   ctx.fillStyle = navy;
-  const campusWidth = ctx.measureText('CAMPUS').width;
-  ctx.fillText('CAMPUS', shieldX + 45, shieldY + 28);
-  ctx.fillStyle = goldDark;
-  ctx.fillText('CONNECT', shieldX + 45 + campusWidth, shieldY + 28);
+  ctx.fillText('CAMPUS', textX, textY);
+
+  ctx.fillStyle = '#615FFF';
+  ctx.fillText('CONNECT', textX + campusW, textY);
   ctx.restore();
 
   y += 90;
 
-  // 4. CERTIFICATE OF MERIT (Engravers MT font)
+  // 4. CERTIFICATE TITLE (Clean bold solid black)
   let titleFontSize = 50;
   ctx.font = `bold ${titleFontSize}px ${FONT_ENGRAVERS}`;
   const titleText = (tmpl.title || 'CERTIFICATE OF MERIT').toUpperCase();
-  
+
   // Dynamically reduce font size if title is too wide to prevent horizontal squishing
   while (ctx.measureText(titleText).width > (W - 160) && titleFontSize > 26) {
     titleFontSize -= 2;
@@ -241,56 +249,108 @@ export function renderCertificateCanvas(certData, tmpl) {
   }
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = navy;
-  ctx.strokeStyle = goldGrad;
-  ctx.lineWidth = 1;
-  ctx.shadowColor = 'rgba(0,0,0,0.3)';
-  ctx.shadowBlur = 5;
-  ctx.shadowOffsetX = 3;
-  ctx.shadowOffsetY = 3;
-  
-  ctx.fillText(titleText, cx, y);
-  ctx.strokeText(titleText, cx, y);
+  ctx.fillStyle = '#000000';
   ctx.shadowColor = 'transparent';
-  
+  ctx.fillText(titleText, cx, y);
+
   y += 50;
 
   // 5. Awarded To
   ctx.font = 'italic 20px ' + FONT_SERIF;
-  ctx.fillStyle = '#111';
+  ctx.fillStyle = '#475569';
   ctx.fillText('Awarded To', cx, y);
-  
-  y += 85;
 
-  // 6. Name (Old English Text MT / Blackletter)
-  const nameStr = certData.userName || certData.studentName || certData.name || 'Alex Rivera';
-  ctx.font = '85px ' + FONT_BLACKLETTER;
-  ctx.fillStyle = goldGrad;
-  ctx.strokeStyle = goldDark;
-  ctx.lineWidth = 1;
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
-  ctx.shadowBlur = 8;
-  ctx.shadowOffsetX = 4;
-  ctx.shadowOffsetY = 4;
-  ctx.fillText(nameStr, cx, y);
-  ctx.strokeText(nameStr, cx, y);
+  y += 75;
+
+  // 6. Name / Team Heading (Application Theme Style - Modern Bold Typography with Brand Gradient & Polish)
+  const teamNameStr = String(certData.teamName || certData.team_name || '');
+  const positionStr = String(certData.position || certData.certificate_type || tmpl.title || '').toLowerCase();
+  const rankVal = Number(certData.rank || 0);
+  const isWinning = rankVal > 0 || positionStr.includes('1st') || positionStr.includes('2nd') || positionStr.includes('3rd') || positionStr.includes('winner') || positionStr.includes('runner') || positionStr.includes('merit') || positionStr.includes('place') || positionStr === '1' || positionStr === '2' || positionStr === '3';
+  const isTeamWinning = Boolean(teamNameStr && isWinning);
+
+  // If team is 1st, 2nd, 3rd (winning), main big text is Team Name!
+  let mainDisplayName = '';
+  if (isTeamWinning) {
+    mainDisplayName = teamNameStr.toLowerCase().startsWith('team') ? teamNameStr : `Team: ${teamNameStr}`;
+  } else {
+    mainDisplayName = String(certData.userName || certData.studentName || certData.name || 'Alex Rivera');
+  }
+
+  const FONT_THEME_NAME = '"Manrope", "Outfit", "Plus Jakarta Sans", "Inter", sans-serif';
+
+  let nameFontSize = 68;
+  ctx.font = `800 ${nameFontSize}px ${FONT_THEME_NAME}`;
+  while (ctx.measureText(mainDisplayName).width > (W - 240) && nameFontSize > 32) {
+    nameFontSize -= 2;
+    ctx.font = `800 ${nameFontSize}px ${FONT_THEME_NAME}`;
+  }
+
+  // Theme brand gradient for student name / team name
+  const nameGrad = ctx.createLinearGradient(cx - 200, 0, cx + 200, 0);
+  nameGrad.addColorStop(0, '#312e81');
+  nameGrad.addColorStop(0.3, '#4338ca');
+  nameGrad.addColorStop(0.7, '#615FFF');
+  nameGrad.addColorStop(1, '#4f46e5');
+
+  ctx.fillStyle = nameGrad;
+  ctx.shadowColor = 'rgba(97, 95, 255, 0.2)';
+  ctx.shadowBlur = 10;
+  ctx.shadowOffsetY = 3;
+  ctx.fillText(mainDisplayName, cx, y);
   ctx.shadowColor = 'transparent';
 
-  // Thin line below name
+  // Elegant accent line below name with theme gradient
+  const lineGrad = ctx.createLinearGradient(cx - 260, 0, cx + 260, 0);
+  lineGrad.addColorStop(0, 'rgba(97, 95, 255, 0)');
+  lineGrad.addColorStop(0.5, 'rgba(97, 95, 255, 0.45)');
+  lineGrad.addColorStop(1, 'rgba(97, 95, 255, 0)');
   ctx.beginPath();
-  ctx.moveTo(cx - 300, y + 15);
-  ctx.lineTo(cx + 300, y + 15);
-  ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-  ctx.lineWidth = 1;
+  ctx.moveTo(cx - 260, y + 14);
+  ctx.lineTo(cx + 260, y + 14);
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 2;
   ctx.stroke();
 
-  y += 65;
+  // Subtitle / Team Members
+  const rawMembers = Array.isArray(certData.members) ? certData.members : (certData.members ? [certData.members] : []);
+  const membersList = rawMembers.map(m => typeof m === 'object' ? (m.name || m.studentName || m.full_name || m.email) : String(m)).filter(Boolean);
+
+  if (isTeamWinning) {
+    // Show team members below team name
+    const membersText = membersList.length > 0
+      ? `Team Members: ${membersList.join(', ')}`
+      : (certData.userName ? `Team Member: ${certData.userName}` : '');
+
+    if (membersText) {
+      ctx.font = 'bold italic 20px ' + FONT_SERIF;
+      ctx.fillStyle = '#4338ca';
+      ctx.fillText(membersText, cx, y + 42, W - 240);
+      y += 25;
+    }
+  } else if (teamNameStr) {
+    ctx.font = 'bold italic 22px ' + FONT_SERIF;
+    ctx.fillStyle = '#4338ca';
+    ctx.fillText(`(Team: ${teamNameStr})`, cx, y + 42);
+    y += 25;
+  }
+
+  y += 55;
 
   // 7. Body text
   ctx.font = '19px ' + FONT_SERIF;
   ctx.fillStyle = '#000';
-  ctx.fillText('In Recognition of Outstanding Achievement, Creativity, and Active Participation in the', cx, y);
-  
+  let bodyText = '';
+  if (isTeamWinning) {
+    const posLabel = String(certData.position) === '1' ? '1st Place (Winner)' : String(certData.position) === '2' ? '2nd Place (Runner Up)' : String(certData.position) === '3' ? '3rd Place (Runner Up)' : (certData.position || 'Top Position');
+    bodyText = `In Recognition of Outstanding Achievement and Securing ${posLabel} in the`;
+  } else if (teamNameStr) {
+    bodyText = `In Recognition of Active Team Participation with Team "${teamNameStr}" in`;
+  } else {
+    bodyText = 'In Recognition of Outstanding Achievement, Creativity, and Active Participation in the';
+  }
+  ctx.fillText(bodyText, cx, y);
+
   y += 45;
 
   // Event Name (Engravers MT font)
@@ -298,7 +358,7 @@ export function renderCertificateCanvas(certData, tmpl) {
   ctx.font = 'bold 26px ' + FONT_ENGRAVERS;
   ctx.fillStyle = navy;
   ctx.fillText(eventStr, cx, y, W - 200);
-  
+
   y += 40;
 
   // Details
@@ -308,7 +368,7 @@ export function renderCertificateCanvas(certData, tmpl) {
   const eventDateStr = certData.eventDate || dateStr;
   const venueStr = certData.venue || 'the CampusConnect Innovation Center';
   ctx.fillText(`Held on ${eventDateStr}, at ${venueStr}.`, cx, y);
-  
+
   y += 30;
   ctx.fillText('Demonstrating exceptional skills, teamwork, and innovation', cx, y);
   y += 24;
@@ -331,12 +391,12 @@ export function renderCertificateCanvas(certData, tmpl) {
   sealGrad.addColorStop(0.5, '#a9222a');
   sealGrad.addColorStop(0.8, '#70131a');
   sealGrad.addColorStop(1, '#3b060b');
-  
+
   ctx.fillStyle = sealGrad;
   ctx.shadowColor = 'rgba(0,0,0,0.6)';
   ctx.shadowBlur = 15;
   ctx.shadowOffsetY = 8;
-  
+
   ctx.beginPath();
   const rOuter = 46;
   for (let angle = 0; angle < Math.PI * 2; angle += 0.1) {
@@ -348,14 +408,14 @@ export function renderCertificateCanvas(certData, tmpl) {
   }
   ctx.closePath();
   ctx.fill();
-  
+
   ctx.shadowColor = 'transparent';
-  
+
   ctx.fillStyle = '#8f141b';
   ctx.beginPath();
   ctx.arc(sealX, footerY, 34, 0, Math.PI * 2);
   ctx.fill();
-  
+
   // Seal inner text
   ctx.strokeStyle = goldGrad;
   ctx.lineWidth = 1;
@@ -365,7 +425,7 @@ export function renderCertificateCanvas(certData, tmpl) {
   ctx.textAlign = 'center';
   ctx.fillText('OFFICIAL', sealX, footerY - 5);
   ctx.fillText('SEAL', sealX, footerY + 12);
-  
+
   ctx.beginPath();
   ctx.arc(sealX, footerY, 11, 0, Math.PI * 2);
   ctx.stroke();
@@ -373,41 +433,29 @@ export function renderCertificateCanvas(certData, tmpl) {
   ctx.fillText('C', sealX, footerY + 5);
   ctx.restore();
 
-  // 10. Signatures
-  const sigLineY = footerY + 10;
-  const drawSig = (xPos, cursiveName, printedName, role) => {
-    ctx.save();
-    ctx.font = 'italic 30px "Brush Script MT", "Cedarville Cursive", cursive';
-    ctx.fillStyle = '#0a192f'; // ink color
-    ctx.textAlign = 'center';
-    ctx.fillText(cursiveName, xPos, sigLineY - 25, 180);
+  // 10. Dynamic Event Venue & Certificate ID (Balanced Center-Aligned Right Column)
+  const venueName = certData.venue || certData.location || 'Main Campus Auditorium';
+  const codeStr = certData.certificate_number || certData.verifyCode || certData.certCode || certData.id || 'CERT-2026-9842';
+  const rightColX = W - 230;
 
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(xPos - 85, sigLineY - 5);
-    ctx.lineTo(xPos + 85, sigLineY - 5);
-    ctx.stroke();
+  ctx.save();
+  ctx.textAlign = 'center';
 
-    ctx.font = 'bold 14px ' + FONT_SERIF;
-    ctx.fillStyle = '#000';
-    ctx.fillText(printedName, xPos, sigLineY + 15);
+  // Venue Name
+  ctx.font = 'bold 16px ' + FONT_SERIF;
+  ctx.fillStyle = '#0f172a';
+  ctx.fillText(venueName, rightColX, footerY - 5, 240);
 
-    ctx.font = '13px ' + FONT_SERIF;
-    ctx.fillStyle = '#444';
-    ctx.fillText(role, xPos, sigLineY + 32);
-    ctx.restore();
-  };
-
-  const venueName = certData.venue || 'Event Venue';
-  drawSig(W - 250, '', venueName, '');
+  // Venue Label
+  ctx.font = '12px ' + FONT_SERIF;
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('Event Venue', rightColX, footerY + 14);
 
   // Certificate ID
-  const codeStr = certData.certificate_number || certData.verifyCode || certData.certCode || certData.id || 'CERT-2026-9842';
-  ctx.font = '14px ' + FONT_SERIF;
-  ctx.fillStyle = '#333';
-  ctx.textAlign = 'right';
-  ctx.fillText(`Certificate ID: ${codeStr}`, W - 150, footerY + 55);
+  ctx.font = '600 13px ' + FONT_SERIF;
+  ctx.fillStyle = '#334155';
+  ctx.fillText(`Certificate ID: ${codeStr}`, rightColX, footerY + 46);
+  ctx.restore();
 
   return canvas.toDataURL('image/jpeg', 0.95);
 }
@@ -418,7 +466,7 @@ function hexToRgba(hex, alpha = 1) {
   if (hex.length === 3) hex = hex.split('').map(c => c + c).join('')
   const n = Number.parseInt(hex, 16)
   const r = (n >> 16) & 255
-  const g = (n >> 8)  & 255
+  const g = (n >> 8) & 255
   const b = n & 255
   return `rgba(${r},${g},${b},${alpha})`
 }
@@ -431,19 +479,19 @@ function hexToRgba(hex, alpha = 1) {
 export function downloadCertificatePDF(certData = {}, tmpl = {}) {
   // Default tmpl values if not provided
   const template = {
-    org:         'State University',
-    title:       'Certificate of Participation',
-    subtitle:    'This is to certify that',
-    body:        'has successfully participated in',
-    footer:      'campusconnect.university.edu/verify',
-    gradFrom:    '#1a1060',
-    gradMid:     '#0f0a45',
-    gradTo:      '#0a0838',
+    org: 'State University',
+    title: 'Certificate of Participation',
+    subtitle: 'This is to certify that',
+    body: 'has successfully participated in',
+    footer: 'campusconnect.university.edu/verify',
+    gradFrom: '#1a1060',
+    gradMid: '#0f0a45',
+    gradTo: '#0a0838',
     accentColor: '#615FFF',
     borderStyle: 'none',
-    fontFamily:  'Manrope, sans-serif',
-    showLogo:        true,
-    showSignatures:  true,
+    fontFamily: 'Manrope, sans-serif',
+    showLogo: true,
+    showSignatures: true,
     ...tmpl,
   }
 
@@ -453,12 +501,12 @@ export function downloadCertificatePDF(certData = {}, tmpl = {}) {
   const certTitle = certData.certificate_title || '';
   const rankVal = Number(certData.rank || 0);
 
-  const isAchievement = (certType && certType !== 'participation' && certType !== 'participant') || 
-    (position && 
-     !position.toLowerCase().includes('participant') && 
-     !position.toLowerCase().includes('participation') && 
-     !position.toLowerCase().includes('completed') && 
-     !position.toLowerCase().includes('n/a'));
+  const isAchievement = (certType && certType !== 'participation' && certType !== 'participant') ||
+    (position &&
+      !position.toLowerCase().includes('participant') &&
+      !position.toLowerCase().includes('participation') &&
+      !position.toLowerCase().includes('completed') &&
+      !position.toLowerCase().includes('n/a'));
 
   if (isAchievement) {
     template.title = certTitle || 'Certificate of Merit';
@@ -478,8 +526,8 @@ export function downloadCertificatePDF(certData = {}, tmpl = {}) {
   const imgDataUrl = renderCertificateCanvas(certData, template)
 
   // Strip data:image/jpeg;base64, prefix
-  const base64     = imgDataUrl.split(',')[1]
-  const byteCount  = atob(base64).length
+  const base64 = imgDataUrl.split(',')[1]
+  const byteCount = atob(base64).length
 
   // PDF A4 Landscape: 842 x 595 pt
   const PW = 842
@@ -568,16 +616,22 @@ export function downloadCertificatePDF(certData = {}, tmpl = {}) {
 
   // Merge all Uint8Arrays
   const totalLen = parts.reduce((s, p) => s + p.length, 0)
-  const final    = new Uint8Array(totalLen)
+  const final = new Uint8Array(totalLen)
   let pos = 0
   for (const p of parts) { final.set(p, pos); pos += p.length }
 
-  const blob    = new Blob([final], { type: 'application/pdf' })
-  const url     = URL.createObjectURL(blob)
+  const blob = new Blob([final], { type: 'application/pdf' })
+  const url = URL.createObjectURL(blob)
+
+  // Format filename as: <StudentName>_<CertificateCode>.pdf
+  const rawStudent = certData.userName || certData.studentName || certData.student_name || certData.name || certData.user_name || certData.recipient_name || ''
+  const cleanStudent = rawStudent.trim().replace(/[^a-zA-Z0-9_\- ]/g, '').replace(/\s+/g, '_')
   const codeStr = certData.certificate_number || certData.verifyCode || certData.certCode || certData.id || 'CC'
-  const a       = document.createElement('a')
-  a.href        = url
-  a.download    = `Certificate-${codeStr}.pdf`
+  const fileName = cleanStudent ? `${cleanStudent}_${codeStr}.pdf` : `Certificate_${codeStr}.pdf`
+
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
