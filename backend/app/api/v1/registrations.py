@@ -18,6 +18,10 @@ def _reg_to_dict(reg) -> dict:
     participant_name = reg.user.full_name if (hasattr(reg, "user") and reg.user) else None
     participant_email = reg.user.email if (hasattr(reg, "user") and reg.user) else None
 
+    team_name = None
+    if hasattr(reg, "team") and reg.team:
+        team_name = reg.team.team_name
+
     event_obj = None
     if hasattr(reg, "event") and reg.event:
         event_obj = {
@@ -51,6 +55,7 @@ def _reg_to_dict(reg) -> dict:
         "registered_at": reg.registered_at.isoformat(),  # ISO 8601 date string
         "registration_type": reg.registration_type,      # "individual" or "team"
         "team_id": reg.team_id,                          # None for individual registrations
+        "team_name": team_name,                          # Team Name for team registrations
         "event": event_obj,
     }
 

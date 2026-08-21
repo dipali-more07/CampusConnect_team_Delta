@@ -20,7 +20,8 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
             select(EventRegistration)
             .options(
                 joinedload(EventRegistration.event),
-                joinedload(EventRegistration.user)
+                joinedload(EventRegistration.user),
+                joinedload(EventRegistration.team)
             )
             .where(EventRegistration.registration_id == registration_id)
         ).scalar_one_or_none()
@@ -33,7 +34,8 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
             select(EventRegistration)
             .options(
                 joinedload(EventRegistration.event),
-                joinedload(EventRegistration.user)
+                joinedload(EventRegistration.user),
+                joinedload(EventRegistration.team)
             )
             .where(
                 and_(
@@ -51,7 +53,8 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
             select(EventRegistration)
             .options(
                 joinedload(EventRegistration.event),
-                joinedload(EventRegistration.user)
+                joinedload(EventRegistration.user),
+                joinedload(EventRegistration.team)
             )
             .where(EventRegistration.event_id == event_id)
             .offset(skip)
@@ -67,7 +70,8 @@ class RegistrationRepository(BaseRepository[EventRegistration]):
             select(EventRegistration)
             .options(
                 joinedload(EventRegistration.event),
-                joinedload(EventRegistration.user)
+                joinedload(EventRegistration.user),
+                joinedload(EventRegistration.team)
             )
             .where(EventRegistration.participant_id == user_id)
             .order_by(EventRegistration.registered_at.desc())
