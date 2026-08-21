@@ -8,6 +8,12 @@ import {
 import analyticsService from '../../services/analyticsService'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 
+import {
+  exportAnalyticsToPdf,
+  exportAnalyticsToExcel,
+  exportAnalyticsToCsv
+} from '../../utils/analyticsExport'
+
 // Sub-components
 import AnalyticsStats from '../../components/admin/adminAnalytics/AnalyticsStats'
 import AnalyticsTrendChart from '../../components/admin/adminAnalytics/AnalyticsTrendChart'
@@ -66,28 +72,24 @@ export default function AnalyticsPage({ tokens }) {
     loadTrend(activeTab)
   }, [activeTab])
 
-  // ── CSV Export ──
+  // ── Export Handlers ──
   const handleExport = (type) => {
-    let headers = ''
-    let rows = []
-    let filename = `analytics_report_${activeTab}`
-
-    if (activeTab === 'event') {
-      headers = 'Category,Count,Percentage\n'
-      rows = categories.map(c => `"${c.name}",${c.count},${c.percentage}%`)
-    } else {
-      headers = 'Department,Count,Percentage\n'
-      rows = depts.map(d => `"${d.dept}",${d.count},${d.percentage}%`)
+    const payload = {
+      stats,
+      trendData,
+      categories,
+      depts,
+      radarData,
+      activeTab
     }
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + headers + rows.join('\n')
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement('a')
-    link.setAttribute('href', encodedUri)
-    link.setAttribute('download', `${filename}.${type === 'csv' ? 'csv' : type === 'excel' ? 'xls' : 'txt'}`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    if (type === 'pdf') {
+      exportAnalyticsToPdf(payload)
+    } else if (type === 'excel') {
+      exportAnalyticsToExcel(payload)
+    } else {
+      exportAnalyticsToCsv(payload)
+    }
   }
 
   return (

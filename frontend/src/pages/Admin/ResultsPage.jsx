@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Download, Trophy, Users, User, Award, Plus, CalendarDays } from 'lucide-react'
+import { Upload, Trophy, Users, User, Award, Plus, CalendarDays } from 'lucide-react'
 import resultsService from '../../services/resultsService'
 import eventsService from '../../services/eventsService'
 import studentsService from '../../services/studentsService'
@@ -304,7 +304,7 @@ export default function ResultsPage({ tokens }) {
             disabled={filteredResults.length === 0}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#1e2d45] bg-white dark:bg-[#1a2236] cursor-pointer transition-all duration-150 hover:bg-slate-50 dark:hover:bg-[#1e2d45] disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Download size={14} className="text-slate-400" /> Export CSV
+            <Upload size={14} className="text-slate-400" /> Export CSV
           </button>
 
           <button

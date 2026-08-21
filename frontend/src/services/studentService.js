@@ -718,6 +718,8 @@ function mapStudentCertificate(item, idx) {
     issueDate: formattedDate,
     position: position,
     studentName: item.student_name || item.userName || item.name || 'Student',
+    teamName: item.team_name || item.teamName || null,
+    teamId: item.team_id || item.teamId || null,
     pdfUrl: item.certificate_url || item.pdf_path || item.pdfUrl || null,
   }
 }
@@ -1035,6 +1037,21 @@ async function apiRegisterEvent(eventId, payload) {
 
     const createdData = data.data || data
     const regId = createdData.id || createdData.registration_id || `reg-${Date.now()}`
+
+    if (regType === 'team') {
+      try {
+        const teamCache = JSON.parse(localStorage.getItem('cc_team_registrations') || '{}')
+        const cacheEntry = {
+          eventId: eventId,
+          teamName: payload.team_name,
+          teamMembers: payload.team_members || []
+        }
+        teamCache[`${eventId}`] = cacheEntry
+        if (regId) teamCache[regId] = cacheEntry
+        localStorage.setItem('cc_team_registrations', JSON.stringify(teamCache))
+      } catch (e) {}
+    }
+
     saveMockEventRegistrations([...getMockEventRegistrations(), {
       id: regId,
       event_id: eventId,

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Download, Plus } from 'lucide-react'
+import { Upload, Plus } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../data/dashboardData'
 import studentsService from '../../services/studentsService'
 import { useToast } from '../../context/ToastContext'
@@ -193,14 +193,18 @@ export default function StudentsPage({ tokens }) {
           <p className="text-[13px] mt-1" style={{ color: tokens.txtSec }}>Manage student accounts and profiles</p>
         </div>
         <div className="flex gap-2.5">
-          <button onClick={handleExport}
+          <button 
+            type='button'
+            onClick={handleExport}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-[10px] text-[13px] font-semibold bg-transparent border transition-all"
             style={{ borderColor: tokens.border, color: tokens.txtSec }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND; e.currentTarget.style.color = BRAND }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = tokens.border; e.currentTarget.style.color = tokens.txtSec }}>
-            <Download size={14} /> Export
+            <Upload size={14} /> Export
           </button>
-          <button onClick={openCreate}
+          <button 
+            type='button'
+            onClick={openCreate}
             className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] text-[13px] font-bold text-white border-none cursor-pointer hover:-translate-y-px transition-all"
             style={{ background: BRAND, boxShadow: '0 4px 14px rgba(97,95,255,0.4)' }}>
             <Plus size={15} /> Add Student

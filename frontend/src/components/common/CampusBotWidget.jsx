@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Send, Loader2, Calendar, ChevronRight, User, Trash2,
   X, Award, Zap, ExternalLink, Mic, Volume2, VolumeX,
-  Sparkles, Square
+  Sparkles, Square, RotateCcw
 } from 'lucide-react'
 import aiService from '../../services/aiService'
 import { useAuth } from '../../context/AuthContext'
@@ -234,6 +234,8 @@ function WidgetHeader({
   setVoiceEnabled,
   stopSpeaking,
   handleClearChat,
+  hasCustomPos,
+  onResetPos,
   onClose
 }) {
   return (
@@ -284,6 +286,20 @@ function WidgetHeader({
               {voiceEnabled ? <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <VolumeX className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
             </button>
           )}
+          {hasCustomPos && (
+            <button
+              type="button"
+              onClick={onResetPos}
+              title="Reset Bot Position to Default Corner"
+              className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${
+                dark
+                  ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/5'
+                  : 'text-slate-400 hover:text-cyan-600 hover:bg-slate-100'
+              }`}
+            >
+              <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            </button>
+          )}
           <button type="button" onClick={handleClearChat} title="Clear Chat" className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${dark ? 'text-slate-400 hover:text-red-400 hover:bg-white/5' : 'text-slate-400 hover:text-red-500 hover:bg-slate-100'}`}>
             <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
           </button>
@@ -313,13 +329,148 @@ export default function CampusBotWidget() {
   const [userBadge, setUserBadge] = useState(null)
   const [currentMood, setCurrentMood] = useState(null)
   const [isWaving, setIsWaving] = useState(false)
-  
+
   const showToast = useToast()
   const [isCelebrating, setIsCelebrating] = useState(false)
 
   const [isListening, setIsListening] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
+
+  // ── Drag & Drop for Floating Bot Avatar ──
+  const [botPos, setBotPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem('cc_bot_avatar_pos')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (typeof parsed.x === 'number' && typeof parsed.y === 'number') {
+          return parsed
+        }
+      }
+    } catch {}
+    return null
+  })
+
+  const isDraggingRef = useRef(false)
+  const dragStartRef = useRef({ startX: 0, startY: 0, origX: 0, origY: 0, width: 0, height: 0 })
+  const hasDraggedRef = useRef(false)
+  const avatarElemRef = useRef(null)
+
+  const handleAvatarPointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return
+
+    const elem = avatarElemRef.current
+    if (!elem) return
+
+    const rect = elem.getBoundingClientRect()
+    dragStartRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: rect.left,
+      origY: rect.top,
+      width: rect.width,
+      height: rect.height
+    }
+    isDraggingRef.current = true
+    hasDraggedRef.current = false
+
+    const handlePointerMove = (moveEvent) => {
+      if (!isDraggingRef.current) return
+      const dx = moveEvent.clientX - dragStartRef.current.startX
+      const dy = moveEvent.clientY - dragStartRef.current.startY
+
+      if (!hasDraggedRef.current && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) {
+        hasDraggedRef.current = true
+      }
+
+      if (hasDraggedRef.current) {
+        let newX = dragStartRef.current.origX + dx
+        let newY = dragStartRef.current.origY + dy
+
+        const maxW = window.innerWidth
+        const maxH = window.innerHeight
+        const w = dragStartRef.current.width || 64
+        const h = dragStartRef.current.height || 64
+
+        newX = Math.max(8, Math.min(newX, maxW - w - 8))
+        newY = Math.max(8, Math.min(newY, maxH - h - 8))
+
+        setBotPos({ x: newX, y: newY })
+      }
+    }
+
+    const handlePointerUp = () => {
+      if (isDraggingRef.current) {
+        isDraggingRef.current = false
+        if (hasDraggedRef.current) {
+          setBotPos(curr => {
+            if (curr) {
+              try { localStorage.setItem('cc_bot_avatar_pos', JSON.stringify(curr)) } catch {}
+            }
+            return curr
+          })
+        }
+      }
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      window.removeEventListener('pointercancel', handlePointerUp)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+    window.addEventListener('pointercancel', handlePointerUp)
+  }
+
+  const resetBotPosition = (e) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    setBotPos(null)
+    try {
+      localStorage.removeItem('cc_bot_avatar_pos')
+    } catch {}
+  }
+
+  const getWidgetPosition = (pos) => {
+    if (!pos || typeof window === 'undefined') return null
+
+    const isMobile = window.innerWidth < 640
+    const widgetW = isMobile ? Math.min(window.innerWidth - 24, 400) : 400
+    const widgetH = isMobile ? Math.min(window.innerHeight * 0.76, 520) : Math.min(window.innerHeight * 0.82, 580)
+    const botSize = isMobile ? 56 : 64
+    const pad = 10
+
+    let left = pos.x
+    let top = pos.y
+
+    // Horizontal: If on right half of screen, align right edge of widget to bot
+    if (pos.x + botSize / 2 > window.innerWidth / 2) {
+      left = pos.x + botSize - widgetW
+    } else {
+      left = pos.x
+    }
+
+    // Vertical: If in lower half of screen, open above bot
+    if (pos.y + botSize / 2 > window.innerHeight / 2) {
+      top = pos.y - widgetH - pad
+      if (top < 8) {
+        top = Math.max(8, pos.y + botSize + pad)
+      }
+    } else {
+      // If in upper half of screen, open below bot
+      top = pos.y + botSize + pad
+      if (top + widgetH > window.innerHeight - 8) {
+        top = Math.max(8, pos.y - widgetH - pad)
+      }
+    }
+
+    // Clamp within viewport
+    left = Math.max(8, Math.min(left, window.innerWidth - widgetW - 8))
+    top = Math.max(8, Math.min(top, window.innerHeight - widgetH - 8))
+
+    return { left, top }
+  }
 
   const [globalForceStop, setGlobalForceStop] = useState(false)
 
@@ -795,12 +946,39 @@ export default function CampusBotWidget() {
           onClick={() => { stopSpeaking(); stopRecording(); setIsOpen(false) }}
         />
       )}
-      <div id="global-campus-bot" className="fixed bottom-3 right-3 sm:bottom-5 sm:right-5 z-50 font-[Inter,Manrope,sans-serif] max-w-[calc(100vw-24px)]">
-
       {!isOpen && (
-        <div className="hover:scale-105 active:scale-95 transition-transform">
+        <div
+          ref={avatarElemRef}
+          onPointerDown={handleAvatarPointerDown}
+          onDoubleClick={resetBotPosition}
+          onClick={(e) => {
+            if (hasDraggedRef.current) {
+              e.stopPropagation()
+              return
+            }
+            setIsWaving(false)
+            setIsOpen(true)
+          }}
+          style={
+            botPos
+              ? {
+                  position: 'fixed',
+                  left: `${botPos.x}px`,
+                  top: `${botPos.y}px`,
+                  bottom: 'auto',
+                  right: 'auto',
+                  touchAction: 'none',
+                  zIndex: 9999
+                }
+              : {
+                  touchAction: 'none',
+                  zIndex: 9999
+                }
+          }
+          className={`cursor-grab active:cursor-grabbing select-none hover:scale-105 active:scale-95 transition-transform group/bot-drag ${botPos ? '' : 'fixed bottom-3 right-3 sm:bottom-5 sm:right-5'}`}
+          title={botPos ? 'Drag to move / Double-click to reset position' : 'Drag & drop Camy anywhere / Click to open'}
+        >
           <EmoBotCharacter
-            onClick={() => { setIsWaving(false); setIsOpen(true) }}
             isTyping={loading}
             isSpeaking={isSpeaking}
             isListening={isListening}
@@ -809,254 +987,292 @@ export default function CampusBotWidget() {
             mood={currentMood}
             size={window.innerWidth < 640 ? 56 : 64}
           />
+
+          {/* Quick reset badge when moved - visible ONLY on hover */}
+          {botPos && (
+            <button
+              type="button"
+              onClick={resetBotPosition}
+              onPointerDown={(e) => e.stopPropagation()}
+              title="Reset bot to default corner position"
+              className="absolute -top-2 -right-2 px-2 py-0.5 rounded-full bg-slate-900/95 text-cyan-300 hover:bg-cyan-600 hover:text-white border border-cyan-400/60 shadow-xl flex items-center gap-1 cursor-pointer transition-all duration-200 opacity-0 group-hover/bot-drag:opacity-100 scale-75 group-hover/bot-drag:scale-100 pointer-events-none group-hover/bot-drag:pointer-events-auto z-50 text-[10.5px] font-bold select-none whitespace-nowrap"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>Reset</span>
+            </button>
+          )}
         </div>
       )}
 
-      {isOpen && (
-        <div
-          className={`flex flex-col w-[calc(100vw-24px)] sm:w-[400px] h-[520px] max-h-[76vh] sm:h-[580px] sm:max-h-[82vh] rounded-[22px] sm:rounded-[26px] shadow-2xl border overflow-hidden backdrop-blur-xl transition-all duration-300 ${dark
-            ? 'bg-[#0a0f1e]/95 text-slate-100 border-cyan-900/40 shadow-[0_8px_40px_rgba(8,145,178,0.15)]'
-            : 'bg-white/98 text-slate-900 border-slate-200 shadow-[0_8px_40px_rgba(0,0,0,0.12)]'
-            }`}
-          style={{ animation: 'cbPop 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
-        >
-          <WidgetHeader
-            dark={dark}
-            loading={loading}
-            isSpeaking={isSpeaking}
-            isListening={isListening}
-            isCelebrating={isCelebrating}
-            currentMood={currentMood}
-            currentBadge={currentBadge}
-            voiceEnabled={voiceEnabled}
-            setVoiceEnabled={setVoiceEnabled}
-            stopSpeaking={stopSpeaking}
-            handleClearChat={handleClearChat}
-            onClose={() => { stopSpeaking(); stopRecording(); setIsOpen(false) }}
-          />
+      {isOpen && (() => {
+        const winPos = getWidgetPosition(botPos)
+        return (
+          <div
+            id="global-campus-bot"
+            style={
+              winPos
+                ? {
+                    position: 'fixed',
+                    left: `${winPos.left}px`,
+                    top: `${winPos.top}px`,
+                    bottom: 'auto',
+                    right: 'auto',
+                    zIndex: 9999
+                  }
+                : {
+                    zIndex: 9999
+                  }
+            }
+            className={`${winPos ? '' : 'fixed bottom-3 right-3 sm:bottom-5 sm:right-5'} font-[Inter,Manrope,sans-serif] max-w-[calc(100vw-24px)]`}
+          >
+            <div
+              className={`flex flex-col w-[calc(100vw-24px)] sm:w-[400px] h-[520px] max-h-[76vh] sm:h-[580px] sm:max-h-[82vh] rounded-[22px] sm:rounded-[26px] shadow-2xl border overflow-hidden backdrop-blur-xl transition-all duration-300 ${dark
+                ? 'bg-[#0a0f1e]/95 text-slate-100 border-cyan-900/40 shadow-[0_8px_40px_rgba(8,145,178,0.15)]'
+                : 'bg-white/98 text-slate-900 border-slate-200 shadow-[0_8px_40px_rgba(0,0,0,0.12)]'
+                }`}
+              style={{ animation: 'cbPop 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
+            >
+            <WidgetHeader
+              dark={dark}
+              loading={loading}
+              isSpeaking={isSpeaking}
+              isListening={isListening}
+              isCelebrating={isCelebrating}
+              currentMood={currentMood}
+              currentBadge={currentBadge}
+              voiceEnabled={voiceEnabled}
+              setVoiceEnabled={setVoiceEnabled}
+              stopSpeaking={stopSpeaking}
+              handleClearChat={handleClearChat}
+              hasCustomPos={botPos !== null}
+              onResetPos={resetBotPosition}
+              onClose={() => { stopSpeaking(); stopRecording(); setIsOpen(false) }}
+            />
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 cb-scrollbar">
-            {messages.map((msg, i) => {
-              const isBot = msg.role === 'assistant'
-              const isLastBotMsg = isBot && i === messages.length - 1
-              const msgMood = isBot ? (msg.mood || analyzeSentiment(msg.reply) || 'happy') : null
-              const msgKey = `msg-${i}-${msg.timestamp ? new Date(msg.timestamp).getTime() : i}`
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 cb-scrollbar">
+              {messages.map((msg, i) => {
+                const isBot = msg.role === 'assistant'
+                const isLastBotMsg = isBot && i === messages.length - 1
+                const msgMood = isBot ? (msg.mood || analyzeSentiment(msg.reply) || 'happy') : null
+                const msgKey = `msg-${i}-${msg.timestamp ? new Date(msg.timestamp).getTime() : i}`
 
-              let bubbleClass = 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-br-sm shadow-md'
-              if (isBot) {
-                bubbleClass = dark ? 'bg-[#111d35] border border-cyan-900/30 rounded-bl-sm' : 'bg-slate-50 border border-slate-200 rounded-bl-sm'
-              }
+                let bubbleClass = 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-br-sm shadow-md'
+                if (isBot) {
+                  bubbleClass = dark ? 'bg-[#111d35] border border-cyan-900/30 rounded-bl-sm' : 'bg-slate-50 border border-slate-200 rounded-bl-sm'
+                }
 
-              return (
-                <div key={msgKey} className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}>
-                  <div className={`flex items-end gap-2 max-w-[88%] ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
-                    {isBot ? (
-                      <div className="shrink-0 mb-1">
-                        <EmoBotCharacter
-                          size={32}
-                          isSpeaking={isSpeaking && isLastBotMsg}
-                          isTyping={loading && isLastBotMsg}
-                          isListening={isListening && isLastBotMsg}
-                          mood={msgMood}
-                          onClick={() => { }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-                        <User className="w-3.5 h-3.5" />
-                      </div>
-                    )}
-                    <div className={`px-3.5 py-3 rounded-2xl relative group/msg ${bubbleClass}`}>
-                      {isBot && msg.typed && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (isSpeaking) {
-                              stopSpeaking()
-                            } else {
-                              speakReply(msg.speech_text || msg.reply)
-                            }
-                          }}
-                          title={isSpeaking ? "Stop Voice" : "Listen to Response"}
-                          className="absolute -top-2.5 -right-2.5 p-1 rounded-full bg-slate-900 border border-cyan-400/60 text-cyan-300 hover:text-cyan-200 opacity-0 group-hover/msg:opacity-100 transition-opacity cursor-pointer shadow-md"
-                        >
-                          <Volume2 className="w-3 h-3" />
-                        </button>
-                      )}
-
-                      {isBot && !msg.typed ? (
-                        <TypewriterText
-                          text={msg.reply}
-                          speed={18}
-                          onComplete={(truncatedText) => markTyped(i, truncatedText)}
-                          onNavigate={(p) => navigate(p)}
-                          forceStop={globalForceStop}
-                        />
+                return (
+                  <div key={msgKey} className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}>
+                    <div className={`flex items-end gap-2 max-w-[88%] ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
+                      {isBot ? (
+                        <div className="shrink-0 mb-1">
+                          <EmoBotCharacter
+                            size={32}
+                            isSpeaking={isSpeaking && isLastBotMsg}
+                            isTyping={loading && isLastBotMsg}
+                            isListening={isListening && isLastBotMsg}
+                            mood={msgMood}
+                            onClick={() => { }}
+                          />
+                        </div>
                       ) : (
-                        <MarkdownRenderer content={msg.reply} onNavigate={(p) => navigate(p)} />
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                          <User className="w-3.5 h-3.5" />
+                        </div>
                       )}
-                    </div>
-                  </div>
-
-                  {isBot && msg.typed && msg.recommended_events?.length > 0 && (
-                    <div className="mt-2.5 ml-9 space-y-1.5 w-[85%]">
-                      <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 m-0 ${dark ? 'text-cyan-500' : 'text-cyan-600'}`}>
-                        <Calendar className="w-3 h-3" /> Recommended Events
-                      </p>
-                      {msg.recommended_events.map((ev, j) => {
-                        const evId = ev.event_id || ev.id || ev._id || j
-                        return (
+                      <div className={`px-3.5 py-3 rounded-2xl relative group/msg ${bubbleClass}`}>
+                        {isBot && msg.typed && (
                           <button
                             type="button"
-                            key={`rec-ev-${evId}-${j}`}
-                            onClick={() => navigate(`/events/${evId}`)}
-                            className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${dark ? 'bg-cyan-950/30 hover:bg-cyan-900/40 border-cyan-800/30' : 'bg-cyan-50/70 hover:bg-cyan-100 border-cyan-200/70'
-                              }`}
+                            onClick={() => {
+                              if (isSpeaking) {
+                                stopSpeaking()
+                              } else {
+                                speakReply(msg.speech_text || msg.reply)
+                              }
+                            }}
+                            title={isSpeaking ? "Stop Voice" : "Listen to Response"}
+                            className="absolute -top-2.5 -right-2.5 p-1 rounded-full bg-slate-900 border border-cyan-400/60 text-cyan-300 hover:text-cyan-200 opacity-0 group-hover/msg:opacity-100 transition-opacity cursor-pointer shadow-md"
                           >
-                            <div>
-                              <h4 className={`font-bold text-[12px] group-hover:underline m-0 ${dark ? 'text-cyan-300' : 'text-cyan-700'}`}>{ev.title || ev.name}</h4>
-                              <p className="text-[10px] opacity-70 m-0 mt-0.5">{ev.category || 'Event'} • {ev.location || 'Campus'}</p>
-                            </div>
-                            <ChevronRight className="w-3.5 h-3.5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+                            <Volume2 className="w-3 h-3" />
                           </button>
-                        )
-                      })}
+                        )}
+
+                        {isBot && !msg.typed ? (
+                          <TypewriterText
+                            text={msg.reply}
+                            speed={18}
+                            onComplete={(truncatedText) => markTyped(i, truncatedText)}
+                            onNavigate={(p) => navigate(p)}
+                            forceStop={globalForceStop}
+                          />
+                        ) : (
+                          <MarkdownRenderer content={msg.reply} onNavigate={(p) => navigate(p)} />
+                        )}
+                      </div>
                     </div>
-                  )}
 
-                  <span className={`text-[9px] mt-1 px-1.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                  </span>
-                </div>
-              )
-            })}
+                    {isBot && msg.typed && msg.recommended_events?.length > 0 && (
+                      <div className="mt-2.5 ml-9 space-y-1.5 w-[85%]">
+                        <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 m-0 ${dark ? 'text-cyan-500' : 'text-cyan-600'}`}>
+                          <Calendar className="w-3 h-3" /> Recommended Events
+                        </p>
+                        {msg.recommended_events.map((ev, j) => {
+                          const evId = ev.event_id || ev.id || ev._id || j
+                          return (
+                            <button
+                              type="button"
+                              key={`rec-ev-${evId}-${j}`}
+                              onClick={() => navigate(`/events/${evId}`)}
+                              className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${dark ? 'bg-cyan-950/30 hover:bg-cyan-900/40 border-cyan-800/30' : 'bg-cyan-50/70 hover:bg-cyan-100 border-cyan-200/70'
+                                }`}
+                            >
+                              <div>
+                                <h4 className={`font-bold text-[12px] group-hover:underline m-0 ${dark ? 'text-cyan-300' : 'text-cyan-700'}`}>{ev.title || ev.name}</h4>
+                                <p className="text-[10px] opacity-70 m-0 mt-0.5">{ev.category || 'Event'} • {ev.location || 'Campus'}</p>
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
 
-            {loading && (
-              <div className="flex items-center gap-2 pl-1">
-                <div className="shrink-0">
-                  <EmoBotCharacter size={28} isTyping={true} onClick={() => { }} />
-                </div>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-[12px] font-medium ${dark ? 'bg-[#111d35] border border-cyan-900/30 text-cyan-300' : 'bg-slate-50 border border-slate-200 text-cyan-700'
-                  }`}>
-                  <span>Camy is thinking</span>
-                  <span className="flex gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:150ms]" />
-                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:300ms]" />
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {isSpeaking && !loading && (
-              <div className="flex items-center gap-2 pl-1 animate-fadeIn">
-                <button
-                  type="button"
-                  onClick={stopSpeaking}
-                  title="Click to Stop Voice Output"
-                  className="w-8 h-8 rounded-xl bg-slate-950 border border-cyan-400/80 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse shrink-0 hover:bg-red-950 hover:border-red-400 hover:text-red-300 cursor-pointer transition-colors"
-                >
-                  <Square className="w-3.5 h-3.5 fill-cyan-300 hover:fill-red-300" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={stopSpeaking}
-                  title="Click to Stop Voice"
-                  className="relative group cursor-pointer text-left border-none bg-transparent p-0"
-                >
-                  <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 opacity-80 blur-md animate-pulse" />
-                  <div className="relative flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-cyan-400/70 shadow-[0_0_18px_rgba(34,211,238,0.5)]">
-                    <span className="text-[11.5px] font-extrabold tracking-wide text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]">
-                      Speaking... (Click to stop)
+                    <span className={`text-[9px] mt-1 px-1.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                     </span>
-                    <SoundWaveIndicator />
                   </div>
-                </button>
-              </div>
-            )}
+                )
+              })}
 
-            <div ref={messagesEndRef} />
-          </div>
-
-          {quickChips?.length > 0 && (
-            <div className={`px-2.5 sm:px-3 py-1.5 shrink-0 border-t ${dark ? 'bg-[#0c1424] border-cyan-900/20' : 'bg-slate-50/80 border-slate-200'}`}>
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                {quickChips.map((chip, idx) => (
-                  <button type="button" key={chip.id || `chip-${idx}`} onClick={() => handleSendMessage(chip.prompt || chip.label, false)} disabled={loading} className={`shrink-0 flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-semibold border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 ${dark ? 'bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-200 border-cyan-800/50' : 'bg-white hover:bg-cyan-50 text-cyan-700 border-cyan-200'
+              {loading && (
+                <div className="flex items-center gap-2 pl-1">
+                  <div className="shrink-0">
+                    <EmoBotCharacter size={28} isTyping={true} onClick={() => { }} />
+                  </div>
+                  <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-[12px] font-medium ${dark ? 'bg-[#111d35] border border-cyan-900/30 text-cyan-300' : 'bg-slate-50 border border-slate-200 text-cyan-700'
                     }`}>
-                    <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400 shrink-0" />
-                    <span>{chip.label || chip.prompt}</span>
+                    <span>Camy is thinking</span>
+                    <span className="flex gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:150ms]" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:300ms]" />
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {isSpeaking && !loading && (
+                <div className="flex items-center gap-2 pl-1 animate-fadeIn">
+                  <button
+                    type="button"
+                    onClick={stopSpeaking}
+                    title="Click to Stop Voice Output"
+                    className="w-8 h-8 rounded-xl bg-slate-950 border border-cyan-400/80 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse shrink-0 hover:bg-red-950 hover:border-red-400 hover:text-red-300 cursor-pointer transition-colors"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-cyan-300 hover:fill-red-300" />
                   </button>
-                ))}
-              </div>
+
+                  <button
+                    type="button"
+                    onClick={stopSpeaking}
+                    title="Click to Stop Voice"
+                    className="relative group cursor-pointer text-left border-none bg-transparent p-0"
+                  >
+                    <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 opacity-80 blur-md animate-pulse" />
+                    <div className="relative flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-cyan-400/70 shadow-[0_0_18px_rgba(34,211,238,0.5)]">
+                      <span className="text-[11.5px] font-extrabold tracking-wide text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]">
+                        Speaking... (Click to stop)
+                      </span>
+                      <SoundWaveIndicator />
+                    </div>
+                  </button>
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
             </div>
-          )}
 
-          <div className={`p-2.5 sm:p-3 shrink-0 border-t flex flex-col items-center relative ${dark ? 'bg-[#080d1a] border-cyan-900/30' : 'bg-white border-slate-200'}`}>
-            {isBotTyping && (
-              <button
-                type="button"
-                onClick={stopBotTyping}
-                className={`absolute -top-11 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-lg transition-all border ${dark ? 'bg-[#111d35] text-red-400 border-red-900/30 hover:bg-red-950/30' : 'bg-white text-red-500 border-slate-200 hover:bg-slate-50'}`}
-              >
-                <Square className="w-3 h-3 fill-current" /> Stop generating
-              </button>
+            {quickChips?.length > 0 && (
+              <div className={`px-2.5 sm:px-3 py-1.5 shrink-0 border-t ${dark ? 'bg-[#0c1424] border-cyan-900/20' : 'bg-slate-50/80 border-slate-200'}`}>
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  {quickChips.map((chip, idx) => (
+                    <button type="button" key={chip.id || `chip-${idx}`} onClick={() => handleSendMessage(chip.prompt || chip.label, false)} disabled={loading} className={`shrink-0 flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-semibold border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 ${dark ? 'bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-200 border-cyan-800/50' : 'bg-white hover:bg-cyan-50 text-cyan-700 border-cyan-200'
+                      }`}>
+                      <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400 shrink-0" />
+                      <span>{chip.label || chip.prompt}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault()
-                handleSendMessage(null, wasVoiceUsedRef.current)
-              }}
-              className="flex items-center gap-1.5 sm:gap-2"
-            >
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputText}
-                onChange={(e) => {
-                  setInputText(e.target.value)
-                  if (!isListening) wasVoiceUsedRef.current = false
+
+            <div className={`p-2.5 sm:p-3 shrink-0 border-t flex flex-col items-center relative ${dark ? 'bg-[#080d1a] border-cyan-900/30' : 'bg-white border-slate-200'}`}>
+              {isBotTyping && (
+                <button
+                  type="button"
+                  onClick={stopBotTyping}
+                  className={`absolute -top-11 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-lg transition-all border ${dark ? 'bg-[#111d35] text-red-400 border-red-900/30 hover:bg-red-950/30' : 'bg-white text-red-500 border-slate-200 hover:bg-slate-50'}`}
+                >
+                  <Square className="w-3 h-3 fill-current" /> Stop generating
+                </button>
+              )}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleSendMessage(null, wasVoiceUsedRef.current)
                 }}
-                placeholder={isListening ? '🎙️ Recording voice...' : 'Ask Camy anything...'}
-                disabled={loading}
-                className={`flex-1 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl text-[12.5px] sm:text-[13px] outline-none border transition-all ${inputStyle}`}
-              />
-
-              {(isListening || (inputText.trim() && isListening)) && (
-                <button
-                  type="button"
-                  onClick={cancelRecording}
-                  title="Cancel & Discard Recording"
-                  className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-slate-800 hover:bg-red-600/80 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer border border-slate-700"
-                >
-                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                </button>
-              )}
-
-              {recognitionRef.current && (
-                <button
-                  type="button"
-                  onClick={toggleMic}
-                  title={isListening ? 'Pause / Stop Recording' : 'Start Voice Recording'}
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer border ${micButtonStyle}`}
-                >
-                  {isListening ? <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" /> : <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                </button>
-              )}
-
-              <button
-                type="submit"
-                disabled={!inputText.trim() || loading}
-                title="Send Message to Camy"
-                className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white flex items-center justify-center shrink-0 hover:from-cyan-500 hover:to-teal-500 active:scale-95 disabled:opacity-30 transition-all cursor-pointer shadow-md"
+                className="flex items-center gap-1.5 sm:gap-2"
               >
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />}
-              </button>
-            </form>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => {
+                    setInputText(e.target.value)
+                    if (!isListening) wasVoiceUsedRef.current = false
+                  }}
+                  placeholder={isListening ? '🎙️ Recording voice...' : 'Ask Camy anything...'}
+                  disabled={loading}
+                  className={`flex-1 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl text-[12.5px] sm:text-[13px] outline-none border transition-all ${inputStyle}`}
+                />
+
+                {(isListening || (inputText.trim() && isListening)) && (
+                  <button
+                    type="button"
+                    onClick={cancelRecording}
+                    title="Cancel & Discard Recording"
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-slate-800 hover:bg-red-600/80 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer border border-slate-700"
+                  >
+                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  </button>
+                )}
+
+                {recognitionRef.current && (
+                  <button
+                    type="button"
+                    onClick={toggleMic}
+                    title={isListening ? 'Pause / Stop Recording' : 'Start Voice Recording'}
+                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer border ${micButtonStyle}`}
+                  >
+                    {isListening ? <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" /> : <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                  </button>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={!inputText.trim() || loading}
+                  title="Send Message to Camy"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white flex items-center justify-center shrink-0 hover:from-cyan-500 hover:to-teal-500 active:scale-95 disabled:opacity-30 transition-all cursor-pointer shadow-md"
+                >
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />}
+                </button>
+              </form>
+            </div>
           </div>
         </div>
-      )}
+        )
+      })()}
 
       <style>{`
         @keyframes cbPop {
@@ -1084,7 +1300,6 @@ export default function CampusBotWidget() {
           50% { transform: scaleY(1.2); opacity: 1; }
         }
       `}</style>
-    </div>
     </>
   )
 }

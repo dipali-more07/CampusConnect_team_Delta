@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import {
-  ChevronLeft, Search, ChevronRight, Clock, MapPin, Users, Loader2, XCircle, Award, Check
+  ChevronLeft, Search, ChevronRight, ChevronDown, Clock, MapPin, Users, Loader2, XCircle, Award, Check
 } from 'lucide-react'
 import { BRAND as DEFAULT_BRAND } from '../../../data/dashboardData'
 import eventsService from '../../../services/eventsService'
@@ -102,6 +102,14 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
   const [regSearch, setRegSearch] = useState('')
   const [regPage, setRegPage] = useState(1)
   const [regPerPage, setRegPerPage] = useState(5)
+  const [expandedTeams, setExpandedTeams] = useState({})
+
+  const toggleTeam = (teamKey) => {
+    setExpandedTeams(prev => ({
+      ...prev,
+      [teamKey]: !prev[teamKey]
+    }))
+  }
 
   // Search and Pagination states for Attendance
   const [attSearch, setAttSearch] = useState('')
@@ -254,7 +262,7 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
   const remaining = isApproved ? Math.max(event.capacity - effectiveRegs, 0) : event.capacity
 
   // Filtered & Paginated Registrations
-  const filteredRegs = registrations.map(r => {
+  const normalizedRegs = registrations.map(r => {
     const student = students.find(s => s.id === r.userId || s.id === r.user_id || (r.user_email && s.email && r.user_email.toLowerCase() === s.email.toLowerCase()))
 
     // Check payment status for paid events
@@ -276,18 +284,70 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
       department: student?.department || r.department || 'N/A',
       year: student?.year || r.year || 'N/A',
       date: r.registeredAt || r.registered_at ? new Date(r.registeredAt || r.registered_at).toLocaleDateString() : (r.date || 'N/A'),
-      status: displayStatus
+      status: displayStatus,
+      teamId: r.team_id || r.teamId || null,
+      teamName: r.team_name || r.teamName || null,
+      registrationType: (r.registration_type || r.registrationType || '').toLowerCase()
     }
-  }).filter(r => {
+  })
+
+  // Group team members together
+  const groupedRegItems = []
+  const teamGroupsMap = new Map()
+
+  normalizedRegs.forEach(reg => {
+    const isTeam = reg.registrationType === 'team' || Boolean(reg.teamId || reg.teamName)
+    if (isTeam) {
+      const groupKey = reg.teamId || reg.teamName || 'team_default'
+      if (!teamGroupsMap.has(groupKey)) {
+        const teamObj = {
+          isGroup: true,
+          type: 'team',
+          teamKey: groupKey,
+          teamId: reg.teamId,
+          teamName: reg.teamName || 'Team',
+          date: reg.date,
+          status: reg.status,
+          department: reg.department,
+          year: reg.year,
+          members: []
+        }
+        teamGroupsMap.set(groupKey, teamObj)
+        groupedRegItems.push(teamObj)
+      }
+      teamGroupsMap.get(groupKey).members.push(reg)
+    } else {
+      groupedRegItems.push({
+        isGroup: false,
+        type: 'solo',
+        ...reg
+      })
+    }
+  })
+
+  const filteredRegs = groupedRegItems.filter(item => {
     const q = regSearch.toLowerCase().trim()
     if (!q) return true
+    if (item.isGroup) {
+      const matchTeam = (item.teamName || '').toLowerCase().includes(q) ||
+        (item.status || '').toLowerCase().includes(q) ||
+        (item.date || '').toLowerCase().includes(q)
+      const matchMember = item.members.some(m =>
+        (m.studentName || '').toLowerCase().includes(q) ||
+        (m.rollNo || '').toLowerCase().includes(q) ||
+        (m.department || '').toLowerCase().includes(q) ||
+        (m.year || '').toLowerCase().includes(q) ||
+        (m.status || '').toLowerCase().includes(q)
+      )
+      return matchTeam || matchMember
+    }
     return (
-      (r.studentName || '').toLowerCase().includes(q) ||
-      (r.rollNo || '').toLowerCase().includes(q) ||
-      (r.department || '').toLowerCase().includes(q) ||
-      (r.year || '').toLowerCase().includes(q) ||
-      (r.status || '').toLowerCase().includes(q) ||
-      (r.date || '').toLowerCase().includes(q)
+      (item.studentName || '').toLowerCase().includes(q) ||
+      (item.rollNo || '').toLowerCase().includes(q) ||
+      (item.department || '').toLowerCase().includes(q) ||
+      (item.year || '').toLowerCase().includes(q) ||
+      (item.status || '').toLowerCase().includes(q) ||
+      (item.date || '').toLowerCase().includes(q)
     )
   })
 
@@ -788,9 +848,102 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
                           </td>
                         </tr>
                       ) : (
-                        paginatedRegs.map((att, i) => {
-                          const statusBadge = getRegStatusStyle(att.status)
-                          const regId = att.id || att.registration_id
+                        paginatedRegs.map((item, i) => {
+                          if (item.isGroup) {
+                            const isExpanded = Boolean(expandedTeams[item.teamKey])
+                            const teamStatusBadge = getRegStatusStyle(item.status)
+                            return (
+                              <Fragment key={`team-group-${item.teamKey}`}>
+                                <tr
+                                  onClick={() => toggleTeam(item.teamKey)}
+                                  className="cursor-pointer transition-colors duration-150 select-none animate-slide-up-fade"
+                                  style={{
+                                    background: isExpanded ? (dark ? '#13233a' : '#f1f5f9') : (dark ? '#0c1829' : '#f8fafc'),
+                                    borderBottom: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}`,
+                                    animationDelay: `${i * 40}ms`
+                                  }}
+                                >
+                                  <td className="py-3.5 px-4 text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                                    <div className="flex items-center gap-2.5">
+                                      <span className="w-5 h-5 rounded-md flex items-center justify-center bg-indigo-500/10 text-indigo-500 transition-transform">
+                                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                      </span>
+                                      <span className="font-black text-[13.5px] flex items-center gap-1.5" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
+                                        <Users size={14} className="text-indigo-500 shrink-0" />
+                                        {item.teamName}
+                                      </span>
+                                      <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20">
+                                        {item.members.length} {item.members.length === 1 ? 'Member' : 'Members'}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="py-3.5 px-4 text-[12px] font-mono text-slate-400 dark:text-[#7a98bb]">
+                                    {item.teamId ? `TEAM-${item.teamId.slice(0, 6)}` : 'Team'}
+                                  </td>
+                                  <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-600 dark:text-[#7a98bb]">
+                                    {item.department !== 'N/A' ? item.department : (item.members[0]?.department || '—')}
+                                  </td>
+                                  <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">
+                                    {item.year !== 'N/A' ? item.year : (item.members[0]?.year || '—')}
+                                  </td>
+                                  <td className="py-3.5 px-4 text-[13px] font-medium text-slate-500 dark:text-[#7a98bb]">{item.date}</td>
+                                  <td className="py-3.5 px-4 text-[13px]">
+                                    <span
+                                      className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
+                                      style={{ background: teamStatusBadge.bg, color: teamStatusBadge.text }}
+                                    >
+                                      {item.status}
+                                    </span>
+                                  </td>
+                                </tr>
+
+                                {/* Expanded Team Members */}
+                                {isExpanded && item.members.map((m, mIdx) => {
+                                  const mStatusBadge = getRegStatusStyle(m.status)
+                                  const mRegId = m.id || m.registration_id || `tm-${mIdx}`
+                                  const isLast = mIdx === item.members.length - 1
+                                  return (
+                                    <tr
+                                      key={mRegId}
+                                      className="transition-colors duration-150"
+                                      style={{
+                                        background: dark ? '#0a1322' : '#ffffff',
+                                        borderBottom: isLast ? `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` : `1px dashed ${dark ? '#162842' : '#edf2f7'}`
+                                      }}
+                                    >
+                                      <td className="py-3 px-4 text-[13px] font-semibold pl-10" style={{ color: dark ? '#cbd5e1' : '#334155' }}>
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-slate-400 font-mono text-xs">↳</span>
+                                          <span>{m.studentName}</span>
+                                          {mIdx === 0 && (
+                                            <span className="px-1.5 py-0.2 text-[9.5px] font-extrabold rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                                              Leader
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="py-3 px-4 text-[12.5px] font-semibold text-slate-500 dark:text-[#7a98bb]">{m.rollNo}</td>
+                                      <td className="py-3 px-4 text-[12.5px] font-semibold text-slate-600 dark:text-[#7a98bb]">{m.department}</td>
+                                      <td className="py-3 px-4 text-[12.5px] font-semibold text-slate-500 dark:text-[#7a98bb]">{m.year}</td>
+                                      <td className="py-3 px-4 text-[12.5px] font-medium text-slate-500 dark:text-[#7a98bb]">{m.date}</td>
+                                      <td className="py-3 px-4 text-[12.5px]">
+                                        <span
+                                          className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider inline-block text-center"
+                                          style={{ background: mStatusBadge.bg, color: mStatusBadge.text }}
+                                        >
+                                          {m.status}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </Fragment>
+                            )
+                          }
+
+                          // Solo participant row
+                          const statusBadge = getRegStatusStyle(item.status)
+                          const regId = item.id || item.registration_id
                           return (
                             <tr
                               key={regId}
@@ -800,17 +953,17 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
                                 animationDelay: `${i * 40}ms`
                               }}
                             >
-                              <td className="py-3.5 px-4 text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{att.studentName}</td>
-                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.rollNo}</td>
-                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-600 dark:text-[#7a98bb]">{att.department}</td>
-                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{att.year}</td>
-                              <td className="py-3.5 px-4 text-[13px] font-medium text-slate-500 dark:text-[#7a98bb]">{att.date}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{item.studentName}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{item.rollNo}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-600 dark:text-[#7a98bb]">{item.department}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-semibold text-slate-500 dark:text-[#7a98bb]">{item.year}</td>
+                              <td className="py-3.5 px-4 text-[13px] font-medium text-slate-500 dark:text-[#7a98bb]">{item.date}</td>
                               <td className="py-3.5 px-4 text-[13px]">
                                 <span
                                   className="px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
                                   style={{ background: statusBadge.bg, color: statusBadge.text }}
                                 >
-                                  {att.status}
+                                  {item.status}
                                 </span>
                               </td>
                             </tr>
@@ -886,6 +1039,7 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
 
                       return (
                         <button
+                          type='button'
                           key={page}
                           onClick={() => setRegPage(page)}
                           className="w-8 h-8 rounded-lg text-[12.5px] font-extrabold cursor-pointer transition-all border-none"
@@ -901,6 +1055,7 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
                     })}
 
                     <button
+                      type='button'
                       onClick={() => setRegPage(prev => Math.min(prev + 1, totalRegPages))}
                       disabled={currentRegPage === totalRegPages || totalRegPages === 0}
                       className="p-1.5 rounded-lg border bg-transparent cursor-pointer transition-all disabled:opacity-30 disabled:cursor-not-allowed"

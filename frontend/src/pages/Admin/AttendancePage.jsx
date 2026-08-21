@@ -217,8 +217,15 @@ export default function AttendancePage({ tokens }) {
 
   /* fetch */
   const loadRegistrations = async (evtId) => {
+    const targetId = evtId || selectedEvent
+    if (!targetId || targetId === 'ALL') {
+      const stuRes = await studentsService.fetchAll()
+      if (stuRes.success) setStudents(stuRes.students || [])
+      setRegistrations([])
+      return
+    }
     const [res, stuRes] = await Promise.all([
-      eventsService.fetchRegistrations(evtId || selectedEvent),
+      eventsService.fetchRegistrations(targetId),
       studentsService.fetchAll()
     ])
     if (stuRes.success) setStudents(stuRes.students || [])
@@ -226,10 +233,16 @@ export default function AttendancePage({ tokens }) {
   }
 
   const loadRecords = async (evtId) => {
+    const targetId = evtId || selectedEvent
+    if (!targetId || targetId === 'ALL') {
+      setRecords([])
+      setLoading(false)
+      return
+    }
     setLoading(true)
-    const res = await attendanceService.fetchAll(evtId || selectedEvent)
-        if (res.success) {
-            setRecords(res.records)
+    const res = await attendanceService.fetchAll(targetId)
+    if (res.success) {
+      setRecords(res.records)
     }
     else showToast(res.message || 'Failed to load attendance.', 'error')
     setLoading(false)

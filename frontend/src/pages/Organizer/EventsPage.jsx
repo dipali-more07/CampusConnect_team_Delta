@@ -487,17 +487,69 @@ export default function EventsPage({ tokens }) {
     }
   }
 
-  // Export Events (Download JSON)
+  // Export Events (Download CSV)
   const handleExport = () => {
     try {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(events, null, 2))
+      if (!events || events.length === 0) {
+        showToast('No events available to export.', 'info')
+        return
+      }
+
+      const headers = [
+        'Event ID',
+        'Event Name',
+        'Organizer',
+        'Category',
+        'Participation Type',
+        'Event Type',
+        'Venue',
+        'Start Date & Time',
+        'End Date & Time',
+        'Registration Deadline',
+        'Capacity',
+        'Registrations',
+        'Fees (INR)',
+        'Status',
+        'Approval Status',
+        'Description'
+      ]
+
+      const escapeCSV = (val) => {
+        if (val === null || val === undefined) return '""'
+        const str = String(val).replace(/"/g, '""')
+        return `"${str}"`
+      }
+
+      const rows = events.map(ev => [
+        escapeCSV(ev.id || ''),
+        escapeCSV(ev.name || ev.title || ev.event_name || ''),
+        escapeCSV(ev.organizer || ev.organizer_name || ev.organized_by || ''),
+        escapeCSV(ev.category || ''),
+        escapeCSV(ev.participationType || ev.participation_type || 'individual'),
+        escapeCSV(ev.eventType || ev.event_type || 'offline'),
+        escapeCSV(ev.venue || ''),
+        escapeCSV(ev.start_datetime || ev.startDateTime || ev.date || ev.event_date || ''),
+        escapeCSV(ev.end_datetime || ev.endDateTime || ''),
+        escapeCSV(ev.registration_deadline || ev.reg_deadline || ev.registrationDeadline || ''),
+        escapeCSV(ev.capacity || ev.max_participants || 0),
+        escapeCSV(ev.registrationsCount || 0),
+        escapeCSV(ev.fees || 0),
+        escapeCSV(getEventDynamicStatus(ev) || ev.status || ''),
+        escapeCSV(ev.approvalStatus || 'Approved'),
+        escapeCSV(ev.description || '')
+      ].join(','))
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n')
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
       const downloadAnchor = document.createElement('a')
-      downloadAnchor.setAttribute("href", dataStr)
-      downloadAnchor.setAttribute("download", `events_export_${new Date().toISOString().split('T')[0]}.json`)
+      downloadAnchor.setAttribute('href', url)
+      downloadAnchor.setAttribute('download', `events_export_${new Date().toISOString().split('T')[0]}.csv`)
       document.body.appendChild(downloadAnchor)
       downloadAnchor.click()
-      downloadAnchor.remove()
-      showToast('Events exported successfully.', 'success')
+      document.body.removeChild(downloadAnchor)
+      URL.revokeObjectURL(url)
+      showToast('Events exported as CSV successfully.', 'success')
     } catch (err) {
       showToast('Failed to export events.', 'error')
     }

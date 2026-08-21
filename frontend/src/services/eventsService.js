@@ -486,8 +486,12 @@ async function apiFetchRegistrations(eventId) {
       return { success: true, registrations: [] }
     }
 
+    if (!eventId || eventId === 'ALL') {
+      return { success: true, registrations: [] }
+    }
+
     const res = await fetchWithAuth(
-      `${API_BASE}/registrations/event/${eventId}?page=1&size=500`,
+      `${API_BASE}/registrations/event/${eventId}`,
       { method: 'GET' }
     )
     const data = await parseJSON(res)
@@ -551,6 +555,9 @@ function mapAttendanceRecord(r) {
 }
 
 async function apiFetchAttendance(eventId) {
+  if (!eventId || eventId === 'ALL') {
+    return { success: true, attendance: [] }
+  }
   try {
     const res = await fetch(`${API_BASE}/attendance/event/${eventId}`, {
       headers: authHeaders(),

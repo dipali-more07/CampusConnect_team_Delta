@@ -80,6 +80,7 @@ import eventsService from './eventsService'
 import studentsService from './studentsService'
 import certificatesService from './certificatesService'
 import organizersService from './organizersService'
+import analyticsService from './analyticsService'
 
 /* ── API IMPLEMENTATIONS ── */
 async function mockFetchStats() {
@@ -105,21 +106,27 @@ async function mockFetchStats() {
 
 async function apiFetchStats() {
   try {
-    const [eventsRes, studentsRes, certsRes, organizersRes] = await Promise.allSettled([
+    const [eventsRes, studentsRes, certsRes, organizersRes, publicStatsRes] = await Promise.allSettled([
       eventsService.fetchAll(),
       studentsService.fetchAll(),
       certificatesService.fetchAll(),
-      organizersService.fetchAll()
+      organizersService.fetchAll(),
+      analyticsService.fetchPublicStats()
     ])
 
     const events = eventsRes.status === 'fulfilled' && eventsRes.value?.success ? (eventsRes.value.events || []) : []
     const students = studentsRes.status === 'fulfilled' && studentsRes.value?.success ? (studentsRes.value.students || []) : []
     const certificates = certsRes.status === 'fulfilled' && certsRes.value?.success ? (certsRes.value.certificates || []) : []
     const organizers = organizersRes.status === 'fulfilled' && organizersRes.value?.success ? (organizersRes.value.organizers || []) : []
+    const pubData = publicStatsRes.status === 'fulfilled' && publicStatsRes.value?.success ? (publicStatsRes.value.data || {}) : {}
+
+    const pubCertsCount = pubData.certificates_count ?? pubData.certificates ?? pubData.total_certificates ?? pubData.certificatesCount
+    const totalCertificates = (pubCertsCount !== undefined && pubCertsCount !== null)
+      ? Number(pubCertsCount)
+      : certificates.length
 
     const totalEvents = events.length
     const totalStudents = students.length
-    const totalCertificates = certificates.length
     const totalOrganizers = organizers.length
 
     let totalRegistrations = 0

@@ -161,14 +161,15 @@ function mapAttendanceRecord(r) {
 }
 
 async function apiFetchAll(eventId) {
+  if (!eventId || eventId === 'ALL') {
+    return { success: true, records: [] }
+  }
   try {
-    const url = eventId && eventId !== 'ALL'
-      ? `${API_BASE}/attendance/event/${eventId}`
-      : `${API_BASE}/attendance/event/ALL`
+    const url = `${API_BASE}/attendance/event/${eventId}`
     const res = await fetch(url, { headers: authHeaders() })
     const data = await parseJSON(res)
     if (!res.ok) return { success: false, message: data.message || 'Failed to fetch attendance.' }
-    const raw = data.data || data.records || data || []
+    const raw = data.data || data.records || data.attendance || data || []
     const records = Array.isArray(raw) ? raw.map(mapAttendanceRecord) : []
     return { success: true, records }
   } catch {

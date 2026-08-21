@@ -1,4 +1,4 @@
-import { Award, Zap, Send, RotateCcw, Eye, Download, RefreshCw } from 'lucide-react'
+import { Award, Zap, Send, RotateCcw, Eye, Download, RefreshCw, Check, Loader2 } from 'lucide-react'
 import { downloadCertificatePDF } from '../../../utils/pdfGenerator'
 
 export default function CertificateTable({
@@ -10,6 +10,8 @@ export default function CertificateTable({
   handleSend,
   handleRevoke,
   setPreviewCert,
+  generatingId,
+  sendLoading,
   load,
   badgeStyle,
   tokens,
@@ -44,6 +46,9 @@ export default function CertificateTable({
     return filtered.map((cert, i) => {
       const badge = badgeStyle(cert.status)
       const isSelected = selected?.includes(cert.id)
+      const isGenerating = generatingId === cert.id || (generatingId === 'bulk' && selected?.includes(cert.id))
+      const isPending = cert.status === 'Pending'
+
       return (
         <tr
           key={cert.id}
@@ -70,33 +75,25 @@ export default function CertificateTable({
           </td>
           <td className="px-5 py-4">
             <div className="flex items-center gap-1.5">
-              {cert.status === 'Pending' && (
-                <button
-                  type="button"
-                  onClick={() => handleGenerate(cert)}
-                  title="Generate Certificate"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border-none cursor-pointer transition-all duration-150 text-white"
-                  style={{ background: BRAND }}
-                ><Zap size={11} /> Generate</button>
-              )}
-              {cert.status === 'Generated' && (
-                <button
-                  type="button"
-                  onClick={() => handleSend([cert.id])}
-                  title="Send via Email"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border-none cursor-pointer transition-all duration-150 text-white"
-                  style={{ background: '#00BC7D' }}
-                ><Send size={11} /> Send</button>
-              )}
-              {cert.status === 'Sent' && (
-                <button
-                  type="button"
-                  onClick={() => handleRevoke(cert.id)}
-                  title="Revoke Certificate"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border-none cursor-pointer transition-all duration-150"
-                  style={{ border: `1px solid ${tokens.border}`, color: tokens.txtSec, background: 'transparent' }}
-                ><RotateCcw size={11} /> Revoke</button>
-              )}
+              <button
+                type="button"
+                onClick={() => handleGenerate(cert)}
+                disabled={!isPending || isGenerating}
+                title={isPending ? "Generate Certificate" : "Certificate already generated"}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold border-none transition-all duration-150 text-white disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                style={{ background: BRAND }}
+              >
+                {isGenerating ? (
+                  <>
+                    <Loader2 size={11} className="animate-spin" /> Generating...
+                  </>
+                ) : (
+                  <>
+                    <Zap size={11} /> Generate
+                  </>
+                )}
+              </button>
+
               <button
                 type="button"
                 onClick={() => setPreviewCert(cert)}
