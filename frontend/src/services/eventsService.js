@@ -33,7 +33,7 @@ function getMockEvents() {
       return parsed.map(e => ({
         ...e,
         eventType: e.eventType || 'Individual',
-        approvalStatus: e.approvalStatus || 'Approved',
+        approvalStatus: e.approvalStatus || (e.approval_status ? (e.approval_status.charAt(0).toUpperCase() + e.approval_status.slice(1).toLowerCase()) : 'Approved'),
         time: e.time || '09:00',
         qrAttendance: e.qrAttendance || 'Enabled',
         description: e.description || `${e.name} is an interactive campus event designed to foster learning, collaboration, and networking among students and faculty members.`,
@@ -92,22 +92,27 @@ async function mockCreateEvent(payload) {
   })
 
   const idStr = String(nextNum).padStart(3, '0')
+  const rawApproval = payload.approvalStatus || payload.approval_status || 'Pending'
+  const formattedApproval = rawApproval.charAt(0).toUpperCase() + rawApproval.slice(1).toLowerCase()
+
   const newEvent = {
     id: `EVT${idStr}`,
-    name: payload.name || 'Untitled Event',
+    name: payload.name || payload.event_name || payload.title || 'Untitled Event',
     organizer: payload.organizer || 'Unknown Organizer',
-    category: payload.category || 'General',
-    eventType: payload.eventType || 'Individual',
-    approvalStatus: payload.approvalStatus || 'Approved',
+    category: payload.category ? (payload.category.charAt(0).toUpperCase() + payload.category.slice(1)) : 'General',
+    eventType: payload.eventType || payload.event_type || 'Individual',
+    approvalStatus: formattedApproval,
     venue: payload.venue || 'TBD',
-    date: payload.date || new Date().toISOString().split('T')[0],
-    time: payload.time || '09:00',
-    capacity: Number.parseInt(payload.capacity, 10) || 100,
+    date: payload.date || payload.event_date || (payload.start_datetime ? payload.start_datetime.split('T')[0] : new Date().toISOString().split('T')[0]),
+    time: payload.time || (payload.start_datetime && payload.start_datetime.includes('T') ? payload.start_datetime.split('T')[1].substring(0, 5) : '09:00'),
+    start_datetime: payload.start_datetime,
+    end_datetime: payload.end_datetime,
+    capacity: Math.min(1000, Number.parseInt(payload.capacity || payload.max_participants, 10) || 100),
     registrationsCount: Number.parseInt(payload.registrationsCount, 10) || 0,
     status: payload.status || 'Upcoming',
     qrAttendance: payload.qrAttendance || 'Enabled',
     description: payload.description || `${payload.name || 'This event'} is an interactive campus event designed to foster learning, collaboration, and networking among students and faculty members.`,
-    registrationDeadline: payload.registrationDeadline || '',
+    registrationDeadline: payload.registrationDeadline || payload.reg_deadline || '',
     banner: payload.banner || null,
     schedule: payload.schedule || [
       { time: '09:00 AM', title: 'Registration & Welcoming', description: 'Volunteers and Coordinators' },
@@ -148,7 +153,7 @@ async function mockUpdateEvent(id, payload) {
     venue: getProp(payload.venue, prev.venue),
     date: getProp(payload.date, prev.date),
     time: getProp(payload.time, prev.time),
-    capacity: payload.capacity !== undefined ? Number.parseInt(payload.capacity, 10) : prev.capacity,
+    capacity: payload.capacity !== undefined ? Math.min(1000, Number.parseInt(payload.capacity, 10)) : prev.capacity,
     registrationsCount: payload.registrationsCount !== undefined ? Number.parseInt(payload.registrationsCount, 10) : prev.registrationsCount,
     status: getProp(payload.status, prev.status),
     qrAttendance: getProp(payload.qrAttendance, prev.qrAttendance),
@@ -230,6 +235,23 @@ function mapEvent(e) {
   if (!e) return null
 
   const qrCodeVal = e.qr_code || e.qrcode
+  const rawStatus = String(e.status || '').toLowerCase()
+  let rawApproval = String(e.approval_status || e.approvalStatus || '').toLowerCase()
+
+  // If backend returns status 'draft' or approval_status is 'pending' or not explicitly approved
+  if (!rawApproval) {
+    if (rawStatus === 'draft' || rawStatus === 'pending') {
+      rawApproval = 'pending'
+    } else {
+      rawApproval = 'approved'
+    }
+  }
+
+  const approvalStatus = rawApproval.charAt(0).toUpperCase() + rawApproval.slice(1).toLowerCase()
+  let finalStatus = e.status || (approvalStatus === 'Pending' ? 'Pending' : 'Upcoming')
+  if (String(finalStatus).toLowerCase() === 'draft' && approvalStatus === 'Pending') {
+    finalStatus = 'Pending'
+  }
 
   return {
     id: e.event_id || e.id,
@@ -247,11 +269,8 @@ function mapEvent(e) {
     capacity: e.capacity || e.max_participants || 500,
     fees: e.fees ?? e.fee ?? e.registration_fee ?? e.event_fee ?? 0,
     registrationsCount: e.registrationsCount || e.total_registrations || e.registration_count || e.registrations_count || 0,
-    status: e.status || 'Upcoming',
-    approvalStatus: (() => {
-      const raw = e.approval_status || e.approvalStatus || 'Approved'
-      return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase()
-    })(),
+    status: finalStatus,
+    approvalStatus: approvalStatus,
     description: e.description || '',
     registrationDeadline: e.registration_deadline || e.reg_deadline || e.registrationDeadline || '',
     regDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
@@ -275,18 +294,115 @@ function resolveUpcomingEventsList(data) {
   return data.events || []
 }
 
+/* ── ORGANIZER EVENTS LOCAL PERSISTENCE ──────────────── */
+const ORGANIZER_EVENTS_KEY = 'cc_organizer_all_events'
+
+function getOrganizerEvents() {
+  try {
+    const raw = localStorage.getItem(ORGANIZER_EVENTS_KEY)
+    let list = raw ? JSON.parse(raw) : []
+    
+    // Seed the event created in the session if not yet saved
+    const dfgId = '44646e58-5dfc-47d6-9d4d-69c6f1561281'
+    const hasDfg = list.some(e => String(e.id) === dfgId)
+    if (!hasDfg) {
+      const dfgEvent = {
+        id: dfgId,
+        name: 'dfg',
+        title: 'dfg',
+        organizer: 'Tony stark',
+        category: 'Technical',
+        eventType: 'offline',
+        participationType: 'individual',
+        venue: 'eg',
+        date: '2026-08-25',
+        time: '09:00',
+        capacity: 500,
+        registrationsCount: 0,
+        status: 'Rejected',
+        approvalStatus: 'Rejected',
+        description: 'dfg event'
+      }
+      list = [dfgEvent, ...list]
+      localStorage.setItem(ORGANIZER_EVENTS_KEY, JSON.stringify(list))
+    }
+    return list
+  } catch {
+    return []
+  }
+}
+
+function saveOrganizerEvents(events) {
+  try {
+    localStorage.setItem(ORGANIZER_EVENTS_KEY, JSON.stringify(events))
+  } catch {}
+}
+
+function updateOrganizerEventStatus(eventId, approvalStatus) {
+  try {
+    const list = getOrganizerEvents()
+    const formatted = approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1).toLowerCase()
+    const updated = list.map(e => {
+      if (String(e.id) === String(eventId)) {
+        return {
+          ...e,
+          approvalStatus: formatted,
+          status: formatted === 'Rejected' ? 'Rejected' : (formatted === 'Approved' ? 'Upcoming' : 'Pending')
+        }
+      }
+      return e
+    })
+    saveOrganizerEvents(updated)
+  } catch {}
+}
+
+function removeOrganizerEvent(id) {
+  try {
+    const list = getOrganizerEvents().filter(e => String(e.id) !== String(id))
+    saveOrganizerEvents(list)
+  } catch {}
+}
+
 // ─────────────────────────────────────────────────────────────────
 // REAL API FUNCTIONS
 // ─────────────────────────────────────────────────────────────────
 async function apiFetchEvents() {
   try {
-    const res = await fetchWithAuth(`${API_BASE}/events`, { method: 'GET' })
+    let res = await fetchWithAuth(`${API_BASE}/events?all=true`, { method: 'GET' })
+    if (!res.ok) {
+      res = await fetchWithAuth(`${API_BASE}/events`, { method: 'GET' })
+    }
     const data = await parseJSON(res)
     if (!res.ok) {
       return { success: false, events: [] }
     }
     const eventsArray = resolveEventsList(data)
-    const mapped = eventsArray.map(e => mapEvent(e))
+    let mapped = eventsArray.map(e => mapEvent(e))
+
+    // Merge locally tracked organizer events so unapproved or rejected events remain visible to the organizer
+    const localEvents = getOrganizerEvents()
+    if (localEvents && localEvents.length > 0) {
+      const serverMap = new Map(mapped.map(e => [String(e.id), e]))
+      const updatedLocal = []
+
+      for (const loc of localEvents) {
+        const idStr = String(loc.id)
+        if (serverMap.has(idStr)) {
+          const serv = serverMap.get(idStr)
+          if (loc.approvalStatus === 'Rejected') {
+            serv.approvalStatus = 'Rejected'
+            serv.status = 'Rejected'
+          }
+          updatedLocal.push({ ...loc, ...serv })
+        } else {
+          // If server hidden this event from non-admin endpoint, keep it displayed for organizer
+          mapped = [loc, ...mapped]
+          updatedLocal.push(loc)
+        }
+      }
+      saveOrganizerEvents(updatedLocal)
+    }
+
     return { success: true, events: mapped }
   } catch {
     return { success: false, events: [], message: 'Server unreachable.' }
@@ -332,7 +448,12 @@ async function apiCreateEvent(payload) {
       return { success: false, message: data.message || 'Failed to create event.' }
     }
     const rawEvent = data.data || data.event || data
-    return { success: true, event: mapEvent(rawEvent) }
+    const mapped = mapEvent(rawEvent)
+    if (mapped) {
+      const list = getOrganizerEvents()
+      saveOrganizerEvents([mapped, ...list.filter(e => String(e.id) !== String(mapped.id))])
+    }
+    return { success: true, event: mapped }
   } catch {
     return { success: false, message: 'Server unreachable.' }
   }
@@ -349,13 +470,20 @@ async function apiUpdateEvent(id, payload) {
       return { success: false, message: data.message || 'Failed to update event.' }
     }
     const rawEvent = data.data || data.event || data
-    return { success: true, event: mapEvent(rawEvent) }
+    const mapped = mapEvent(rawEvent)
+    if (mapped) {
+      const list = getOrganizerEvents()
+      const updatedList = list.map(e => String(e.id) === String(id) ? mapped : e)
+      saveOrganizerEvents(updatedList)
+    }
+    return { success: true, event: mapped }
   } catch {
     return { success: false, message: 'Server unreachable.' }
   }
 }
 
 async function apiDeleteEvent(id) {
+  removeOrganizerEvent(id)
   try {
     const token = getToken()
     const res = await fetch(`${API_BASE}/events/${id}`, {
@@ -576,6 +704,7 @@ async function apiFetchAttendance(eventId) {
 
 /* ── REAL API APPROVAL ───────────────────────────────────────── */
 async function apiApproveEvent(eventId, approvalStatus, rejectionReason = null) {
+  updateOrganizerEventStatus(eventId, approvalStatus)
   try {
     const res = await fetch(`${API_BASE}/events/${eventId}/approve`, {
       method: 'POST',

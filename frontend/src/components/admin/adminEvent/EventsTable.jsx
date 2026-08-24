@@ -89,7 +89,32 @@ const getRegProgressBg = (isApproved, BRAND, dark) => {
   return dark ? '#334155' : '#cbd5e1'
 }
 
-function EventStatusBadge({ isCompleted, isOngoing, eventStatus, badge, dark }) {
+function EventStatusBadge({ isCompleted, isOngoing, isPending, isRejected, eventStatus, badge, dark }) {
+  if (isRejected || String(eventStatus || '').toLowerCase() === 'rejected') {
+    return (
+      <span 
+        className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400"
+      >
+        <X size={11} strokeWidth={3} />
+        Rejected
+      </span>
+    )
+  }
+  if (isPending || String(eventStatus || '').toLowerCase() === 'pending') {
+    return (
+      <span 
+        className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border"
+        style={{
+          background: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+          color: dark ? '#fbbf24' : '#d97706',
+          borderColor: dark ? 'rgba(245, 158, 11, 0.3)' : '#fde68a'
+        }}
+      >
+        <Clock size={11} className="animate-pulse" />
+        Pending
+      </span>
+    )
+  }
   if (isCompleted) {
     return (
       <span 
@@ -130,12 +155,18 @@ function EventStatusBadge({ isCompleted, isOngoing, eventStatus, badge, dark }) 
   )
 }
 
-function EditEventButton({ isCompleted, isOrganizerRole, isMyEvent, onOpenEdit, event, dark, BRAND }) {
-  const disabled = isCompleted || (isOrganizerRole && !isMyEvent)
+function EditEventButton({ isCompleted, isOrganizerRole, isMyEvent, isRejected, onOpenEdit, event, dark, BRAND }) {
+  const isAdminRole = !isOrganizerRole
+  const adminCannotEditRejected = isAdminRole && isRejected
+  const organizerCannotEdit = isOrganizerRole && !isMyEvent
+  const disabled = isCompleted || adminCannotEditRejected || organizerCannotEdit
+
   let title = "Edit event"
   if (isCompleted) {
     title = "Completed events cannot be edited"
-  } else if (isOrganizerRole && !isMyEvent) {
+  } else if (adminCannotEditRejected) {
+    title = "Rejected events can only be edited and resubmitted by the organizer"
+  } else if (organizerCannotEdit) {
     title = "You can't edit this event"
   }
 
@@ -213,7 +244,58 @@ const getRegPercent = (isApproved, capacity, regCount) => {
   return Math.min(Math.round((regCount / capacity) * 100), 100)
 }
 
-function AdminApprovalCell({ isApproved, event, onOpenApprovalConfirm }) {
+function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
+  const rawStatus = String(event.approvalStatus || (event.approval_status ? event.approval_status : 'Approved')).toLowerCase()
+  const isApproved = rawStatus === 'approved'
+  const isPending = rawStatus === 'pending'
+  const isRejected = rawStatus === 'rejected'
+
+  const currentUserRole = String(user?.role || user?.userType || '').toLowerCase()
+  const isOrganizerRole = currentUserRole.includes('organizer') && !currentUserRole.includes('admin')
+
+  // If viewed by an Organizer, display clear status badge
+  if (isOrganizerRole) {
+    if (isPending) {
+      return (
+        <span 
+          className="px-2.5 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border w-fit cursor-default shadow-xs"
+          style={{
+            background: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+            color: dark ? '#fbbf24' : '#d97706',
+            borderColor: dark ? 'rgba(245, 158, 11, 0.35)' : '#fde68a'
+          }}
+          title="This event is pending approval from Admin"
+        >
+          <Clock size={11} className="animate-pulse" />
+          Pending Approval
+        </span>
+      )
+    }
+
+    if (isApproved) {
+      return (
+        <span 
+          className="px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 cursor-default w-fit shadow-xs"
+          title="Approved & Published"
+        >
+          <Check size={12} strokeWidth={3} />
+          Approved
+        </span>
+      )
+    }
+
+    return (
+      <span 
+        className="px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400 cursor-default w-fit shadow-xs"
+        title="Event Rejected by Admin"
+      >
+        <X size={12} strokeWidth={3} />
+        Rejected
+      </span>
+    )
+  }
+
+  // Admin View
   if (isApproved) {
     return (
       <span 
@@ -222,6 +304,18 @@ function AdminApprovalCell({ isApproved, event, onOpenApprovalConfirm }) {
       >
         <Check size={12} strokeWidth={3} />
         Approved
+      </span>
+    )
+  }
+
+  if (isRejected) {
+    return (
+      <span 
+        className="px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400 cursor-default w-fit"
+        title="Rejected (Decision Locked)"
+      >
+        <X size={12} strokeWidth={3} />
+        Rejected
       </span>
     )
   }
@@ -244,23 +338,29 @@ function AdminApprovalCell({ isApproved, event, onOpenApprovalConfirm }) {
         className="px-2.5 py-1 rounded-lg text-[11px] font-extrabold cursor-pointer transition-all flex items-center gap-1 border bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400 hover:bg-red-500/20"
       >
         <X size={11} strokeWidth={3} />
-        Rejected
+        Reject
       </button>
     </div>
   )
 }
 
 function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, onOpenView, onOpenEdit, onOpenDelete, onOpenApprovalConfirm }) {
-  const isApproved = (event.approvalStatus || 'Approved') === 'Approved'
+  const rawApproval = String(event.approvalStatus || (event.approval_status ? event.approval_status : '')).toLowerCase()
+  const rawEventStatus = String(event.status || '').toLowerCase()
+  
+  const isRejected = rawApproval === 'rejected' || rawEventStatus === 'rejected'
+  const isPending = !isRejected && (rawApproval === 'pending' || rawEventStatus === 'pending' || (rawEventStatus === 'draft' && rawApproval !== 'approved'))
+  const isApproved = !isRejected && !isPending && rawApproval === 'approved' && rawEventStatus !== 'draft'
+
   const effectiveRegCount = getEffectiveRegCount(isApproved, event)
   const regPercent = getRegPercent(isApproved, event.capacity, effectiveRegCount)
-  const badge = getStatusBadgeStyles(event.status)
+  const badge = getStatusBadgeStyles(isRejected ? 'rejected' : isPending ? 'pending' : event.status)
 
   const { start: eventStart, end: eventEnd } = getEventStartAndEnd(event)
   const now = new Date()
 
-  const isOngoing = checkIsOngoing(event, eventStart, eventEnd, now)
-  const isCompleted = checkIsCompleted(event, eventEnd, now)
+  const isOngoing = !isRejected && !isPending && checkIsOngoing(event, eventStart, eventEnd, now)
+  const isCompleted = !isRejected && !isPending && checkIsCompleted(event, eventEnd, now)
   const isMyEvent = checkIsMyEvent(event, user)
 
   const currentUserRole = String(user?.role || user?.userType || '').toLowerCase()
@@ -359,7 +459,9 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
         <EventStatusBadge
           isCompleted={isCompleted}
           isOngoing={isOngoing}
-          eventStatus={event.status}
+          isPending={isPending}
+          isRejected={isRejected}
+          eventStatus={isRejected ? 'Rejected' : isPending ? 'Pending' : event.status}
           badge={badge}
           dark={dark}
         />
@@ -368,8 +470,9 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
       {/* Admin Approval Switch / Badge */}
       <td className="px-5 py-4">
         <AdminApprovalCell
-          isApproved={isApproved}
           event={event}
+          user={user}
+          dark={dark}
           onOpenApprovalConfirm={onOpenApprovalConfirm}
         />
       </td>
@@ -393,6 +496,7 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
             isCompleted={isCompleted}
             isOrganizerRole={isOrganizerRole}
             isMyEvent={isMyEvent}
+            isRejected={isRejected}
             onOpenEdit={onOpenEdit}
             event={event}
             dark={dark}

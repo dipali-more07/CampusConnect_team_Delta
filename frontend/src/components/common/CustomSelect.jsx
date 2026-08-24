@@ -15,6 +15,7 @@ export default function CustomSelect({
   id = '',
   icon: LeadingIcon = null,
   label = null,
+  required = false,
   dark: darkOverride = undefined,
 }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -116,6 +117,7 @@ export default function CustomSelect({
       {label && (
         <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
           {label}
+          {required && <span className="text-red-500 font-bold ml-1" title="Required field">*</span>}
         </label>
       )}
 

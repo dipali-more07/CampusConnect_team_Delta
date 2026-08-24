@@ -40,7 +40,10 @@ const formatNaiveDateTime = (dateTimeStr) => {
 }
 
 const getEventDynamicStatus = (event) => {
+  const approval = String(event.approvalStatus || event.approval_status || '').toLowerCase()
   const st = String(event.status || '').toLowerCase()
+  if (approval === 'rejected' || st === 'rejected') return 'rejected'
+  if (approval === 'pending' || st === 'pending' || (st === 'draft' && approval !== 'approved')) return 'pending'
   if (st === 'draft') return 'draft'
   if (st === 'cancelled') return 'cancelled'
   if (st === 'completed' || st === 'finished') return 'completed'
@@ -205,13 +208,15 @@ export default function EventsPage({ tokens }) {
   // Categories & Event Types
   const categories = ['All', 'Technical', 'Cultural', 'Seminar', 'Sports', 'Academic', 'Workshop', 'Other']
   const eventTypes = ['Individual', 'Team', 'Both']
-  const statuses = ['All', 'Upcoming', 'Draft', 'Ongoing', 'Completed', 'Approved']
+  const statuses = ['All', 'Pending', 'Upcoming', 'Draft', 'Ongoing', 'Completed', 'Approved']
 
   // Filter events
   const filteredEvents = events.filter(event => {
     let statusMatch = false
     if (activeStatus === 'All') {
       statusMatch = true
+    } else if (activeStatus === 'Pending') {
+      statusMatch = (event.approvalStatus || '').toLowerCase() === 'pending'
     } else if (activeStatus === 'Approved') {
       statusMatch = (event.approvalStatus || 'Approved').toLowerCase() === 'approved'
     } else {
@@ -267,7 +272,7 @@ export default function EventsPage({ tokens }) {
       category: 'Technical',
       participationType: 'individual',
       eventType: 'offline',
-      approvalStatus: 'Approved',
+      approvalStatus: 'Pending',
       venue: '',
       startDateTime: `${tomorrowStr}T09:00`,
       endDateTime: `${tomorrowStr}T17:00`,
@@ -410,6 +415,7 @@ export default function EventsPage({ tokens }) {
     if (!formState.startDateTime) errors.startDateTime = 'Start date & time is required'
     if (!formState.endDateTime) errors.endDateTime = 'End date & time is required'
     if (formState.capacity <= 0) errors.capacity = 'Capacity must be greater than 0'
+    if (formState.capacity > 1000) errors.capacity = 'Capacity cannot exceed 1000'
     if (formState.fees < 0) errors.fees = 'Fees cannot be negative'
     if (formState.registrationsCount < 0) errors.registrationsCount = 'Registrations cannot be negative'
     if (parseInt(formState.registrationsCount, 10) > parseInt(formState.capacity, 10)) {
@@ -455,8 +461,17 @@ export default function EventsPage({ tokens }) {
       fees: parseInt(formState.fees, 10) || 0,
       reg_deadline: reg_dl,
       registration_deadline: reg_dl,
-      event_date: formState.startDateTime ? formState.startDateTime.split('T')[0] : new Date().toISOString().split('T')[0],
-      status: isDraft ? 'Draft' : (formState.status === 'Draft' ? 'Upcoming' : formState.status),
+      status: isDraft 
+        ? 'Draft' 
+        : (selectedEvent && String(selectedEvent.approvalStatus || '').toLowerCase() === 'rejected' 
+            ? 'Pending' 
+            : (formState.status === 'Draft' ? 'Upcoming' : formState.status)),
+      approval_status: selectedEvent 
+        ? (String(selectedEvent.approvalStatus || '').toLowerCase() === 'rejected' ? 'pending' : (selectedEvent.approvalStatus?.toLowerCase() || 'pending')) 
+        : 'pending',
+      approvalStatus: selectedEvent 
+        ? (String(selectedEvent.approvalStatus || '').toLowerCase() === 'rejected' ? 'Pending' : (selectedEvent.approvalStatus || 'Pending')) 
+        : 'Pending',
       organizer: formState.organizer,
       banner: formState.banner
     }
@@ -474,7 +489,7 @@ export default function EventsPage({ tokens }) {
       showToast(
         selectedEvent 
           ? `Event "${eventName}" updated successfully.` 
-          : (isDraft ? 'Draft saved successfully.' : 'New event published successfully.'), 
+          : (isDraft ? 'Draft saved successfully.' : 'Event submitted for admin approval successfully.'), 
         'success'
       )
       setCreateEditOpen(false)
@@ -601,6 +616,16 @@ export default function EventsPage({ tokens }) {
   const getStatusBadgeStyles = (status) => {
     const s = String(status || '').toLowerCase()
     switch (s) {
+      case 'rejected':
+        return {
+          bg: dark ? 'rgba(239, 68, 68, 0.15)' : '#fee2e2',
+          text: '#ef4444',
+        }
+      case 'pending':
+        return {
+          bg: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
+          text: dark ? '#fbbf24' : '#d97706',
+        }
       case 'upcoming':
         return {
           bg: dark ? 'rgba(97, 95, 255, 0.15)' : 'rgba(97, 95, 255, 0.1)',

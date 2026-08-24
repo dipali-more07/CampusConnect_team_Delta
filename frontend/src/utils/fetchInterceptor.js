@@ -14,7 +14,7 @@ const encodePayload = (data) => {
   try {
     const jsonStr = typeof data === 'string' ? data : JSON.stringify(data);
     return btoa(encodeURIComponent(jsonStr).replace(/%([0-9A-F]{2})/g, (match, p1) => {
-      return String.fromCharCode('0x' + p1);
+      return String.fromCodePoint('0x' + p1);
     }));
   } catch {
     return btoa(typeof data === 'string' ? data : JSON.stringify(data));

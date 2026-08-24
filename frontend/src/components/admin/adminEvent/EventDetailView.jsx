@@ -440,12 +440,14 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
                 {event.eventType || 'Individual'} Event
               </span>
               <span
-                className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${(event.approvalStatus || 'Approved') === 'Approved'
+                className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${(event.approvalStatus || 'Approved').toLowerCase() === 'approved'
                     ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+                    : (event.approvalStatus || '').toLowerCase() === 'pending'
+                    ? 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400'
                     : 'bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400'
                   }`}
               >
-                Admin {(event.approvalStatus || 'Approved')}
+                Approval: {(event.approvalStatus || 'Approved')}
               </span>
             </div>
             <p className="text-[12px] mt-1 mb-0 font-semibold" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
@@ -457,7 +459,41 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
 
       </div>
 
-      {/* ── BANNER CARD ── */}
+      {/* ── PENDING APPROVAL ALERT BANNER ── */}
+      {(event.approvalStatus || '').toLowerCase() === 'pending' && (
+        <div 
+          className="rounded-2xl p-4 mb-6 border flex items-center gap-3 transition-all"
+          style={{
+            background: dark ? 'rgba(245, 158, 11, 0.12)' : '#fffbeb',
+            borderColor: dark ? 'rgba(245, 158, 11, 0.3)' : '#fde68a',
+            color: dark ? '#fbbf24' : '#b45309'
+          }}
+        >
+          <Clock size={20} className="shrink-0 animate-pulse" />
+          <div className="text-[13px] leading-relaxed">
+            <span className="font-extrabold">Pending Admin Approval:</span> This event has been submitted and is currently awaiting approval from the university administration. It will be officially published and open for registrations once approved.
+          </div>
+        </div>
+      )}
+
+      {/* ── REJECTED ALERT BANNER ── */}
+      {(event.approvalStatus || '').toLowerCase() === 'rejected' && (
+        <div 
+          className="rounded-2xl p-4 mb-6 border flex items-center gap-3 transition-all"
+          style={{
+            background: dark ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2',
+            borderColor: dark ? 'rgba(239, 68, 68, 0.3)' : '#fecaca',
+            color: dark ? '#f87171' : '#b91c1c'
+          }}
+        >
+          <XCircle size={20} className="shrink-0" />
+          <div className="text-[13px] leading-relaxed">
+            <span className="font-extrabold">Event Rejected:</span> This event was rejected by the administrator. Please update event details or contact the admin for further details.
+          </div>
+        </div>
+      )}
+
+      {/* ── SUB-TABS BAR (iOS Segmented Style) ── */}
       <div
         className="rounded-[24px] p-8 md:p-10 mb-6 relative overflow-hidden flex flex-col justify-end min-h-[160px]"
         style={{

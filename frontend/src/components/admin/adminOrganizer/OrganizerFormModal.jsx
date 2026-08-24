@@ -41,7 +41,9 @@ function PersonalFields({ form, setForm, errors, tokens, BRAND, inputStyle }) {
   return (
     <>
       <div>
-        <label htmlFor="orgName" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Full Name</label>
+        <label htmlFor="orgName" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+          Full Name <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+        </label>
         <input
           id="orgName"
           value={form.name}
@@ -57,7 +59,9 @@ function PersonalFields({ form, setForm, errors, tokens, BRAND, inputStyle }) {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label htmlFor="orgEmail" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Email Address</label>
+          <label htmlFor="orgEmail" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+            Email Address <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+          </label>
           <input
             id="orgEmail"
             value={form.email}
@@ -72,7 +76,9 @@ function PersonalFields({ form, setForm, errors, tokens, BRAND, inputStyle }) {
         </div>
 
         <div>
-          <label htmlFor="orgCollegeId" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>College ID</label>
+          <label htmlFor="orgCollegeId" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+            College ID <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+          </label>
           <input
             id="orgCollegeId"
             value={form.collegeId}
@@ -97,7 +103,9 @@ function PasswordField({ form, setForm, errors, tokens, BRAND, inputStyle }) {
 
   return (
     <div>
-      <label htmlFor="orgPassword" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Password</label>
+      <label htmlFor="orgPassword" className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+        Password <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+      </label>
       <div className="relative flex items-center">
         <input
           id="orgPassword"

@@ -116,25 +116,112 @@ export default function AttendancePage({ tokens }) {
     })
   }, [])
 
+  const selectedEventRef = useRef(selectedEvent)
+  useEffect(() => {
+    selectedEventRef.current = selectedEvent
+  }, [selectedEvent])
+
+  const eventsListRef = useRef(eventsList)
+  useEffect(() => {
+    eventsListRef.current = eventsList
+  }, [eventsList])
+
+  const handleGenerateQRRef = useRef(null)
+
+  // Calculates whether the event qualifies for automatic QR regeneration during its 1-hour active window
+  const getEventAutoRefreshInfo = useCallback((evtId) => {
+    const targetId = evtId || selectedEventRef.current
+    const ev = (eventsListRef.current || []).find(e => String(e.id) === String(targetId))
+    if (!ev) return { canAutoRefresh: false, reason: 'no_event', autoRefreshUntil: 0 }
+
+    const rawStart = ev.start_datetime || ev.startDateTime || ev.date || ev.event_date
+    const rawEnd = ev.end_datetime || ev.endDateTime
+
+    const nowMs = Date.now()
+    const startMs = rawStart ? new Date(rawStart).getTime() : 0
+    let endMs = rawEnd ? new Date(rawEnd).getTime() : 0
+
+    if (!endMs && startMs) {
+      endMs = startMs + 3 * 60 * 60 * 1000 // default 3 hours duration
+    }
+
+    // Check if event is before start
+    const isBeforeStart = Boolean(startMs && !Number.isNaN(startMs) && nowMs < startMs)
+    if (isBeforeStart) {
+      return { canAutoRefresh: false, reason: 'before_start', autoRefreshUntil: 0 }
+    }
+
+    // Check if event has ended
+    const isEnded = Boolean(endMs && !Number.isNaN(endMs) && nowMs >= endMs)
+    if (isEnded) {
+      return { canAutoRefresh: false, reason: 'event_ended', autoRefreshUntil: 0 }
+    }
+
+    // Total event duration
+    const totalDurationMs = (startMs && endMs && endMs > startMs) ? (endMs - startMs) : (3 * 60 * 60 * 1000)
+
+    // If event is very short (<= 20 minutes duration), only 1 generation needed, no auto-refresh
+    if (totalDurationMs <= 20 * 60 * 1000) {
+      return { canAutoRefresh: false, isShortEvent: true, reason: 'short_event', autoRefreshUntil: 0 }
+    }
+
+    // 1-Hour window from event start (or from first session generation)
+    const ONE_HOUR = 60 * 60 * 1000
+    let autoRefreshUntil = 0
+    if (startMs && !Number.isNaN(startMs)) {
+      autoRefreshUntil = Math.min(startMs + ONE_HOUR, endMs || (startMs + ONE_HOUR))
+    } else {
+      let sessionStart = nowMs
+      try {
+        const savedSession = localStorage.getItem(`cc_qr_session_${targetId}`)
+        if (savedSession) {
+          const parsed = JSON.parse(savedSession)
+          if (parsed.firstGeneratedAt) sessionStart = parsed.firstGeneratedAt
+        }
+      } catch (e) {}
+      autoRefreshUntil = sessionStart + ONE_HOUR
+    }
+
+    const canAutoRefresh = nowMs < autoRefreshUntil && !isEnded
+    return {
+      canAutoRefresh,
+      isShortEvent: false,
+      autoRefreshUntil,
+      autoRefreshRemainingSecs: Math.max(0, Math.floor((autoRefreshUntil - nowMs) / 1000)),
+      reason: canAutoRefresh ? 'active_window' : 'window_expired'
+    }
+  }, [])
+
   /* start countdown when QR is generated */
   const startCountdown = useCallback((targetExpiresAt) => {
     if (countdownRef.current) clearInterval(countdownRef.current)
     const expiresAt = targetExpiresAt || (Date.now() + 15 * 60 * 1000)
     setCountdown(Math.max(0, Math.floor((expiresAt - Date.now()) / 1000)))
     setQrExpired(false)
+
     countdownRef.current = setInterval(() => {
       const secs = Math.floor((expiresAt - Date.now()) / 1000)
       if (secs <= 0) {
         clearInterval(countdownRef.current)
-        setCountdown(0)
-        setQrGenerated(false)
-        setQrImageUrl(null)
-        setQrExpired(true)
+        countdownRef.current = null
+
+        // Check if event is active and within the 1-hour auto-refresh window
+        const autoInfo = getEventAutoRefreshInfo(selectedEventRef.current)
+        if (autoInfo.canAutoRefresh) {
+          if (handleGenerateQRRef.current) {
+            handleGenerateQRRef.current(true)
+          }
+        } else {
+          setCountdown(0)
+          setQrGenerated(false)
+          setQrImageUrl(null)
+          setQrExpired(true)
+        }
       } else {
         setCountdown(secs)
       }
     }, 1000)
-  }, [])
+  }, [getEventAutoRefreshInfo])
 
   // Load saved QR for selected event if not expired
   useEffect(() => {
@@ -359,23 +446,33 @@ export default function AttendancePage({ tokens }) {
 
   const selectedEvtName = eventsList.find(e => String(e.id) === String(selectedEvent))?.name || ''
 
-  const handleGenerateQR = async () => {
+  const handleGenerateQR = async (isAutoRefresh = false) => {
     if (!selectedEvent) {
-      showToast('No event selected.', 'error')
+      if (!isAutoRefresh) showToast('No event selected.', 'error')
       return
     }
 
-    // Check if valid QR already exists to prevent repeated generation
-    const saved = localStorage.getItem(`cc_qr_${selectedEvent}`)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        if (parsed.expiresAt > Date.now()) {
-          showToast('QR code is already active for this event.', 'warning')
-          return
-        }
-      } catch (e) {}
+    // Check if valid QR already exists to prevent repeated manual generation
+    if (!isAutoRefresh) {
+      const saved = localStorage.getItem(`cc_qr_${selectedEvent}`)
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved)
+          if (parsed.expiresAt > Date.now() && parsed.qrUrl && !parsed.qrUrl.startsWith('blob:')) {
+            showToast('QR code is already active for this event.', 'warning')
+            return
+          }
+        } catch (e) {}
+      }
     }
+
+    // Save session start for auto-refresh window tracking
+    try {
+      const existingSession = localStorage.getItem(`cc_qr_session_${selectedEvent}`)
+      if (!existingSession) {
+        localStorage.setItem(`cc_qr_session_${selectedEvent}`, JSON.stringify({ firstGeneratedAt: Date.now() }))
+      }
+    } catch (e) {}
 
     setQrLoading(true)
     const res = await eventsService.getQRCodeBlob(selectedEvent)
@@ -399,15 +496,24 @@ export default function AttendancePage({ tokens }) {
 
         setQrImageUrl(finalUrl)
         setQrGenerated(true)
+        setQrExpired(false)
         startCountdown(expiresAt)
-        showToast(`QR generated for ${selectedEvtName}`, 'success')
+
+        if (isAutoRefresh) {
+          showToast(`QR code auto-refreshed (Event 1-Hour window active)`, 'info')
+        } else {
+          showToast(`QR generated for ${selectedEvtName}`, 'success')
+        }
       } else {
-        showToast('Failed to generate QR code.', 'error')
+        if (!isAutoRefresh) showToast('Failed to generate QR code.', 'error')
       }
     } else {
-      showToast(res.message || 'Failed to generate QR code.', 'error')
+      if (!isAutoRefresh) showToast(res.message || 'Failed to generate QR code.', 'error')
     }
   }
+
+  // Keep ref up to date for countdown auto-refresh triggers
+  handleGenerateQRRef.current = handleGenerateQR
 
   return (
     <div className="animate-fadeIn p-6" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
@@ -488,6 +594,7 @@ export default function AttendancePage({ tokens }) {
           label={label}
           fmtCountdown={fmtCountdown}
           qrExpired={qrExpired}
+          autoRefreshInfo={getEventAutoRefreshInfo(selectedEvent)}
         />
       )}
 

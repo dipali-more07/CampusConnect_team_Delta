@@ -93,10 +93,10 @@ function QrExpiredView({ dark, labelStyle, setImgFailed, handleGenerateQR, isBef
   )
 }
 
-function QrActiveView({ dark, displayQrUrl, setImgFailed, selectedEvtName, labelStyle, countdown, fmtCountdown, brandColor, qrImageUrl, selectedEvent, inputStyle, showToast, handlePrintQR }) {
+function QrActiveView({ dark, displayQrUrl, setImgFailed, selectedEvtName, labelStyle, countdown, fmtCountdown, brandColor, qrImageUrl, selectedEvent, inputStyle, showToast, handlePrintQR, autoRefreshInfo }) {
   return (
     <>
-      <div className="mb-5 p-3 rounded-2xl flex items-center justify-center" style={{ background: dark ? '#060e1c' : '#f8fafc' }}>
+      <div className="mb-4 p-3 rounded-2xl flex items-center justify-center relative" style={{ background: dark ? '#060e1c' : '#f8fafc' }}>
         <img
           src={displayQrUrl}
           alt="Event QR Code"
@@ -107,14 +107,30 @@ function QrActiveView({ dark, displayQrUrl, setImgFailed, selectedEvtName, label
 
       <p className="text-[15px] font-extrabold mb-1 text-center">{selectedEvtName}</p>
 
-      <p className="text-[12px] font-semibold mb-5 text-center" style={labelStyle}>
+      <p className="text-[12px] font-semibold mb-2 text-center" style={labelStyle}>
         <span>15-Minute Validity Window</span>
         {countdown > 0 && (
           <span> · Expires in <span style={{ color: brandColor, fontVariantNumeric: 'tabular-nums' }}>{fmtCountdown(countdown)}</span></span>
         )}
       </p>
 
-      <div className="flex flex-wrap items-center justify-center gap-2.5 w-full mt-2">
+      {/* Auto-Refresh Badge / Status Indicator */}
+      {autoRefreshInfo?.canAutoRefresh ? (
+        <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span>Auto-refresh active (1-Hour Event Window)</span>
+        </div>
+      ) : autoRefreshInfo?.isShortEvent ? (
+        <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <span>⚡ Short Event (Single 15-min QR window)</span>
+        </div>
+      ) : (
+        <div className="mb-4 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-slate-500/10 text-slate-500 dark:text-slate-400 border border-slate-500/20">
+          <span>Manual re-generate available on expiry</span>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-center gap-2.5 w-full mt-1">
         {qrImageUrl ? (
           <a
             href={qrImageUrl}
@@ -180,7 +196,8 @@ export default function AttendanceTabQR({
   inp,
   label,
   fmtCountdown,
-  qrExpired = false
+  qrExpired = false,
+  autoRefreshInfo = null
 }) {
   const [imgFailed, setImgFailed] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -222,7 +239,7 @@ export default function AttendanceTabQR({
           </div>
           <h2 style="font-size: 22px; font-weight: 800; color: #0f172a; margin: 0 0 8px 0;">${selectedEvtName || 'Campus Event'}</h2>
           <p style="font-size: 13px; color: #64748b; font-weight: 600; margin: 0 0 20px 0;">Scan using CampusConnect App to mark attendance</p>
-          <div style="font-size: 12px; font-weight: 700; color: #475569; background: #f1f5f9; padding: 10px 18px; border-radius: 12px; display: inline-block;">⏱ 15-Minute Validity Window</div>
+          <div style="font-size: 12px; font-weight: 700; color: #475569; background: #f1f5f9; padding: 10px 18px; border-radius: 12px; display: inline-block;">⏱ 15-Minute Validity Window · Auto-Refresh Active</div>
         </div>
       </div>
     `
@@ -264,6 +281,7 @@ export default function AttendanceTabQR({
           inputStyle={inp}
           showToast={showToast}
           handlePrintQR={handlePrintQR}
+          autoRefreshInfo={autoRefreshInfo}
         />
       )
     }

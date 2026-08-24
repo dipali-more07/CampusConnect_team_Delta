@@ -132,11 +132,32 @@
     "capacity": 80, 
     "registrationsCount": 24, 
     "status": "Cancelled",
+    "approvalStatus": "Approved",
     "qrAttendance": "Enabled",
     "description": "An intensive weekend bootcamp for aspiring student startup founders. Learn ideation, customer validation, business model canvas drafting, and pitch preparation.",
     "schedule": [
       { "time": "10:00 AM", "title": "Welcome Remarks & Bootcamp Kickoff", "description": "Prof. Raj Kumar" },
       { "time": "10:30 AM", "title": "Ideation Workshop & Brainstorming", "description": "Startup Mentors" }
+    ]
+  },
+  {
+    "id": "EVT088",
+    "name": "Robotics Design Sprint",
+    "organizer": "Dr. Priya Sharma",
+    "category": "Technical",
+    "venue": "Robotics Lab 3",
+    "date": "2025-10-18",
+    "time": "09:30",
+    "capacity": 120,
+    "registrationsCount": 0,
+    "status": "Upcoming",
+    "approvalStatus": "Pending",
+    "qrAttendance": "Enabled",
+    "description": "A collaborative hands-on robotics prototyping sprint where teams design autonomous rover models under guided faculty mentorship.",
+    "schedule": [
+      { "time": "09:30 AM", "title": "Hardware & Sensor Kit Handout", "description": "Lab Assistants" },
+      { "time": "11:00 AM", "title": "Circuit & Firmware Prototyping", "description": "Participating Teams" },
+      { "time": "03:00 PM", "title": "Obstacle Course Arena Trials", "description": "Evaluation Committee" }
     ]
   }
 ]

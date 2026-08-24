@@ -274,6 +274,7 @@ export default function ResultFormModal({
               <CustomSelect
                 id="resultEventSelect"
                 label="Select Event"
+                required={true}
                 value={localEventId}
                 onChange={(e, val) => {
                   setLocalEventId(val)
@@ -289,7 +290,7 @@ export default function ResultFormModal({
             {/* Solo / Team toggle */}
             <div>
               <span className="text-[11.5px] font-bold uppercase block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                Participation Type
+                Participation Type <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
               </span>
               <div className="flex gap-2">
                 {[
@@ -317,7 +318,7 @@ export default function ResultFormModal({
             {type === 'Solo' && (
               <div>
                 <label htmlFor="resultParticipantSelect" className="text-[11.5px] font-bold uppercase block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                  Select Participant
+                  Select Participant <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
                 </label>
                 <SoloSelection
                   regsLoading={regsLoading}
@@ -335,7 +336,7 @@ export default function ResultFormModal({
             {type === 'Team' && (
               <div>
                 <label htmlFor="resultTeamSelect" className="text-[11.5px] font-bold uppercase block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                  Select Team
+                  Select Team <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
                 </label>
                 <TeamSelection
                   regsLoading={regsLoading}
@@ -353,7 +354,7 @@ export default function ResultFormModal({
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label htmlFor="rankPositionInput" className="text-[11.5px] font-bold uppercase block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                  Rank Position
+                  Rank Position <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
                 </label>
                 <input
                   id="rankPositionInput"
