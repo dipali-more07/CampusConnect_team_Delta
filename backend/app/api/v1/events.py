@@ -88,6 +88,9 @@ def _event_to_dict(event, db: Optional[Session] = None) -> dict:
         "poster": event.poster,           # File path / URL to the event poster image
         "status": status_val,             # Combined status (see logic above)
         "approval_status": event.approval_status,
+        "rejection_reason": getattr(event, "rejection_reason", None),
+        "remarks": getattr(event, "rejection_reason", None),
+        "note": getattr(event, "rejection_reason", None),
         "qr_code": qr_code_val,          # Clean relative QR code URL path
         "total_registrations": reg_count,
         "registration_count": reg_count,

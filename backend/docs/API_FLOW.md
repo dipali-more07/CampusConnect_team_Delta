@@ -1,52 +1,64 @@
-# API Flow & Sequence Diagrams — CampusConnect
+# API Flow & Sequence Diagrams — CampusConnect Enterprise
 
-## 1. Authentication Flow
+## 1. Authentication & Role Authorization Flow
 ```
 User                 FastAPI Router             AuthService             Database
  │                         │                         │                      │
  ├─1. Register Request ───>│                         │                      │
  │                         ├─2. Check Email exists ────────────────────────>│ (Email lookup)
- │                         │                         │                      │ (Unique check)
- │                         ├─3. Hash password ──────>│                      │
+ │                         ├─3. Hash password (Bcrypt)─>│                   │
  │                         ├─4. Create User/Profile ───────────────────────>│ (Insert transaction)
- │                         ├─5. Send email ─────────>│                      │
- │<─6. Success Response ───┤                         │                      │
+ │                         ├─5. Send Welcome Email ─>│                      │
+ │<─6. Success + JWT Token─┤                         │                      │
 ```
 
-## 2. Event Registration & Waitlist Flow
+## 2. Event Lifecycle & Registration Flow
 ```
 Student              FastAPI Router          RegistrationService        Database
  │                         │                         │                      │
  ├─1. Register for Event ─>│                         │                      │
- │                         ├─2. Check event details ───────────────────────>│ (Get Event Status/Cap)
- │                         ├─3. Check duplicates ──────────────────────────>│ (Get User Registration)
- │                         ├─4. Compute Registration status                 │
- │                         │    (Confirmed OR Waitlisted)                   │
- │                         ├─5. Create Registration & Notif ───────────────>│ (Save transaction)
- │<─6. Registration status─┤                         │                      │
+ │                         ├─2. Verify JWT & Role ──>│                      │
+ │                         ├─3. Check Event Capacity & Deadline ───────────>│ (Verify Capacity)
+ │                         ├─4. Check Duplicate Registration ──────────────>│ (Ensure Unique)
+ │                         ├─5. Create Registration & Issue Pass Code ─────>│ (Save transaction)
+ │<─6. 201 Created (Pass) ─┤                         │                      │
 ```
 
-## 3. QR Code Attendance Check-In Flow
+## 3. Venue Attendance Check-In Flow
 ```
 Organizer            FastAPI Router          AttendanceService          Database
  │                         │                         │                      │
- ├─1. Scan Student QR ────>│                         │                      │
- │    (registration_id)    ├─2. Verify registration ───────────────────────>│ (Load registration)
- │                         ├─3. Check-in student ───>│                      │
- │                         │    (Ensure not duplicate scan)                 │
- │                         ├─4. Save attendance ───────────────────────────>│ (Save attendance row)
- │                         │    (Set reg_status to "attended")              │
- │<─5. Checked In Success ─┤                         │                      │
+ ├─1. Mark Attendance ────>│                         │                      │
+ │    (registration_id)    ├─2. Verify Organizer Permissions ──────────────>│ (Verify Role)
+ │                         ├─3. Check Duplicate Scan ──────────────────────>│ (Check past check-in)
+ │                         ├─4. Set Status = "PRESENT" ────────────────────>│ (Save attendance row)
+ │                         ├─5. Award +50 Merit Points to Student ─────────>│ (Update Profile)
+ │<─6. 200 OK Checked In ──┤                         │                      │
 ```
 
-## 4. Certificate Generation & Verification Flow
+## 4. Automated Certificate Generation & Email Dispatch
 ```
-Organizer            FastAPI Router          CertificateService         Database
+Organizer            FastAPI Router          CertificateService         ReportLab / DB
  │                         │                         │                      │
- ├─1. Trigger Bulk Cert ──>│                         │                      │
- │                         ├─2. Fetch attendees ───────────────────────────>│ (Load "present" users)
- │                         ├─3. Generate PDF cert ──>│                      │
- │                         │    (Embed verification QR code)                │
- │                         ├─4. Save Certificate row ──────────────────────>│ (Save to certificates)
- │<─5. Done Response ──────┤                         │                      │
+ ├─1. Complete Event ─────>│                         │                      │
+ │                         ├─2. Update Event Status to "COMPLETED" ────────>│ (Set Completed)
+ │                         ├─3. Fetch all "PRESENT" registered students ───>│ (Query Attendees)
+ │                         ├─4. Generate Vector PDF Certificates ──────────>│ (ReportLab Canvas)
+ │                         ├─5. Save Certificate records & URLs ───────────>│ (Batch Insert)
+ │                         ├─6. Dispatch PDF via SMTP Email ───────────────>│ (Background Task)
+ │<─7. 200 OK Complete ────┤                         │                      │
+```
+
+## 5. Camy AI Multilingual Voice & Fallback Chain Flow
+```
+User                 FastAPI Router             AIService            Gemini / Groq / RAG
+ │                         │                         │                      │
+ ├─1. Chat / Voice Query ─>│                         │                      │
+ │                         ├─2. Sanitize Input & Check Jailbreak Guard ─────│
+ │                         ├─3. Detect Query Language (HI / EN / MR) ───────│
+ │                         ├─4. Call Tier 1 (Gemini 3.5 Flash) ────────────>│
+ │                         │    (If Error/Timeout → Fallback to Groq) ─────>│
+ │                         │    (If Offline → Fallback to Native RAG) ─────>│
+ │                         ├─5. Synthesize Multilingual Voice Config ───────│
+ │<─6. Text + Voice Payload┤                         │                      │
 ```

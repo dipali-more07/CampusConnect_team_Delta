@@ -155,6 +155,26 @@ class UpdateEventRequest(BaseModel):
 class ApproveEventRequest(BaseModel):
     approval_status: ApprovalStatus
     rejection_reason: Optional[str] = Field(None, max_length=1000)
+    remarks: Optional[str] = Field(None, max_length=1000)
+    note: Optional[str] = Field(None, max_length=1000)
+    admin_remarks: Optional[str] = Field(None, max_length=1000)
+
+    @model_validator(mode="before")
+    @classmethod
+    def align_remarks_fields(cls, data):
+        if isinstance(data, dict):
+            reason = (
+                data.get("rejection_reason")
+                or data.get("remarks")
+                or data.get("note")
+                or data.get("admin_remarks")
+            )
+            if reason:
+                data["rejection_reason"] = reason
+                data["remarks"] = reason
+                data["note"] = reason
+                data["admin_remarks"] = reason
+        return data
 
 
 class EventResponse(BaseModel):
@@ -180,6 +200,9 @@ class EventResponse(BaseModel):
     poster: Optional[str] = None
     status: str
     approval_status: str
+    rejection_reason: Optional[str] = None
+    remarks: Optional[str] = None
+    note: Optional[str] = None
     qr_code: Optional[str] = None
     total_registrations: int = 0
     registration_count: int = 0
@@ -199,15 +222,11 @@ class EventListResponse(BaseModel):
     venue: Optional[str] = None
     start_datetime: datetime
     status: str
+    approval_status: Optional[str] = None
+    rejection_reason: Optional[str] = None
+    remarks: Optional[str] = None
+    note: Optional[str] = None
     poster: Optional[str] = None
-    max_participants: Optional[int] = None
-    capacity: Optional[int] = None
-    participation_type: str
-    fees: Optional[float] = None
-    event_date: Optional[date] = None
-    total_registrations: int = 0
-    registration_count: int = 0
-    model_config = {"from_attributes": True}
     max_participants: Optional[int] = None
     capacity: Optional[int] = None
     participation_type: str
