@@ -171,7 +171,7 @@ export default function CertBulkGenerateModal({
 
             <div>
               <label htmlFor="certEventSelect" className="text-[11.5px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-                Select Event
+                Select Event <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
               </label>
               {loadingEvents ? (
                 <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-[#7a98bb] py-2">

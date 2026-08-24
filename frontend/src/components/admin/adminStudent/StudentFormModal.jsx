@@ -109,7 +109,9 @@ export default function StudentFormModal({
           
           {/* Full Name */}
           <div>
-            <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Full Name *</label>
+            <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+              Full Name <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+            </label>
             <div className="relative">
               <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                 <User size={15} />
@@ -129,7 +131,9 @@ export default function StudentFormModal({
           {/* Email Address & Phone */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Email Address *</label>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+                Email Address <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                   <Mail size={15} />
@@ -147,7 +151,9 @@ export default function StudentFormModal({
             </div>
 
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Mobile Number</label>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+                Mobile Number <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                   <Phone size={15} />
@@ -170,7 +176,9 @@ export default function StudentFormModal({
           {/* College Name & Course Name */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>College Name</label>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+                College Name <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                   <Building size={15} />
@@ -187,7 +195,9 @@ export default function StudentFormModal({
             </div>
 
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Course Name</label>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+                Course Name <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                   <BookOpen size={15} />
@@ -209,6 +219,7 @@ export default function StudentFormModal({
             <div>
               <CustomSelect
                 label="Department"
+                required={true}
                 value={form.department || deptOptions[0]}
                 onChange={(e, val) => setForm(p => ({ ...p, department: val }))}
                 options={deptOptions.map(d => ({ value: d, label: d }))}
@@ -219,6 +230,7 @@ export default function StudentFormModal({
             <div>
               <CustomSelect
                 label="Year of Study"
+                required={true}
                 value={form.year || '1st'}
                 onChange={(e, val) => setForm(p => ({ ...p, year: val }))}
                 options={yearOptions.map(y => ({ value: y, label: y }))}
@@ -232,6 +244,7 @@ export default function StudentFormModal({
             <div>
               <CustomSelect
                 label="Gender"
+                required={true}
                 value={form.gender || 'Select Gender'}
                 onChange={(e, val) => setForm(p => ({ ...p, gender: val }))}
                 options={genderOptions.map(g => ({ value: g, label: g }))}
@@ -240,7 +253,9 @@ export default function StudentFormModal({
             </div>
 
             <div>
-              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Roll Number / ID *</label>
+              <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+                Roll Number / ID <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+              </label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                   <GraduationCap size={15} />
@@ -262,7 +277,9 @@ export default function StudentFormModal({
           {!editing && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Password *</label>
+                <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+                  Password <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+                </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                     <Lock size={15} />
@@ -308,7 +325,9 @@ export default function StudentFormModal({
               </div>
 
               <div>
-                <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>Confirm Password *</label>
+                <label className="text-[12px] font-bold block mb-1.5" style={{ color: tokens.txtSec }}>
+                  Confirm Password <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
+                </label>
                 <div className="relative">
                   <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
                     <Lock size={15} />

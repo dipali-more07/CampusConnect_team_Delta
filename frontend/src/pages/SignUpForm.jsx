@@ -320,7 +320,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
         {/* Full Name */}
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1 block">
-            Full Name
+            Full Name <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <div className="relative">
             <User size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -339,7 +339,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
         {/* Email */}
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1 block">
-            Email Address
+            Email Address <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <div className="relative">
             <Mail size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -364,7 +364,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
           {/* Mobile */}
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">
-              Mobile Number
+              Mobile Number <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
             </label>
             <div className="relative">
               <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -387,7 +387,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
           {/* College */}
           <div>
             <label className="text-xs font-semibold text-slate-600 mb-1 block">
-              College Name
+              College Name <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
             </label>
             <div className="relative">
               <GraduationCap size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -410,6 +410,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
           <div>
             <CustomSelect
               label="Course Name"
+              required={true}
               value={course}
               onChange={e => setCourse(e.target.value)}
               placeholder="Select Course"
@@ -433,6 +434,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
           <div>
             <CustomSelect
               label="Department"
+              required={true}
               value={department}
               onChange={e => setDepartment(e.target.value)}
               placeholder="Select Department"
@@ -460,6 +462,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
           <div>
             <CustomSelect
               label="Gender"
+              required={true}
               value={gender}
               onChange={e => setGender(e.target.value)}
               placeholder="Select Gender"
@@ -479,6 +482,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
           <div>
             <CustomSelect
               label="Year of Study"
+              required={true}
               value={yearOfStudy}
               onChange={e => setYearOfStudy(Number(e.target.value))}
               placeholder="Select Year"
@@ -491,7 +495,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
         {/* Password */}
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1 block">
-            Password
+            Password <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <div className="relative">
             <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -542,7 +546,7 @@ export default function SignUpForm({ onSwitchToSignIn, onSignUpSuccess, verifyOn
         {/* Confirm Password */}
         <div>
           <label className="text-xs font-semibold text-slate-600 mb-1 block">
-            Confirm Password
+            Confirm Password <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <div className="relative">
             <Lock size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />

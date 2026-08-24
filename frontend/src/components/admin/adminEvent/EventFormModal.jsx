@@ -35,7 +35,7 @@ function EventFormBasicInfo({
       {/* Event Name */}
       <div>
         <label htmlFor="eventNameInput" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-          Event Name
+          Event Name <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
         </label>
         <input
           id="eventNameInput"
@@ -61,6 +61,7 @@ function EventFormBasicInfo({
           <CustomSelect
             id="eventCategorySelect"
             label="Category"
+            required={true}
             value={formState.category}
             onChange={(e, val) => setFormState(p => ({ ...p, category: val }))}
             options={categories.filter(c => c !== 'All').map(c => ({ value: c, label: c }))}
@@ -70,7 +71,7 @@ function EventFormBasicInfo({
 
         <div>
           <label htmlFor="eventVenueInput" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-            Venue
+            Venue <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <input
             id="eventVenueInput"
@@ -116,6 +117,7 @@ function EventFormTypesAndOrganizer({
           <CustomSelect
             id="eventTypeSelect"
             label="Event Type (Online / Offline)"
+            required={true}
             value={formState.eventType || 'offline'}
             onChange={(e, val) => setFormState(p => ({ ...p, eventType: val }))}
             options={[
@@ -130,6 +132,7 @@ function EventFormTypesAndOrganizer({
           <CustomSelect
             id="eventParticipationTypeSelect"
             label="Participation Type"
+            required={true}
             value={formState.participationType || 'individual'}
             onChange={(e, val) => setFormState(p => ({ ...p, participationType: val }))}
             options={[
@@ -220,7 +223,7 @@ function EventFormSchedulingDates({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
           <label htmlFor="eventStartDateTimeInput" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-            Start Date &amp; Time
+            Start Date &amp; Time <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <input
             id="eventStartDateTimeInput"
@@ -243,7 +246,7 @@ function EventFormSchedulingDates({
 
         <div>
           <label htmlFor="eventEndDateTimeInput" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-            End Date &amp; Time
+            End Date &amp; Time <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <input
             id="eventEndDateTimeInput"
@@ -292,7 +295,7 @@ function EventFormSchedulingDates({
 
         <div>
           <label htmlFor="eventRegistrationDeadlineInput" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-            Registration Deadline (Date &amp; Time)
+            Registration Deadline (Date &amp; Time) <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
           </label>
           <input
             id="eventRegistrationDeadlineInput"
@@ -333,15 +336,20 @@ function EventFormSchedulingCapacity({
       {/* Grid: Capacity & Description */}
       <div>
         <label htmlFor="eventCapacityInput" className="text-[13px] font-bold block mb-1.5" style={{ color: dark ? '#cbd5e1' : '#475569' }}>
-          Capacity
+          Capacity (Max 1000) <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
         </label>
         <input
           id="eventCapacityInput"
           type="number"
           min="1"
-          placeholder="500"
+          max="1000"
+          placeholder="e.g. 500 (Max 1000)"
           value={formState.capacity === 0 ? '' : formState.capacity}
-          onChange={e => setFormState(p => ({ ...p, capacity: e.target.value === '' ? 0 : Number.parseInt(e.target.value, 10) || 0 }))}
+          onChange={e => {
+            const raw = e.target.value === '' ? 0 : Number.parseInt(e.target.value, 10) || 0;
+            const clamped = raw > 1000 ? 1000 : raw;
+            setFormState(p => ({ ...p, capacity: clamped }));
+          }}
           className="w-full px-4 py-3 rounded-xl text-[13.5px] outline-none transition-all duration-200 border"
           style={{
             ...inputStyle,
@@ -384,8 +392,17 @@ function EventFormModalFooter({
   BRAND,
   submitting,
   handleClose,
-  onSaveEvent
+  onSaveEvent,
+  isOrganizerRole,
+  selectedEvent
 }) {
+  let submitLabel = 'Publish Event'
+  if (selectedEvent) {
+    submitLabel = 'Update Event'
+  } else if (isOrganizerRole) {
+    submitLabel = 'Submit for Approval'
+  }
+
   return (
     <div className="flex gap-4 px-8 py-5" style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e8edf5'}` }}>
       <button
@@ -415,9 +432,9 @@ function EventFormModalFooter({
       >
         {submitting ? (
           <>
-            <Loader2 size={14} className="animate-spin" /> Saving...
+            <Loader2 size={14} className="animate-spin" /> Submitting...
           </>
-        ) : 'Publish Event'}
+        ) : submitLabel}
       </button>
     </div>
   )
@@ -566,6 +583,8 @@ export default function EventFormModal({
             submitting={submitting}
             handleClose={handleClose}
             onSaveEvent={onSaveEvent}
+            isOrganizerRole={isOrganizerRole}
+            selectedEvent={selectedEvent}
           />
 
         </div>

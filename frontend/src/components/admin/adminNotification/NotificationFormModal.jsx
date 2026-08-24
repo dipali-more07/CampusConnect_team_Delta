@@ -23,7 +23,7 @@ function NotificationFormFields({
       {/* Notification Type */}
       <div>
         <label htmlFor="notificationTypeSelect" className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-          Notification Type
+          Notification Type <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
         </label>
         <select
           id="notificationTypeSelect"
@@ -52,7 +52,7 @@ function NotificationFormFields({
       {/* Recipients */}
       <div>
         <label htmlFor="recipientUserSelect" className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-          Recipient User
+          Recipient User <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
         </label>
         {loadingUsers ? (
           <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-[#7a98bb] py-2">
@@ -91,7 +91,7 @@ function NotificationFormFields({
             {recipientType === 'custom' && (
               <div className="space-y-1">
                 <label htmlFor="customUserIdInput" className="text-[11px] font-bold block mb-1" style={{ color: dark ? '#5f7b9e' : '#94a3b8' }}>
-                  Custom User ID (UUID)
+                  Custom User ID (UUID) <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
                 </label>
                 <input
                   id="customUserIdInput"
@@ -113,7 +113,7 @@ function NotificationFormFields({
       {/* Title */}
       <div>
         <label htmlFor="notificationTitleInput" className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-          Title
+          Title <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
         </label>
         <input
           id="notificationTitleInput"
@@ -130,7 +130,7 @@ function NotificationFormFields({
       {/* Message */}
       <div>
         <label htmlFor="notificationMessageTextarea" className="text-[12px] font-bold block mb-1.5" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
-          Message
+          Message <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
         </label>
         <textarea
           id="notificationMessageTextarea"

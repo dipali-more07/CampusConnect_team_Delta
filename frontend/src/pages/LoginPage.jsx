@@ -520,7 +520,7 @@ export default function LoginPage() {
                       {/* Email */}
                       <div>
                         <label htmlFor="login-email" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
-                          Email Address
+                          Email Address <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
                         </label>
                         <div className="relative group">
                           <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
@@ -539,7 +539,7 @@ export default function LoginPage() {
                       {/* Password */}
                       <div>
                         <label htmlFor="login-password" className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
-                          Password
+                          Password <span className="text-red-500 font-bold ml-0.5" title="Required field">*</span>
                         </label>
                         <div className="relative group">
                           <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" />

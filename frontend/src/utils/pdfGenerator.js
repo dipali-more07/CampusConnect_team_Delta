@@ -37,6 +37,26 @@ export function renderCertificateCanvas(certData, tmpl) {
   const navy = '#0c1b33';
   const paper = '#fbf8f1';
 
+  // --- Rank & Winner Detection (Calculated early for full canvas coordination) ---
+  const teamNameStr = String(certData.teamName || certData.team_name || '');
+  const positionStr = String(certData.position || certData.certificate_type || tmpl.title || certData.certificate_title || '').toLowerCase();
+  const rankVal = Number(certData.rank || 0);
+  const isWinning = rankVal > 0 || positionStr.includes('1st') || positionStr.includes('2nd') || positionStr.includes('3rd') || positionStr.includes('winner') || positionStr.includes('runner') || positionStr.includes('merit') || positionStr.includes('place') || positionStr === '1' || positionStr === '2' || positionStr === '3';
+  const isTeamWinning = Boolean(teamNameStr && isWinning);
+
+  let rankNum = null;
+  if (rankVal === 1 || positionStr.includes('1st') || positionStr === '1' || positionStr.includes('winner (1st') || positionStr.includes('first')) {
+    rankNum = 1;
+  } else if (rankVal === 2 || positionStr.includes('2nd') || positionStr === '2' || positionStr.includes('runner up (2nd') || positionStr.includes('second')) {
+    rankNum = 2;
+  } else if (rankVal === 3 || positionStr.includes('3rd') || positionStr === '3' || positionStr.includes('3rd place') || positionStr.includes('runner up (3rd') || positionStr.includes('third')) {
+    rankNum = 3;
+  } else if (rankVal > 0 && rankVal <= 3) {
+    rankNum = rankVal;
+  } else if (positionStr.includes('winner') || positionStr.includes('1st place')) {
+    rankNum = 1;
+  }
+
   // 1. Background with vignette
   const bgGrad = ctx.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, W);
   bgGrad.addColorStop(0, '#ffffff');
@@ -81,6 +101,113 @@ export function renderCertificateCanvas(certData, tmpl) {
   ctx.strokeStyle = goldGrad;
   ctx.lineWidth = 1;
   ctx.strokeRect(m4, m4, W - m4 * 2, H - m4 * 2);
+
+  // 2.5 Background Official Watermark (Subtle, Clean Black & White Monochrome Brand Watermark)
+  ctx.save();
+  const wmX = W / 2;
+  const wmY = H / 2 + 30; // Centered straight in the certificate body
+  ctx.translate(wmX, wmY);
+  ctx.globalAlpha = 0.11; // Soft, light, perfectly balanced watermark opacity
+
+  // A. Outer Circular Security Seal Rings (Monochrome Black/Dark Charcoal)
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(0, 0, 210, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(0, 0, 198, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Decorative dashed security ring
+  ctx.save();
+  ctx.setLineDash([7, 7]);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#000000';
+  ctx.beginPath();
+  ctx.arc(0, 0, 186, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // B. Large CampusConnect Rounded Square Logo Box (Monochrome Black)
+  const wmBoxSize = 108;
+  const wmBoxR = 26;
+  const wmBoxX = -wmBoxSize / 2;
+  const wmBoxY = -95;
+
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(wmBoxX + wmBoxR, wmBoxY);
+  ctx.lineTo(wmBoxX + wmBoxSize - wmBoxR, wmBoxY);
+  ctx.quadraticCurveTo(wmBoxX + wmBoxSize, wmBoxY, wmBoxX + wmBoxSize, wmBoxY + wmBoxR);
+  ctx.lineTo(wmBoxX + wmBoxSize, wmBoxY + wmBoxSize - wmBoxR);
+  ctx.quadraticCurveTo(wmBoxX + wmBoxSize, wmBoxY + wmBoxSize, wmBoxX + wmBoxSize - wmBoxR, wmBoxY + wmBoxSize);
+  ctx.lineTo(wmBoxX + wmBoxR, wmBoxY + wmBoxSize);
+  ctx.quadraticCurveTo(wmBoxX, wmBoxY + wmBoxSize, wmBoxX, wmBoxY + wmBoxSize - wmBoxR);
+  ctx.lineTo(wmBoxX, wmBoxY + wmBoxR);
+  ctx.quadraticCurveTo(wmBoxX, wmBoxY, wmBoxX + wmBoxR, wmBoxY);
+  ctx.closePath();
+  ctx.fillStyle = '#000000';
+  ctx.fill();
+
+  // Graduation Cap inside Logo Box (Crisp White)
+  ctx.save();
+  ctx.translate(wmBoxX + 18, wmBoxY + 18);
+  ctx.scale(3.0, 3.0);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  if (typeof Path2D !== 'undefined') {
+    const p1 = new Path2D("M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.084a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z");
+    const p2 = new Path2D("M6 12.5v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3v-3");
+    const p3 = new Path2D("M18 12.5v5a1.5 1.5 0 0 0 3 0v-5");
+    ctx.stroke(p1);
+    ctx.stroke(p2);
+    ctx.stroke(p3);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(12, 4.5);
+    ctx.lineTo(21.4, 9);
+    ctx.lineTo(12, 13.5);
+    ctx.lineTo(2.6, 9);
+    ctx.closePath();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(6, 12.5);
+    ctx.lineTo(6, 15.5);
+    ctx.quadraticCurveTo(6, 18.5, 12, 18.5);
+    ctx.quadraticCurveTo(18, 18.5, 18, 15.5);
+    ctx.lineTo(18, 12.5);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(18, 12.5);
+    ctx.lineTo(18, 17.5);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.restore();
+
+  // C. Large Bold "CAMPUSCONNECT" Brand Text (100% Monochrome Black)
+  ctx.font = '900 40px ' + FONT_SERIF;
+  ctx.fillStyle = '#000000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('CAMPUSCONNECT', 0, 48);
+
+  // Sub-text & Stars
+  ctx.font = 'bold 13px ' + FONT_SERIF;
+  ctx.fillStyle = '#000000';
+  ctx.textAlign = 'center';
+  ctx.fillText('★   OFFICIAL VERIFIED ACADEMIC SEAL   ★', 0, 88);
+
+  ctx.restore();
 
   // Ornate Ribbon Corners (Extremely detailed to match image)
   const drawCornerRibbon = (cx, cy, rotation) => {
@@ -142,7 +269,9 @@ export function renderCertificateCanvas(certData, tmpl) {
   };
 
   drawCornerRibbon(m3, m3, 0); // TL
-  drawCornerRibbon(W - m3, m3, Math.PI / 2); // TR
+  if (!rankNum) {
+    drawCornerRibbon(W - m3, m3, Math.PI / 2); // TR (Omit generic C crest if winner so medal badge is unobstructed)
+  }
   drawCornerRibbon(W - m3, H - m3, Math.PI); // BR
   drawCornerRibbon(m3, H - m3, -Math.PI / 2); // BL
 
@@ -237,21 +366,56 @@ export function renderCertificateCanvas(certData, tmpl) {
 
   y += 90;
 
-  // 4. CERTIFICATE TITLE (Clean bold solid black)
-  let titleFontSize = 50;
+  // 4. CERTIFICATE TITLE (Prestigious, Bold, Crystal-Clear Typography)
+  let titleFontSize = isWinning ? 44 : 48;
   ctx.font = `bold ${titleFontSize}px ${FONT_ENGRAVERS}`;
-  const titleText = (tmpl.title || 'CERTIFICATE OF MERIT').toUpperCase();
+  const titleText = (tmpl.title || (isWinning ? 'CERTIFICATE OF WINNER (1ST PLACE)' : 'CERTIFICATE OF MERIT')).toUpperCase();
 
-  // Dynamically reduce font size if title is too wide to prevent horizontal squishing
-  while (ctx.measureText(titleText).width > (W - 160) && titleFontSize > 26) {
+  // Dynamically reduce font size if title is too wide to ensure generous spacing from corners
+  const maxTitleWidth = isWinning ? (W - 400) : (W - 200);
+  while (ctx.measureText(titleText).width > maxTitleWidth && titleFontSize > 22) {
     titleFontSize -= 2;
     ctx.font = `bold ${titleFontSize}px ${FONT_ENGRAVERS}`;
   }
 
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#000000';
-  ctx.shadowColor = 'transparent';
-  ctx.fillText(titleText, cx, y);
+
+  if (isWinning) {
+    // Rich, High-Contrast Prestigious Championship Navy-Black Title with Gold Accent
+    ctx.fillStyle = '#0c1b33';
+    ctx.shadowColor = 'rgba(0,0,0,0.15)';
+    ctx.shadowBlur = 4;
+    ctx.shadowOffsetY = 2;
+    ctx.fillText(titleText, cx, y);
+    ctx.shadowColor = 'transparent';
+
+    // Elegant Golden Championship Ribbon Line below Title
+    const tw = ctx.measureText(titleText).width;
+    const lineW = Math.min(tw + 80, W - 320);
+    const gradLine = ctx.createLinearGradient(cx - lineW / 2, 0, cx + lineW / 2, 0);
+    gradLine.addColorStop(0, 'rgba(212, 175, 55, 0)');
+    gradLine.addColorStop(0.2, '#D4AF37');
+    gradLine.addColorStop(0.5, '#FFF3A3');
+    gradLine.addColorStop(0.8, '#D4AF37');
+    gradLine.addColorStop(1, 'rgba(212, 175, 55, 0)');
+
+    ctx.beginPath();
+    ctx.moveTo(cx - lineW / 2, y + 14);
+    ctx.lineTo(cx + lineW / 2, y + 14);
+    ctx.strokeStyle = gradLine;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // Symmetrical Little Gold Stars
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillStyle = '#D4AF37';
+    ctx.fillText('★', cx - lineW / 2 + 10, y + 18);
+    ctx.fillText('★', cx + lineW / 2 - 10, y + 18);
+  } else {
+    ctx.fillStyle = '#000000';
+    ctx.shadowColor = 'transparent';
+    ctx.fillText(titleText, cx, y);
+  }
 
   y += 50;
 
@@ -263,13 +427,6 @@ export function renderCertificateCanvas(certData, tmpl) {
   y += 75;
 
   // 6. Name / Team Heading (Application Theme Style - Modern Bold Typography with Brand Gradient & Polish)
-  const teamNameStr = String(certData.teamName || certData.team_name || '');
-  const positionStr = String(certData.position || certData.certificate_type || tmpl.title || '').toLowerCase();
-  const rankVal = Number(certData.rank || 0);
-  const isWinning = rankVal > 0 || positionStr.includes('1st') || positionStr.includes('2nd') || positionStr.includes('3rd') || positionStr.includes('winner') || positionStr.includes('runner') || positionStr.includes('merit') || positionStr.includes('place') || positionStr === '1' || positionStr === '2' || positionStr === '3';
-  const isTeamWinning = Boolean(teamNameStr && isWinning);
-
-  // If team is 1st, 2nd, 3rd (winning), main big text is Team Name!
   let mainDisplayName = '';
   if (isTeamWinning) {
     mainDisplayName = teamNameStr.toLowerCase().startsWith('team') ? teamNameStr : `Team: ${teamNameStr}`;
@@ -456,6 +613,264 @@ export function renderCertificateCanvas(certData, tmpl) {
   ctx.fillStyle = '#334155';
   ctx.fillText(`Certificate ID: ${codeStr}`, rightColX, footerY + 46);
   ctx.restore();
+
+  // 11. Large Realistic Rosette Medal Trophy Badge for 1st, 2nd, 3rd (Individual & Team Winners)
+  if (rankNum) {
+    // Positioned proudly in the Top-Right Corner
+    const badgeX = W - 110;
+    const badgeY = 108;
+
+    ctx.save();
+    ctx.translate(badgeX, badgeY);
+
+    // Determine colors based on rank
+    let medalOuterGrad, coinGrad, ribbonGrad, ribbonBorder, textColor, numText, sufText, subText;
+
+    if (rankNum === 1) {
+      // 1st Place - Brilliant Gold & Deep Ruby Red
+      numText = '1';
+      sufText = 'st';
+      subText = 'WINNER';
+
+      medalOuterGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 68);
+      medalOuterGrad.addColorStop(0, '#FFFBE0');
+      medalOuterGrad.addColorStop(0.35, '#FFD700');
+      medalOuterGrad.addColorStop(0.7, '#D4AF37');
+      medalOuterGrad.addColorStop(1, '#AA771C');
+
+      coinGrad = ctx.createRadialGradient(-12, -12, 4, 0, 0, 48);
+      coinGrad.addColorStop(0, '#FFFFFF');
+      coinGrad.addColorStop(0.2, '#FFF8CC');
+      coinGrad.addColorStop(0.55, '#FFD700');
+      coinGrad.addColorStop(0.85, '#D4AF37');
+      coinGrad.addColorStop(1, '#996515');
+
+      ribbonGrad = ctx.createLinearGradient(-18, 0, 18, 100);
+      ribbonGrad.addColorStop(0, '#E51A1A');
+      ribbonGrad.addColorStop(0.5, '#B80000');
+      ribbonGrad.addColorStop(1, '#700000');
+      ribbonBorder = '#4A0000';
+      textColor = '#B22222';
+    } else if (rankNum === 2) {
+      // 2nd Place - Brilliant Polished Silver & Royal Blue
+      numText = '2';
+      sufText = 'nd';
+      subText = 'RUNNER UP';
+
+      medalOuterGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 68);
+      medalOuterGrad.addColorStop(0, '#FFFFFF');
+      medalOuterGrad.addColorStop(0.35, '#E2E8F0');
+      medalOuterGrad.addColorStop(0.7, '#94A3B8');
+      medalOuterGrad.addColorStop(1, '#475569');
+
+      coinGrad = ctx.createRadialGradient(-12, -12, 4, 0, 0, 48);
+      coinGrad.addColorStop(0, '#FFFFFF');
+      coinGrad.addColorStop(0.25, '#F8FAFC');
+      coinGrad.addColorStop(0.6, '#CBD5E1');
+      coinGrad.addColorStop(0.85, '#94A3B8');
+      coinGrad.addColorStop(1, '#64748B');
+
+      ribbonGrad = ctx.createLinearGradient(-18, 0, 18, 100);
+      ribbonGrad.addColorStop(0, '#2563EB');
+      ribbonGrad.addColorStop(0.5, '#1D4ED8');
+      ribbonGrad.addColorStop(1, '#1E3A8A');
+      ribbonBorder = '#0F172A';
+      textColor = '#1E3A8A';
+    } else {
+      // 3rd Place - Rich Bronze & Crimson
+      numText = '3';
+      sufText = 'rd';
+      subText = '2ND RUNNER';
+
+      medalOuterGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, 68);
+      medalOuterGrad.addColorStop(0, '#FFE8D6');
+      medalOuterGrad.addColorStop(0.35, '#E07A5F');
+      medalOuterGrad.addColorStop(0.7, '#CD7F32');
+      medalOuterGrad.addColorStop(1, '#8B4513');
+
+      coinGrad = ctx.createRadialGradient(-12, -12, 4, 0, 0, 48);
+      coinGrad.addColorStop(0, '#FFF1E6');
+      coinGrad.addColorStop(0.25, '#FDBA74');
+      coinGrad.addColorStop(0.6, '#EA580C');
+      coinGrad.addColorStop(0.85, '#C2410C');
+      coinGrad.addColorStop(1, '#7C2D12');
+
+      ribbonGrad = ctx.createLinearGradient(-18, 0, 18, 100);
+      ribbonGrad.addColorStop(0, '#C2410C');
+      ribbonGrad.addColorStop(0.5, '#9A3412');
+      ribbonGrad.addColorStop(1, '#431407');
+      ribbonBorder = '#431407';
+      textColor = '#7C2D12';
+    }
+
+    // A. Draw Twin Hanging Satin Ribbons with Swallowtail Cut & White Racing Stripes
+    const drawRibbonTail = (angle) => {
+      ctx.save();
+      ctx.rotate(angle);
+
+      // Ribbon drop shadow
+      ctx.shadowColor = 'rgba(0,0,0,0.45)';
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetY = 8;
+
+      const rw = 32;
+      const rl = 96;
+
+      // Ribbon body with swallowtail V-cut
+      ctx.beginPath();
+      ctx.moveTo(-rw / 2, 0);
+      ctx.lineTo(rw / 2, 0);
+      ctx.lineTo(rw / 2, rl);
+      ctx.lineTo(0, rl - 20);
+      ctx.lineTo(-rw / 2, rl);
+      ctx.closePath();
+
+      ctx.fillStyle = ribbonGrad;
+      ctx.fill();
+
+      ctx.shadowColor = 'transparent';
+      ctx.strokeStyle = ribbonBorder;
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // White double accent racing stripe
+      ctx.beginPath();
+      ctx.moveTo(-4.5, 0);
+      ctx.lineTo(-4.5, rl - 21);
+      ctx.lineTo(4.5, rl - 21);
+      ctx.lineTo(4.5, 0);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)';
+      ctx.fill();
+
+      // Golden border edge highlight
+      ctx.strokeStyle = medalOuterGrad;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(-rw / 2 + 1.2, 0);
+      ctx.lineTo(-rw / 2 + 1.2, rl - 2);
+      ctx.moveTo(rw / 2 - 1.2, 0);
+      ctx.lineTo(rw / 2 - 1.2, rl - 2);
+      ctx.stroke();
+
+      ctx.restore();
+    };
+
+    drawRibbonTail(-0.25); // Left Ribbon Tail
+    drawRibbonTail(0.25);  // Right Ribbon Tail
+
+    // B. Draw Realistic Scalloped Flower Petal Rosette (28 smooth lobes)
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.5)';
+    ctx.shadowBlur = 18;
+    ctx.shadowOffsetY = 8;
+
+    const numScallops = 28;
+    const baseR = 56;
+    const scallopR = 10;
+
+    ctx.beginPath();
+    for (let i = 0; i < numScallops; i++) {
+      const angle = (i * Math.PI * 2) / numScallops;
+      const cxLobe = Math.cos(angle) * baseR;
+      const cyLobe = Math.sin(angle) * baseR;
+      ctx.arc(cxLobe, cyLobe, scallopR, 0, Math.PI * 2);
+    }
+    ctx.fillStyle = medalOuterGrad;
+    ctx.fill();
+
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = '#8A6D2B';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    // C. Outer Bevel Gold Circle
+    ctx.beginPath();
+    ctx.arc(0, 0, 52, 0, Math.PI * 2);
+    ctx.fillStyle = medalOuterGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#8A6D2B';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    // D. Inner Golden Coin Disc with Sunburst Radial Reflection
+    ctx.beginPath();
+    ctx.arc(0, 0, 46, 0, Math.PI * 2);
+    ctx.fillStyle = coinGrad;
+    ctx.fill();
+
+    // Concentric Inner Gold Ring
+    ctx.beginPath();
+    ctx.arc(0, 0, 42, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, 40, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(138, 109, 43, 0.6)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // E. 3D Bold Number & Suffix (e.g. 1st) with Specular Bevel
+    // Draw big Number
+    ctx.font = '900 48px "Arial Black", "Impact", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Thick crisp white outline
+    ctx.lineWidth = 7;
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeText(numText, -8, 2);
+
+    // Deep drop shadow
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillText(numText, -6, 5);
+
+    // Crimson Red / Theme fill
+    ctx.fillStyle = textColor;
+    ctx.fillText(numText, -8, 2);
+
+    // Draw Suffix ("st", "nd", "rd")
+    ctx.font = 'bold 20px "Arial Black", sans-serif';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.strokeText(sufText, 22, -10);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillText(sufText, 24, -8);
+
+    ctx.fillStyle = textColor;
+    ctx.fillText(sufText, 22, -10);
+
+    // F. Golden Ribbon Banner at bottom of medal
+    ctx.beginPath();
+    const bw = 70;
+    const bh = 17;
+    const by = 30;
+    ctx.fillStyle = ribbonGrad;
+    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+    ctx.shadowBlur = 6;
+    ctx.shadowOffsetY = 3;
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(-bw / 2, by - bh / 2, bw, bh, 5);
+    } else {
+      ctx.rect(-bw / 2, by - bh / 2, bw, bh);
+    }
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+
+    ctx.strokeStyle = medalOuterGrad;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.font = 'bold 10px "Inter", "Arial Black", sans-serif';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(subText, 0, by);
+
+    ctx.restore();
+  }
 
   return canvas.toDataURL('image/jpeg', 0.95);
 }
