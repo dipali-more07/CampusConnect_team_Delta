@@ -393,10 +393,10 @@ export default function EventsPage({ tokens }) {
   }
 
   // Admin Approval Confirmation Action
-  const handleConfirmApprovalStatus = async () => {
+  const handleConfirmApprovalStatus = async (reason = null) => {
     const { event, targetStatus } = approvalConfirmModal
     if (!event) return
-    const res = await eventsService.approve(event.id, targetStatus, null)
+    const res = await eventsService.approve(event.id, targetStatus, reason)
     if (res.success) {
       showToast(`Event "${event.name}" ${targetStatus === 'Approved' ? 'approved' : 'rejected'} successfully.`, 'success')
       setApprovalConfirmModal({ open: false, event: null, targetStatus: 'Approved' })

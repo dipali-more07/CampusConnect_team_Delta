@@ -1,4 +1,4 @@
-import { 
+import {
   Calendar, Check, X, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, CheckCircle2, Sparkles, Clock
 } from 'lucide-react'
 import { useAuth } from '../../../context/AuthContext'
@@ -89,11 +89,12 @@ const getRegProgressBg = (isApproved, BRAND, dark) => {
   return dark ? '#334155' : '#cbd5e1'
 }
 
-function EventStatusBadge({ isCompleted, isOngoing, isPending, isRejected, eventStatus, badge, dark }) {
+function EventStatusBadge({ isCompleted, isOngoing, isPending, isRejected, eventStatus, badge, dark, rejectionReason }) {
   if (isRejected || String(eventStatus || '').toLowerCase() === 'rejected') {
     return (
-      <span 
+      <span
         className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400"
+        title={rejectionReason ? `Rejected Reason: ${rejectionReason}` : 'Event Rejected'}
       >
         <X size={11} strokeWidth={3} />
         Rejected
@@ -102,7 +103,7 @@ function EventStatusBadge({ isCompleted, isOngoing, isPending, isRejected, event
   }
   if (isPending || String(eventStatus || '').toLowerCase() === 'pending') {
     return (
-      <span 
+      <span
         className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border"
         style={{
           background: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
@@ -117,7 +118,7 @@ function EventStatusBadge({ isCompleted, isOngoing, isPending, isRejected, event
   }
   if (isCompleted) {
     return (
-      <span 
+      <span
         className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border"
         style={{
           background: dark ? 'rgba(168, 85, 247, 0.15)' : '#f3e8ff',
@@ -132,7 +133,7 @@ function EventStatusBadge({ isCompleted, isOngoing, isPending, isRejected, event
   }
   if (isOngoing) {
     return (
-      <span 
+      <span
         className="px-2.5 py-1 rounded-full text-[11px] font-extrabold uppercase tracking-wider inline-flex items-center gap-1 text-center border"
         style={{
           background: dark ? 'rgba(59, 130, 246, 0.15)' : '#dbeafe',
@@ -146,7 +147,7 @@ function EventStatusBadge({ isCompleted, isOngoing, isPending, isRejected, event
     )
   }
   return (
-    <span 
+    <span
       className="px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider inline-block text-center"
       style={{ background: badge.bg, color: badge.text }}
     >
@@ -244,11 +245,12 @@ const getRegPercent = (isApproved, capacity, regCount) => {
   return Math.min(Math.round((regCount / capacity) * 100), 100)
 }
 
-function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
+function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm, onOpenView }) {
   const rawStatus = String(event.approvalStatus || (event.approval_status ? event.approval_status : 'Approved')).toLowerCase()
   const isApproved = rawStatus === 'approved'
   const isPending = rawStatus === 'pending'
   const isRejected = rawStatus === 'rejected'
+  const rejectionMsg = event.rejectionReason || event.rejection_reason || event.adminRemarks || ''
 
   const currentUserRole = String(user?.role || user?.userType || '').toLowerCase()
   const isOrganizerRole = currentUserRole.includes('organizer') && !currentUserRole.includes('admin')
@@ -257,7 +259,7 @@ function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
   if (isOrganizerRole) {
     if (isPending) {
       return (
-        <span 
+        <span
           className="px-2.5 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border w-fit cursor-default shadow-xs"
           style={{
             background: dark ? 'rgba(245, 158, 11, 0.15)' : '#fef3c7',
@@ -274,7 +276,7 @@ function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
 
     if (isApproved) {
       return (
-        <span 
+        <span
           className="px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 cursor-default w-fit shadow-xs"
           title="Approved & Published"
         >
@@ -286,11 +288,12 @@ function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
 
     return (
       <span 
-        className="px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400 cursor-default w-fit shadow-xs"
-        title="Event Rejected by Admin"
+        className="text-[12px] font-semibold block overflow-hidden text-ellipsis whitespace-nowrap max-w-[130px] cursor-pointer hover:underline"
+        style={{ color: dark ? '#f87171' : '#dc2626' }}
+        title={`${rejectionMsg || 'Event Rejected by Admin'} — Click to view details`}
+        onClick={(e) => { e.stopPropagation(); onOpenView && onOpenView(event, e); }}
       >
-        <X size={12} strokeWidth={3} />
-        Rejected
+        Reason: {rejectionMsg || 'Rejected'}...
       </span>
     )
   }
@@ -298,7 +301,7 @@ function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
   // Admin View
   if (isApproved) {
     return (
-      <span 
+      <span
         className="px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 cursor-default w-fit"
         title="Approved (Decision Locked)"
       >
@@ -311,11 +314,11 @@ function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
   if (isRejected) {
     return (
       <span 
-        className="px-3 py-1 rounded-full text-[11px] font-extrabold flex items-center gap-1.5 border bg-red-500/15 border-red-500/30 text-red-600 dark:text-red-400 cursor-default w-fit"
-        title="Rejected (Decision Locked)"
+        className="text-[12px] font-semibold block overflow-hidden text-ellipsis whitespace-nowrap max-w-[130px]"
+        style={{ color: dark ? '#f87171' : '#dc2626' }}
+        title={rejectionMsg || 'Rejected'}
       >
-        <X size={12} strokeWidth={3} />
-        Rejected
+        Reason: {rejectionMsg || 'Rejected'}...
       </span>
     )
   }
@@ -347,7 +350,7 @@ function AdminApprovalCell({ event, user, dark, onOpenApprovalConfirm }) {
 function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, onOpenView, onOpenEdit, onOpenDelete, onOpenApprovalConfirm }) {
   const rawApproval = String(event.approvalStatus || (event.approval_status ? event.approval_status : '')).toLowerCase()
   const rawEventStatus = String(event.status || '').toLowerCase()
-  
+
   const isRejected = rawApproval === 'rejected' || rawEventStatus === 'rejected'
   const isPending = !isRejected && (rawApproval === 'pending' || rawEventStatus === 'pending' || (rawEventStatus === 'draft' && rawApproval !== 'approved'))
   const isApproved = !isRejected && !isPending && rawApproval === 'approved' && rawEventStatus !== 'draft'
@@ -367,25 +370,25 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
   const isOrganizerRole = currentUserRole.includes('organizer') && !currentUserRole.includes('admin')
 
   return (
-    <tr 
+    <tr
       className="transition-colors duration-150 hover:bg-slate-50/50 dark:hover:bg-[#162640]/20"
       style={{ borderBottom: getRowBorderBottom(i, total, dark) }}
     >
       {/* ID */}
-      <td className="px-5 py-4 text-[13px] font-bold" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
+      <td className="px-5 py-2.5 text-[13px] font-bold" style={{ color: dark ? '#7a98bb' : '#64748b' }}>
         {event.id}
       </td>
 
       {/* Name + Organizer */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2.5">
         <div className="flex items-center gap-2 flex-wrap font-sans">
           <div className="text-[13.5px] font-bold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>{event.name}</div>
           {isMyEvent && (
-            <span 
+            <span
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border shadow-xs transition-all duration-200"
               style={{
-                background: dark 
-                  ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(59, 130, 246, 0.18))' 
+                background: dark
+                  ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.18), rgba(59, 130, 246, 0.18))'
                   : 'linear-gradient(135deg, #eef2ff, #eff6ff)',
                 color: dark ? '#a5b4fc' : '#4338ca',
                 borderColor: dark ? 'rgba(165, 180, 252, 0.35)' : '#c7d2fe',
@@ -408,7 +411,7 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
       </td>
 
       {/* Category & Type */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2.5">
         <div className="text-[13px] font-semibold" style={{ color: dark ? '#e8f0fe' : '#334155' }}>
           {event.category}
         </div>
@@ -424,17 +427,17 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
       </td>
 
       {/* Venue */}
-      <td className="px-5 py-4 text-[13px]" style={{ color: dark ? '#7a98bb' : '#475569' }}>
+      <td className="px-5 py-2.5 text-[13px]" style={{ color: dark ? '#7a98bb' : '#475569' }}>
         {event.venue}
       </td>
 
       {/* Date */}
-      <td className="px-5 py-4 text-[13px]" style={{ color: dark ? '#7a98bb' : '#475569' }}>
+      <td className="px-5 py-2.5 text-[13px]" style={{ color: dark ? '#7a98bb' : '#475569' }}>
         {event.date}
       </td>
 
       {/* Combined Registrations & Capacity */}
-      <td className="px-5 py-4 min-w-[150px]">
+      <td className="px-5 py-2.5 min-w-[150px]">
         <div className="flex items-center justify-between gap-2 mb-1">
           <span className="text-[13px] font-extrabold" style={{ color: dark ? '#e8f0fe' : '#0f172a' }}>
             {effectiveRegCount} <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">/ {event.capacity}</span>
@@ -444,10 +447,10 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
           </span>
         </div>
         <div className="w-full h-1.5 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
-          <div 
+          <div
             className="h-full rounded-full transition-all duration-300"
-            style={{ 
-              width: `${regPercent}%`, 
+            style={{
+              width: `${regPercent}%`,
               background: getRegProgressBg(isApproved, BRAND, dark)
             }}
           />
@@ -455,7 +458,7 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
       </td>
 
       {/* Status */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2.5">
         <EventStatusBadge
           isCompleted={isCompleted}
           isOngoing={isOngoing}
@@ -464,21 +467,23 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
           eventStatus={isRejected ? 'Rejected' : isPending ? 'Pending' : event.status}
           badge={badge}
           dark={dark}
+          rejectionReason={event.rejectionReason || event.rejection_reason || event.adminRemarks}
         />
       </td>
 
       {/* Admin Approval Switch / Badge */}
-      <td className="px-5 py-4">
+      <td className="px-5 py-2.5">
         <AdminApprovalCell
           event={event}
           user={user}
           dark={dark}
           onOpenApprovalConfirm={onOpenApprovalConfirm}
+          onOpenView={onOpenView}
         />
       </td>
 
       {/* Actions */}
-      <td className="px-5 py-4 text-right">
+      <td className="px-5 py-2.5 text-right">
         <div className="flex justify-end gap-1.5">
           <button
             type="button"
@@ -491,7 +496,7 @@ function EventRow({ event, i, total, user, dark, BRAND, getStatusBadgeStyles, on
           >
             <Eye size={12.5} />
           </button>
-          
+
           <EditEventButton
             isCompleted={isCompleted}
             isOrganizerRole={isOrganizerRole}
@@ -604,7 +609,7 @@ function TablePaginationBar({
   const strongColor = dark ? '#e8f0fe' : '#0f172a'
 
   return (
-    <div 
+    <div
       className="flex items-center justify-between flex-wrap gap-4 px-6 py-4"
       style={{ borderTop: `1px solid ${dark ? '#1a3050' : '#e2e8f0'}` }}
     >
@@ -715,9 +720,9 @@ export default function EventsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse min-w-[950px]">
           <thead>
-            <tr 
+            <tr
               className="text-[11px] font-extrabold uppercase tracking-wider"
-              style={{ 
+              style={{
                 borderBottom: headerBorder,
                 color: headerColor,
                 background: headerBg
@@ -734,7 +739,7 @@ export default function EventsTable({
               <th className="px-5 py-4 text-right">Actions</th>
             </tr>
           </thead>
-          
+
           <tbody className="divide-y" style={{ divideColor: dark ? '#1a3050' : '#e2e8f0' }}>
             <EventRows
               loading={loading}
