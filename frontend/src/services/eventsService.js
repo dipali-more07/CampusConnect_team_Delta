@@ -209,12 +209,23 @@ async function mockImportEvents(importedList) {
   return { success: true, count: newItems.length }
 }
 
-async function mockApproveEvent(eventId, approvalStatus) {
+async function mockApproveEvent(eventId, approvalStatus, rejectionReason = '') {
   await new Promise(r => setTimeout(r, 300))
   const events = getMockEvents()
-  const idx = events.findIndex(e => e.id === eventId)
+  const idx = events.findIndex(e => String(e.id) === String(eventId))
   if (idx !== -1) {
     events[idx].approvalStatus = approvalStatus
+    if (approvalStatus === 'Rejected') {
+      events[idx].status = 'Rejected'
+      events[idx].rejectionReason = rejectionReason
+      events[idx].rejection_reason = rejectionReason
+      events[idx].adminRemarks = rejectionReason
+    } else if (approvalStatus === 'Approved') {
+      events[idx].status = 'Upcoming'
+      events[idx].rejectionReason = ''
+      events[idx].rejection_reason = ''
+      events[idx].adminRemarks = ''
+    }
     saveMockEvents(events)
   }
   return { success: true }
@@ -271,6 +282,9 @@ function mapEvent(e) {
     registrationsCount: e.registrationsCount || e.total_registrations || e.registration_count || e.registrations_count || 0,
     status: finalStatus,
     approvalStatus: approvalStatus,
+    rejectionReason: e.rejection_reason || e.rejectionReason || e.admin_remarks || e.adminRemarks || e.remarks || e.note || '',
+    rejection_reason: e.rejection_reason || e.rejectionReason || e.admin_remarks || e.adminRemarks || e.remarks || e.note || '',
+    adminRemarks: e.admin_remarks || e.adminRemarks || e.remarks || e.rejection_reason || '',
     description: e.description || '',
     registrationDeadline: e.registration_deadline || e.reg_deadline || e.registrationDeadline || '',
     regDateTime: e.registration_start_datetime || e.registration_start_date || e.reg_start_datetime || e.reg_date_time || e.regDateTime || e.registration_start || e.created_at || e.start_datetime || '',
@@ -301,32 +315,12 @@ function getOrganizerEvents() {
   try {
     const raw = localStorage.getItem(ORGANIZER_EVENTS_KEY)
     let list = raw ? JSON.parse(raw) : []
-    
-    // Seed the event created in the session if not yet saved
-    const dfgId = '44646e58-5dfc-47d6-9d4d-69c6f1561281'
-    const hasDfg = list.some(e => String(e.id) === dfgId)
-    if (!hasDfg) {
-      const dfgEvent = {
-        id: dfgId,
-        name: 'dfg',
-        title: 'dfg',
-        organizer: 'Tony stark',
-        category: 'Technical',
-        eventType: 'offline',
-        participationType: 'individual',
-        venue: 'eg',
-        date: '2026-08-25',
-        time: '09:00',
-        capacity: 500,
-        registrationsCount: 0,
-        status: 'Rejected',
-        approvalStatus: 'Rejected',
-        description: 'dfg event'
-      }
-      list = [dfgEvent, ...list]
-      localStorage.setItem(ORGANIZER_EVENTS_KEY, JSON.stringify(list))
+    // Filter out obsolete hardcoded dummy dfg event if present
+    const cleaned = list.filter(e => String(e.id) !== '44646e58-5dfc-47d6-9d4d-69c6f1561281')
+    if (cleaned.length !== list.length) {
+      localStorage.setItem(ORGANIZER_EVENTS_KEY, JSON.stringify(cleaned))
     }
-    return list
+    return cleaned
   } catch {
     return []
   }
@@ -338,7 +332,7 @@ function saveOrganizerEvents(events) {
   } catch {}
 }
 
-function updateOrganizerEventStatus(eventId, approvalStatus) {
+function updateOrganizerEventStatus(eventId, approvalStatus, rejectionReason = '') {
   try {
     const list = getOrganizerEvents()
     const formatted = approvalStatus.charAt(0).toUpperCase() + approvalStatus.slice(1).toLowerCase()
@@ -347,7 +341,10 @@ function updateOrganizerEventStatus(eventId, approvalStatus) {
         return {
           ...e,
           approvalStatus: formatted,
-          status: formatted === 'Rejected' ? 'Rejected' : (formatted === 'Approved' ? 'Upcoming' : 'Pending')
+          status: formatted === 'Rejected' ? 'Rejected' : (formatted === 'Approved' ? 'Upcoming' : 'Pending'),
+          rejectionReason: formatted === 'Rejected' ? rejectionReason : '',
+          rejection_reason: formatted === 'Rejected' ? rejectionReason : '',
+          adminRemarks: formatted === 'Rejected' ? rejectionReason : ''
         }
       }
       return e
@@ -392,6 +389,11 @@ async function apiFetchEvents() {
           if (loc.approvalStatus === 'Rejected') {
             serv.approvalStatus = 'Rejected'
             serv.status = 'Rejected'
+            if (loc.rejectionReason && !serv.rejectionReason) {
+              serv.rejectionReason = loc.rejectionReason
+              serv.rejection_reason = loc.rejectionReason
+              serv.adminRemarks = loc.adminRemarks || loc.rejectionReason
+            }
           }
           updatedLocal.push({ ...loc, ...serv })
         } else {
@@ -704,21 +706,27 @@ async function apiFetchAttendance(eventId) {
 
 /* ── REAL API APPROVAL ───────────────────────────────────────── */
 async function apiApproveEvent(eventId, approvalStatus, rejectionReason = null) {
-  updateOrganizerEventStatus(eventId, approvalStatus)
+  const normApproval = (approvalStatus || '').toLowerCase()
+  const reasonText = rejectionReason || ''
+  updateOrganizerEventStatus(eventId, approvalStatus, reasonText)
   try {
-    const res = await fetch(`${API_BASE}/events/${eventId}/approve`, {
-      method: 'POST',
+    const payload = {
+      approval_status: normApproval,
+      rejection_reason: reasonText,
+      remarks: reasonText,
+      note: reasonText,
+      admin_remarks: reasonText,
+    }
+    const res = await fetchWithAuth(`${API_BASE}/events/${eventId}/approve`, {
+      method: 'PUT',
       headers: authHeaders(),
-      body: JSON.stringify({
-        approval_status: approvalStatus.toLowerCase(),
-        rejection_reason: rejectionReason,
-      }),
+      body: JSON.stringify(payload),
     })
     const data = await parseJSON(res)
     if (!res.ok) {
-      return { success: false, message: data.message || 'Failed to update event approval status.' }
+      return { success: false, message: data.message || data.detail || 'Failed to update event approval status.' }
     }
-    return { success: true, message: data.message }
+    return { success: true, message: data.message || `Event ${normApproval} successfully.` }
   } catch {
     return { success: false, message: 'Server unreachable.' }
   }
@@ -775,7 +783,7 @@ const eventsService = {
     USE_MOCK ? mockFetchAttendance(eventId) : apiFetchAttendance(eventId),
 
   approve: (eventId, approvalStatus, rejectionReason) =>
-    USE_MOCK ? mockApproveEvent(eventId, approvalStatus) : apiApproveEvent(eventId, approvalStatus, rejectionReason),
+    USE_MOCK ? mockApproveEvent(eventId, approvalStatus, rejectionReason) : apiApproveEvent(eventId, approvalStatus, rejectionReason),
 
   publish: (eventId) =>
     USE_MOCK ? Promise.resolve({ success: true, message: 'Event published (mock).' }) : apiPublishEvent(eventId),

@@ -393,10 +393,10 @@ export default function EventsPage({ tokens }) {
   }
 
   // Admin Approval Confirmation Action
-  const handleConfirmApprovalStatus = async () => {
+  const handleConfirmApprovalStatus = async (reason = null) => {
     const { event, targetStatus } = approvalConfirmModal
     if (!event) return
-    const res = await eventsService.approve(event.id, targetStatus, null)
+    const res = await eventsService.approve(event.id, targetStatus, reason)
     if (res.success) {
       let toastMsg = `Event "${event.name}" ${targetStatus === 'Approved' ? 'approved' : 'rejected'} successfully.`
       if (targetStatus === 'Approved') {
@@ -427,7 +427,7 @@ export default function EventsPage({ tokens }) {
     if (formState.capacity > 1000) errors.capacity = 'Capacity cannot exceed 1000'
     if (formState.fees < 0) errors.fees = 'Fees cannot be negative'
     if (formState.registrationsCount < 0) errors.registrationsCount = 'Registrations cannot be negative'
-    if (parseInt(formState.registrationsCount, 10) > Number.parseInt(formState.capacity, 10)) {
+    if (Number.parseInt(formState.registrationsCount, 10) > Number.parseInt(formState.capacity, 10)) {
       errors.registrationsCount = 'Registrations cannot exceed capacity'
     }
     if (formState.registrationDeadline && formState.startDateTime) {
@@ -467,7 +467,7 @@ export default function EventsPage({ tokens }) {
       capacity: Number.parseInt(formState.capacity, 10),
       participation_type: formState.participationType,
       reg_date_time: formatNaiveDateTime(formState.regDateTime) || formatNaiveDateTime(new Date()),
-      fees: parseInt(formState.fees, 10) || 0,
+      fees: Number.parseInt(formState.fees, 10) || 0,
       reg_deadline: reg_dl,
       registration_deadline: reg_dl,
       event_date: formState.startDateTime ? formState.startDateTime.split('T')[0] : new Date().toISOString().split('T')[0],

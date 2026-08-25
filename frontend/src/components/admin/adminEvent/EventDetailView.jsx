@@ -477,18 +477,48 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
       )}
 
       {/* ── REJECTED ALERT BANNER ── */}
-      {(event.approvalStatus || '').toLowerCase() === 'rejected' && (
+      {((event.approvalStatus || '').toLowerCase() === 'rejected' || (event.status || '').toLowerCase() === 'rejected') && (
         <div 
-          className="rounded-2xl p-4 mb-6 border flex items-center gap-3 transition-all"
+          className="rounded-2xl p-5 mb-6 border transition-all"
           style={{
-            background: dark ? 'rgba(239, 68, 68, 0.12)' : '#fef2f2',
+            background: dark ? 'rgba(239, 68, 68, 0.1)' : '#fef2f2',
             borderColor: dark ? 'rgba(239, 68, 68, 0.3)' : '#fecaca',
             color: dark ? '#f87171' : '#b91c1c'
           }}
         >
-          <XCircle size={20} className="shrink-0" />
-          <div className="text-[13px] leading-relaxed">
-            <span className="font-extrabold">Event Rejected:</span> This event was rejected by the administrator. Please update event details or contact the admin for further details.
+          <div className="flex items-start gap-3.5">
+            <div className="p-2 rounded-xl bg-red-500/15 text-red-500 shrink-0 mt-0.5">
+              <XCircle size={22} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between flex-wrap gap-2 mb-1.5">
+                <h4 className="text-[15px] font-extrabold m-0 text-red-600 dark:text-red-400">
+                  Event Rejected by Administration
+                </h4>
+                <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-500/15 border border-red-500/30 text-red-600 dark:text-red-400">
+                  Status: Rejected
+                </span>
+              </div>
+              
+              <p className="text-[13px] leading-relaxed m-0 text-slate-700 dark:text-slate-300">
+                This event proposal was reviewed and rejected. Please review the administrator's feedback below and update your event details accordingly.
+              </p>
+
+              <div 
+                className="mt-3 p-3.5 rounded-xl border"
+                style={{
+                  background: dark ? '#131e30' : '#ffffff',
+                  borderColor: dark ? 'rgba(239, 68, 68, 0.25)' : '#fed7d7'
+                }}
+              >
+                <div className="text-[11px] font-extrabold uppercase tracking-wider text-red-500 mb-1">
+                  Reason for Rejection / Admin Remarks:
+                </div>
+                <div className="text-[13.5px] font-semibold leading-relaxed" style={{ color: dark ? '#f1f5f9' : '#1e293b', wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                  {event.rejectionReason || event.rejection_reason || event.adminRemarks || event.remarks || event.note || 'No specific remarks were provided by the administrator.'}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -749,11 +779,14 @@ export default function EventDetailView({ event, onBack, tokens, showToast }) {
                       { label: 'Capacity', value: `${event.capacity} seats` },
                       { label: 'Registered', value: `${regCount} students` },
                       { label: 'Organizer', value: event.organizer },
-                      { label: 'QR Attendance', value: event.qrAttendance || 'Enabled' }
+                      { label: 'QR Attendance', value: event.qrAttendance || 'Enabled' },
+                      ...(((event.approvalStatus || '').toLowerCase() === 'rejected' || (event.status || '').toLowerCase() === 'rejected') && (event.rejectionReason || event.rejection_reason || event.adminRemarks) ? [
+                        { label: 'Admin Remarks', value: event.rejectionReason || event.rejection_reason || event.adminRemarks }
+                      ] : [])
                     ].map((row) => (
-                      <div key={row.label} className="flex items-center justify-between text-[13px] font-semibold">
+                      <div key={row.label} className="flex items-center justify-between text-[13px] font-semibold gap-2">
                         <span style={{ color: dark ? '#7a98bb' : '#94a3b8' }}>{row.label}</span>
-                        <span style={{ color: dark ? '#e8f0fe' : '#334155' }} className="text-right">{row.value}</span>
+                        <span style={{ color: row.label === 'Admin Remarks' ? '#ef4444' : dark ? '#e8f0fe' : '#334155' }} className="text-right font-bold">{row.value}</span>
                       </div>
                     ));
                   })()}
