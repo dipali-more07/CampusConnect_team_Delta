@@ -291,11 +291,10 @@ function WidgetHeader({
               type="button"
               onClick={onResetPos}
               title="Reset Bot Position to Default Corner"
-              className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${
-                dark
+              className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${dark
                   ? 'text-slate-400 hover:text-cyan-300 hover:bg-white/5'
                   : 'text-slate-400 hover:text-cyan-600 hover:bg-slate-100'
-              }`}
+                }`}
             >
               <RotateCcw className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </button>
@@ -347,7 +346,7 @@ export default function CampusBotWidget() {
           return parsed
         }
       }
-    } catch {}
+    } catch { }
     return null
   })
 
@@ -405,7 +404,7 @@ export default function CampusBotWidget() {
         if (hasDraggedRef.current) {
           setBotPos(curr => {
             if (curr) {
-              try { localStorage.setItem('cc_bot_avatar_pos', JSON.stringify(curr)) } catch {}
+              try { localStorage.setItem('cc_bot_avatar_pos', JSON.stringify(curr)) } catch { }
             }
             return curr
           })
@@ -429,7 +428,7 @@ export default function CampusBotWidget() {
     setBotPos(null)
     try {
       localStorage.removeItem('cc_bot_avatar_pos')
-    } catch {}
+    } catch { }
   }
 
   const getWidgetPosition = (pos) => {
@@ -625,7 +624,7 @@ export default function CampusBotWidget() {
 
 
 
-  const triggerCelebration = useCallback(() => {
+  const triggerCelebration = useCallback(() => {  
     setIsCelebrating(true)
     setIsWaving(true)
     setCurrentMood('excited')
@@ -888,7 +887,7 @@ export default function CampusBotWidget() {
       }
       setMessages(prev => [...prev, botMsg])
 
-      if (voiceEnabled || isVoiceInput) {
+      if (isVoiceInput) {
         speakReply(res.data.speech_text || res.data.reply)
       }
 
@@ -962,18 +961,18 @@ export default function CampusBotWidget() {
           style={
             botPos
               ? {
-                  position: 'fixed',
-                  left: `${botPos.x}px`,
-                  top: `${botPos.y}px`,
-                  bottom: 'auto',
-                  right: 'auto',
-                  touchAction: 'none',
-                  zIndex: 9999
-                }
+                position: 'fixed',
+                left: `${botPos.x}px`,
+                top: `${botPos.y}px`,
+                bottom: 'auto',
+                right: 'auto',
+                touchAction: 'none',
+                zIndex: 9999
+              }
               : {
-                  touchAction: 'none',
-                  zIndex: 9999
-                }
+                touchAction: 'none',
+                zIndex: 9999
+              }
           }
           className={`cursor-grab active:cursor-grabbing select-none hover:scale-105 active:scale-95 transition-transform group/bot-drag ${botPos ? '' : 'fixed bottom-3 right-3 sm:bottom-5 sm:right-5'}`}
           title={botPos ? 'Drag to move / Double-click to reset position' : 'Drag & drop Camy anywhere / Click to open'}
@@ -1012,16 +1011,16 @@ export default function CampusBotWidget() {
             style={
               winPos
                 ? {
-                    position: 'fixed',
-                    left: `${winPos.left}px`,
-                    top: `${winPos.top}px`,
-                    bottom: 'auto',
-                    right: 'auto',
-                    zIndex: 9999
-                  }
+                  position: 'fixed',
+                  left: `${winPos.left}px`,
+                  top: `${winPos.top}px`,
+                  bottom: 'auto',
+                  right: 'auto',
+                  zIndex: 9999
+                }
                 : {
-                    zIndex: 9999
-                  }
+                  zIndex: 9999
+                }
             }
             className={`${winPos ? '' : 'fixed bottom-3 right-3 sm:bottom-5 sm:right-5'} font-[Inter,Manrope,sans-serif] max-w-[calc(100vw-24px)]`}
           >
@@ -1032,245 +1031,245 @@ export default function CampusBotWidget() {
                 }`}
               style={{ animation: 'cbPop 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
             >
-            <WidgetHeader
-              dark={dark}
-              loading={loading}
-              isSpeaking={isSpeaking}
-              isListening={isListening}
-              isCelebrating={isCelebrating}
-              currentMood={currentMood}
-              currentBadge={currentBadge}
-              voiceEnabled={voiceEnabled}
-              setVoiceEnabled={setVoiceEnabled}
-              stopSpeaking={stopSpeaking}
-              handleClearChat={handleClearChat}
-              hasCustomPos={botPos !== null}
-              onResetPos={resetBotPosition}
-              onClose={() => { stopSpeaking(); stopRecording(); setIsOpen(false) }}
-            />
+              <WidgetHeader
+                dark={dark}
+                loading={loading}
+                isSpeaking={isSpeaking}
+                isListening={isListening}
+                isCelebrating={isCelebrating}
+                currentMood={currentMood}
+                currentBadge={currentBadge}
+                voiceEnabled={voiceEnabled}
+                setVoiceEnabled={setVoiceEnabled}
+                stopSpeaking={stopSpeaking}
+                handleClearChat={handleClearChat}
+                hasCustomPos={botPos !== null}
+                onResetPos={resetBotPosition}
+                onClose={() => { stopSpeaking(); stopRecording(); setIsOpen(false) }}
+              />
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 cb-scrollbar">
-              {messages.map((msg, i) => {
-                const isBot = msg.role === 'assistant'
-                const isLastBotMsg = isBot && i === messages.length - 1
-                const msgMood = isBot ? (msg.mood || analyzeSentiment(msg.reply) || 'happy') : null
-                const msgKey = `msg-${i}-${msg.timestamp ? new Date(msg.timestamp).getTime() : i}`
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 cb-scrollbar">
+                {messages.map((msg, i) => {
+                  const isBot = msg.role === 'assistant'
+                  const isLastBotMsg = isBot && i === messages.length - 1
+                  const msgMood = isBot ? (msg.mood || analyzeSentiment(msg.reply) || 'happy') : null
+                  const msgKey = `msg-${i}-${msg.timestamp ? new Date(msg.timestamp).getTime() : i}`
 
-                let bubbleClass = 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-br-sm shadow-md'
-                if (isBot) {
-                  bubbleClass = dark ? 'bg-[#111d35] border border-cyan-900/30 rounded-bl-sm' : 'bg-slate-50 border border-slate-200 rounded-bl-sm'
-                }
+                  let bubbleClass = 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-br-sm shadow-md'
+                  if (isBot) {
+                    bubbleClass = dark ? 'bg-[#111d35] border border-cyan-900/30 rounded-bl-sm' : 'bg-slate-50 border border-slate-200 rounded-bl-sm'
+                  }
 
-                return (
-                  <div key={msgKey} className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}>
-                    <div className={`flex items-end gap-2 max-w-[88%] ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
-                      {isBot ? (
-                        <div className="shrink-0 mb-1">
-                          <EmoBotCharacter
-                            size={32}
-                            isSpeaking={isSpeaking && isLastBotMsg}
-                            isTyping={loading && isLastBotMsg}
-                            isListening={isListening && isLastBotMsg}
-                            mood={msgMood}
-                            onClick={() => { }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shrink-0 shadow-sm">
-                          <User className="w-3.5 h-3.5" />
-                        </div>
-                      )}
-                      <div className={`px-3.5 py-3 rounded-2xl relative group/msg ${bubbleClass}`}>
-                        {isBot && msg.typed && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isSpeaking) {
-                                stopSpeaking()
-                              } else {
-                                speakReply(msg.speech_text || msg.reply)
-                              }
-                            }}
-                            title={isSpeaking ? "Stop Voice" : "Listen to Response"}
-                            className="absolute -top-2.5 -right-2.5 p-1 rounded-full bg-slate-900 border border-cyan-400/60 text-cyan-300 hover:text-cyan-200 opacity-0 group-hover/msg:opacity-100 transition-opacity cursor-pointer shadow-md"
-                          >
-                            <Volume2 className="w-3 h-3" />
-                          </button>
-                        )}
-
-                        {isBot && !msg.typed ? (
-                          <TypewriterText
-                            text={msg.reply}
-                            speed={18}
-                            onComplete={(truncatedText) => markTyped(i, truncatedText)}
-                            onNavigate={(p) => navigate(p)}
-                            forceStop={globalForceStop}
-                          />
+                  return (
+                    <div key={msgKey} className={`flex flex-col ${isBot ? 'items-start' : 'items-end'}`}>
+                      <div className={`flex items-end gap-2 max-w-[88%] ${isBot ? 'flex-row' : 'flex-row-reverse'}`}>
+                        {isBot ? (
+                          <div className="shrink-0 mb-1">
+                            <EmoBotCharacter
+                              size={32}
+                              isSpeaking={isSpeaking && isLastBotMsg}
+                              isTyping={loading && isLastBotMsg}
+                              isListening={isListening && isLastBotMsg}
+                              mood={msgMood}
+                              onClick={() => { }}
+                            />
+                          </div>
                         ) : (
-                          <MarkdownRenderer content={msg.reply} onNavigate={(p) => navigate(p)} />
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                            <User className="w-3.5 h-3.5" />
+                          </div>
                         )}
-                      </div>
-                    </div>
-
-                    {isBot && msg.typed && msg.recommended_events?.length > 0 && (
-                      <div className="mt-2.5 ml-9 space-y-1.5 w-[85%]">
-                        <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 m-0 ${dark ? 'text-cyan-500' : 'text-cyan-600'}`}>
-                          <Calendar className="w-3 h-3" /> Recommended Events
-                        </p>
-                        {msg.recommended_events.map((ev, j) => {
-                          const evId = ev.event_id || ev.id || ev._id || j
-                          return (
+                        <div className={`px-3.5 py-3 rounded-2xl relative group/msg ${bubbleClass}`}>
+                          {isBot && msg.typed && (
                             <button
                               type="button"
-                              key={`rec-ev-${evId}-${j}`}
-                              onClick={() => navigate(`/events/${evId}`)}
-                              className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${dark ? 'bg-cyan-950/30 hover:bg-cyan-900/40 border-cyan-800/30' : 'bg-cyan-50/70 hover:bg-cyan-100 border-cyan-200/70'
-                                }`}
+                              onClick={() => {
+                                if (isSpeaking) {
+                                  stopSpeaking()
+                                } else {
+                                  speakReply(msg.speech_text || msg.reply)
+                                }
+                              }}
+                              title={isSpeaking ? "Stop Voice" : "Listen to Response"}
+                              className="absolute -top-2.5 -right-2.5 p-1.5 rounded-full bg-slate-900/90 border border-cyan-400/50 text-cyan-300 hover:text-cyan-200 hover:bg-cyan-900/80 hover:border-cyan-300/70 hover:scale-110 opacity-70 group-hover/msg:opacity-100 transition-all duration-200 cursor-pointer shadow-lg backdrop-blur-sm"
                             >
-                              <div>
-                                <h4 className={`font-bold text-[12px] group-hover:underline m-0 ${dark ? 'text-cyan-300' : 'text-cyan-700'}`}>{ev.title || ev.name}</h4>
-                                <p className="text-[10px] opacity-70 m-0 mt-0.5">{ev.category || 'Event'} • {ev.location || 'Campus'}</p>
-                              </div>
-                              <ChevronRight className="w-3.5 h-3.5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+                              <Volume2 className="w-3 h-3" />
                             </button>
-                          )
-                        })}
+                          )}
+
+                          {isBot && !msg.typed ? (
+                            <TypewriterText
+                              text={msg.reply}
+                              speed={18}
+                              onComplete={(truncatedText) => markTyped(i, truncatedText)}
+                              onNavigate={(p) => navigate(p)}
+                              forceStop={globalForceStop}
+                            />
+                          ) : (
+                            <MarkdownRenderer content={msg.reply} onNavigate={(p) => navigate(p)} />
+                          )}
+                        </div>
                       </div>
-                    )}
 
-                    <span className={`text-[9px] mt-1 px-1.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
-                    </span>
-                  </div>
-                )
-              })}
+                      {isBot && msg.typed && msg.recommended_events?.length > 0 && (
+                        <div className="mt-2.5 ml-9 space-y-1.5 w-[85%]">
+                          <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 m-0 ${dark ? 'text-cyan-500' : 'text-cyan-600'}`}>
+                            <Calendar className="w-3 h-3" /> Recommended Events
+                          </p>
+                          {msg.recommended_events.map((ev, j) => {
+                            const evId = ev.event_id || ev.id || ev._id || j
+                            return (
+                              <button
+                                type="button"
+                                key={`rec-ev-${evId}-${j}`}
+                                onClick={() => navigate(`/events/${evId}`)}
+                                className={`w-full text-left p-2.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between group ${dark ? 'bg-cyan-950/30 hover:bg-cyan-900/40 border-cyan-800/30' : 'bg-cyan-50/70 hover:bg-cyan-100 border-cyan-200/70'
+                                  }`}
+                              >
+                                <div>
+                                  <h4 className={`font-bold text-[12px] group-hover:underline m-0 ${dark ? 'text-cyan-300' : 'text-cyan-700'}`}>{ev.title || ev.name}</h4>
+                                  <p className="text-[10px] opacity-70 m-0 mt-0.5">{ev.category || 'Event'} • {ev.location || 'Campus'}</p>
+                                </div>
+                                <ChevronRight className="w-3.5 h-3.5 text-cyan-400 group-hover:translate-x-1 transition-transform" />
+                              </button>
+                            )
+                          })}
+                        </div>
+                      )}
 
-              {loading && (
-                <div className="flex items-center gap-2 pl-1">
-                  <div className="shrink-0">
-                    <EmoBotCharacter size={28} isTyping={true} onClick={() => { }} />
-                  </div>
-                  <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-[12px] font-medium ${dark ? 'bg-[#111d35] border border-cyan-900/30 text-cyan-300' : 'bg-slate-50 border border-slate-200 text-cyan-700'
-                    }`}>
-                    <span>Camy is thinking</span>
-                    <span className="flex gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0ms]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:150ms]" />
-                      <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:300ms]" />
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {isSpeaking && !loading && (
-                <div className="flex items-center gap-2 pl-1 animate-fadeIn">
-                  <button
-                    type="button"
-                    onClick={stopSpeaking}
-                    title="Click to Stop Voice Output"
-                    className="w-8 h-8 rounded-xl bg-slate-950 border border-cyan-400/80 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse shrink-0 hover:bg-red-950 hover:border-red-400 hover:text-red-300 cursor-pointer transition-colors"
-                  >
-                    <Square className="w-3.5 h-3.5 fill-cyan-300 hover:fill-red-300" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={stopSpeaking}
-                    title="Click to Stop Voice"
-                    className="relative group cursor-pointer text-left border-none bg-transparent p-0"
-                  >
-                    <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 opacity-80 blur-md animate-pulse" />
-                    <div className="relative flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-cyan-400/70 shadow-[0_0_18px_rgba(34,211,238,0.5)]">
-                      <span className="text-[11.5px] font-extrabold tracking-wide text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]">
-                        Speaking... (Click to stop)
+                      <span className={`text-[9px] mt-1 px-1.5 ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                       </span>
-                      <SoundWaveIndicator />
                     </div>
-                  </button>
-                </div>
-              )}
+                  )
+                })}
 
-              <div ref={messagesEndRef} />
-            </div>
-
-            {quickChips?.length > 0 && (
-              <div className={`px-2.5 sm:px-3 py-1.5 shrink-0 border-t ${dark ? 'bg-[#0c1424] border-cyan-900/20' : 'bg-slate-50/80 border-slate-200'}`}>
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                  {quickChips.map((chip, idx) => (
-                    <button type="button" key={chip.id || `chip-${idx}`} onClick={() => handleSendMessage(chip.prompt || chip.label, false)} disabled={loading} className={`shrink-0 flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-semibold border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 ${dark ? 'bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-200 border-cyan-800/50' : 'bg-white hover:bg-cyan-50 text-cyan-700 border-cyan-200'
+                {loading && (
+                  <div className="flex items-center gap-2 pl-1">
+                    <div className="shrink-0">
+                      <EmoBotCharacter size={28} isTyping={true} onClick={() => { }} />
+                    </div>
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl text-[12px] font-medium ${dark ? 'bg-[#111d35] border border-cyan-900/30 text-cyan-300' : 'bg-slate-50 border border-slate-200 text-cyan-700'
                       }`}>
-                      <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400 shrink-0" />
-                      <span>{chip.label || chip.prompt}</span>
+                      <span>Camy is thinking</span>
+                      <span className="flex gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:0ms]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:150ms]" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce [animation-delay:300ms]" />
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {isSpeaking && !loading && (
+                  <div className="flex items-center gap-2 pl-1 animate-fadeIn">
+                    <button
+                      type="button"
+                      onClick={stopSpeaking}
+                      title="Click to Stop Voice Output"
+                      className="w-8 h-8 rounded-xl bg-slate-950 border border-cyan-400/80 flex items-center justify-center text-cyan-300 shadow-[0_0_15px_rgba(34,211,238,0.6)] animate-pulse shrink-0 hover:bg-red-950 hover:border-red-400 hover:text-red-300 cursor-pointer transition-colors"
+                    >
+                      <Square className="w-3.5 h-3.5 fill-cyan-300 hover:fill-red-300" />
                     </button>
-                  ))}
-                </div>
+
+                    <button
+                      type="button"
+                      onClick={stopSpeaking}
+                      title="Click to Stop Voice"
+                      className="relative group cursor-pointer text-left border-none bg-transparent p-0"
+                    >
+                      <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 opacity-80 blur-md animate-pulse" />
+                      <div className="relative flex items-center gap-3 px-3.5 py-1.5 rounded-full bg-slate-950/95 border border-cyan-400/70 shadow-[0_0_18px_rgba(34,211,238,0.5)]">
+                        <span className="text-[11.5px] font-extrabold tracking-wide text-cyan-300 drop-shadow-[0_0_8px_rgba(34,211,238,0.9)]">
+                          Speaking... (Click to stop)
+                        </span>
+                        <SoundWaveIndicator />
+                      </div>
+                    </button>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
               </div>
-            )}
 
-            <div className={`p-2.5 sm:p-3 shrink-0 border-t flex flex-col items-center relative ${dark ? 'bg-[#080d1a] border-cyan-900/30' : 'bg-white border-slate-200'}`}>
-              {isBotTyping && (
-                <button
-                  type="button"
-                  onClick={stopBotTyping}
-                  className={`absolute -top-11 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-lg transition-all border ${dark ? 'bg-[#111d35] text-red-400 border-red-900/30 hover:bg-red-950/30' : 'bg-white text-red-500 border-slate-200 hover:bg-slate-50'}`}
-                >
-                  <Square className="w-3 h-3 fill-current" /> Stop generating
-                </button>
+              {quickChips?.length > 0 && (
+                <div className={`px-2.5 sm:px-3 py-1.5 shrink-0 border-t ${dark ? 'bg-[#0c1424] border-cyan-900/20' : 'bg-slate-50/80 border-slate-200'}`}>
+                  <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                    {quickChips.map((chip, idx) => (
+                      <button type="button" key={chip.id || `chip-${idx}`} onClick={() => handleSendMessage(chip.prompt || chip.label, false)} disabled={loading} className={`shrink-0 flex items-center gap-1 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-full text-[10.5px] sm:text-[11px] font-semibold border transition-all cursor-pointer hover:scale-[1.02] active:scale-95 disabled:opacity-40 ${dark ? 'bg-cyan-950/50 hover:bg-cyan-900/60 text-cyan-200 border-cyan-800/50' : 'bg-white hover:bg-cyan-50 text-cyan-700 border-cyan-200'
+                        }`}>
+                        <Zap className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-cyan-400 shrink-0" />
+                        <span>{chip.label || chip.prompt}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  handleSendMessage(null, wasVoiceUsedRef.current)
-                }}
-                className="flex items-center gap-1.5 sm:gap-2"
-              >
-                <input
-                  ref={inputRef}
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => {
-                    setInputText(e.target.value)
-                    if (!isListening) wasVoiceUsedRef.current = false
+
+              <div className={`p-2.5 sm:p-3 shrink-0 border-t flex flex-col items-center relative ${dark ? 'bg-[#080d1a] border-cyan-900/30' : 'bg-white border-slate-200'}`}>
+                {isBotTyping && (
+                  <button
+                    type="button"
+                    onClick={stopBotTyping}
+                    className={`absolute -top-11 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold shadow-lg transition-all border ${dark ? 'bg-[#111d35] text-red-400 border-red-900/30 hover:bg-red-950/30' : 'bg-white text-red-500 border-slate-200 hover:bg-slate-50'}`}
+                  >
+                    <Square className="w-3 h-3 fill-current" /> Stop generating
+                  </button>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    handleSendMessage(null, wasVoiceUsedRef.current)
                   }}
-                  placeholder={isListening ? '🎙️ Recording voice...' : 'Ask Camy anything...'}
-                  disabled={loading}
-                  className={`flex-1 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl text-[12.5px] sm:text-[13px] outline-none border transition-all ${inputStyle}`}
-                />
-
-                {(isListening || (inputText.trim() && isListening)) && (
-                  <button
-                    type="button"
-                    onClick={cancelRecording}
-                    title="Cancel & Discard Recording"
-                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-slate-800 hover:bg-red-600/80 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer border border-slate-700"
-                  >
-                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  </button>
-                )}
-
-                {recognitionRef.current && (
-                  <button
-                    type="button"
-                    onClick={toggleMic}
-                    title={isListening ? 'Pause / Stop Recording' : 'Start Voice Recording'}
-                    className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer border ${micButtonStyle}`}
-                  >
-                    {isListening ? <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" /> : <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
-                  </button>
-                )}
-
-                <button
-                  type="submit"
-                  disabled={!inputText.trim() || loading}
-                  title="Send Message to Camy"
-                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white flex items-center justify-center shrink-0 hover:from-cyan-500 hover:to-teal-500 active:scale-95 disabled:opacity-30 transition-all cursor-pointer shadow-md"
+                  className="flex items-center gap-1.5 sm:gap-2"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />}
-                </button>
-              </form>
+                  <input
+                    ref={inputRef}
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => {
+                      setInputText(e.target.value)
+                      if (!isListening) wasVoiceUsedRef.current = false
+                    }}
+                    placeholder={isListening ? '🎙️ Recording voice...' : 'Ask Camy anything...'}
+                    disabled={loading}
+                    className={`flex-1 px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-xl sm:rounded-2xl text-[12.5px] sm:text-[13px] outline-none border transition-all ${inputStyle}`}
+                  />
+
+                  {(isListening || (inputText.trim() && isListening)) && (
+                    <button
+                      type="button"
+                      onClick={cancelRecording}
+                      title="Cancel & Discard Recording"
+                      className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-slate-800 hover:bg-red-600/80 text-slate-300 hover:text-white flex items-center justify-center shrink-0 transition-all cursor-pointer border border-slate-700"
+                    >
+                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    </button>
+                  )}
+
+                  {recognitionRef.current && (
+                    <button
+                      type="button"
+                      onClick={toggleMic}
+                      title={isListening ? 'Pause / Stop Recording' : 'Start Voice Recording'}
+                      className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer border ${micButtonStyle}`}
+                    >
+                      {isListening ? <Square className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" /> : <Mic className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
+                    </button>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={!inputText.trim() || loading}
+                    title="Send Message to Camy"
+                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 text-white flex items-center justify-center shrink-0 hover:from-cyan-500 hover:to-teal-500 active:scale-95 disabled:opacity-30 transition-all cursor-pointer shadow-md"
+                  >
+                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-0.5" />}
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
-        </div>
         )
       })()}
 
