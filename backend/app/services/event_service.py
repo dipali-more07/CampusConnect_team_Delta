@@ -173,13 +173,26 @@ class EventService:
     def approve_event(
         self, event_id: str, data: ApproveEventRequest, admin_user: User
     ) -> Event:
-        """Admin approves or rejects an event."""
+        """Admin approves or rejects an event with optional remarks/note."""
         event = self.get_event(event_id)
         event.approval_status = data.approval_status
+        
+        reason = (
+            data.rejection_reason
+            or getattr(data, "remarks", None)
+            or getattr(data, "note", None)
+            or getattr(data, "admin_remarks", None)
+        )
+
         if data.approval_status == ApprovalStatus.APPROVED:
             event.status = EventStatus.PUBLISHED
-        if data.rejection_reason:
-            event.rejection_reason = data.rejection_reason
+            event.rejection_reason = None  # Clear any past rejection reason
+        elif data.approval_status == ApprovalStatus.REJECTED:
+            event.status = EventStatus.DRAFT
+            event.rejection_reason = reason or "Event rejected by administrator."
+        elif reason:
+            event.rejection_reason = reason
+
         self.db.commit()
         self.db.refresh(event)
         return event
