@@ -30,8 +30,9 @@ def _notif_to_dict(n) -> dict:
     }
 
 
-@router.get("", summary="Get my notifications")
-def get_my_notifications(
+@router.get("", summary="Get user notifications")
+@router.get("/user", summary="Get user notifications (alias)")
+def get_user_notifications(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     unread_only: bool = Query(default=False),
@@ -48,6 +49,10 @@ def get_my_notifications(
         data={"unread_count": unread_count, "notifications": [_notif_to_dict(n) for n in notifications]},
         total=total, page=page, size=size
     )
+
+
+# Backward compatibility alias
+get_my_notifications = get_user_notifications
 
 
 @router.patch("/{notification_id}/read", summary="Mark notification as read")

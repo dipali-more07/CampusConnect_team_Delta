@@ -156,11 +156,21 @@ def change_password(
 
 
 @router.get(
-    "/me",
-    summary="Get current user info",
+    "/profile",
+    summary="Get current user profile",
     description="Returns the profile of the currently logged in user.",
 )
-def get_me(
+@router.get(
+    "/user",
+    summary="Get current user profile (alias)",
+    description="Returns the profile of the currently logged in user.",
+)
+@router.get(
+    "/me",
+    summary="Get current user profile (legacy alias)",
+    description="Legacy alias for /profile. Returns the profile of the currently logged in user.",
+)
+def get_current_user_profile(
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -234,3 +244,7 @@ async def resend_code(
     service = AuthService(db)
     await service.resend_verification_code(data.email)
     return success_response(message="Verification code resent successfully. Please check your email.")
+
+
+# Backward compatibility alias
+get_me = get_current_user_profile
