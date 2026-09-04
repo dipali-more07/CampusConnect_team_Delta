@@ -54,8 +54,10 @@ def submit_feedback(
     )
 
 
-@router.get("/my", summary="My submitted feedback")
-def get_my_feedback(
+@router.get("/user", summary="Get user submitted feedback")
+@router.get("/user-feedback", summary="Get user submitted feedback (alias)")
+@router.get("/my", summary="Get user submitted feedback (legacy alias)")
+def get_user_feedback(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -65,12 +67,16 @@ def get_my_feedback(
     service = FeedbackService(db)
     feedbacks, total = service.get_my_feedback(current_user, page=page, size=size)
     return paginated_response(
-        message="Your submitted feedback",
+        message="User submitted feedback fetched successfully",
         data=[_feedback_to_dict(f) for f in feedbacks],
         total=total,
         page=page,
         size=size
     )
+
+
+# Backward compatibility alias
+get_my_feedback = get_user_feedback
 
 
 @router.get("/event/{event_id}", summary="Get feedback and rating stats for an event")

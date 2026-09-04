@@ -27,9 +27,44 @@ from app.models.user import User
 router = APIRouter()
 
 
+@router.get(
+    "/profile",
+    summary="Get user profile",
+    description="Retrieve the current logged-in user's profile information.",
+)
+@router.get(
+    "/me",
+    summary="Get user profile (legacy alias)",
+    description="Legacy alias for /profile. Retrieve current user's profile information.",
+)
+def get_user_profile(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    profile = current_user.profile
+    return success_response(
+        message="User profile fetched successfully",
+        data={
+            "user_id": current_user.user_id,
+            "email": current_user.email,
+            "role": current_user.role,
+            "profile_id": profile.profile_id if profile else None,
+            "full_name": profile.full_name if profile else current_user.full_name,
+            "phone": profile.phone if profile else current_user.mobile,
+            "gender": profile.gender.value if (profile and hasattr(profile.gender, "value")) else (profile.gender if profile else None),
+            "department": profile.department if profile else None,
+            "course": profile.course if profile else None,
+            "year_of_study": profile.year_of_study if profile else None,
+            "bio": profile.bio if profile else None,
+            "profile_picture": profile.profile_picture if profile else current_user.profile_image,
+            "college_id": profile.college_id if profile else None,
+        },
+    )
+
+
 @router.patch(
     "/profile",
-    summary="Update my profile",
+    summary="Update user profile",
     description="Update the current user's profile information.",
 )
 def update_profile(
@@ -79,7 +114,7 @@ def update_profile(
 
 @router.get(
     "/profile/appearance",
-    summary="Get my appearance preferences",
+    summary="Get user appearance preferences",
     description="Retrieve current user's light/dark mode, accent color, and font size settings.",
     response_model=None
 )
@@ -94,7 +129,7 @@ def get_appearance(
 
 @router.put(
     "/profile/appearance",
-    summary="Update my appearance preferences",
+    summary="Update user appearance preferences",
     description="Save current user's light/dark mode, accent color, and font size settings.",
     response_model=None
 )

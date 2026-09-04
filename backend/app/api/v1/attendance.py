@@ -74,8 +74,10 @@ def _detailed_attendance_to_dict(att) -> dict:
     }
 
 
-@router.get("/my", summary="Get current logged-in user's attendance records")
-def get_my_attendance(
+@router.get("/user", summary="Get user attendance records")
+@router.get("/user-records", summary="Get user attendance records (alias)")
+@router.get("/my", summary="Get user attendance records (legacy alias)")
+def get_user_attendance(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=20, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -90,8 +92,14 @@ def get_my_attendance(
     )
 
 
-@router.get("/my/analytics", summary="Get current logged-in user's attendance analytics")
-def get_my_attendance_analytics(
+# Backward compatibility alias
+get_my_attendance = get_user_attendance
+
+
+@router.get("/user/analytics", summary="Get user attendance analytics")
+@router.get("/analytics", summary="Get user attendance analytics (alias)")
+@router.get("/my/analytics", summary="Get user attendance analytics (legacy alias)")
+def get_user_attendance_analytics(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -101,6 +109,10 @@ def get_my_attendance_analytics(
         message="Attendance analytics fetched successfully",
         data=analytics
     )
+
+
+# Backward compatibility alias
+get_my_attendance_analytics = get_user_attendance_analytics
 
 
 @router.get("/student/{student_id}", summary="Get student's attendance records (Organizer/Admin only)")

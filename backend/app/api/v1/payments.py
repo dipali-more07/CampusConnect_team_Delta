@@ -119,8 +119,10 @@ async def fail_payment(
 
 
 
-@router.get("/my", summary="Get my payments")
-def get_my_payments(
+@router.get("/user", summary="Get user payments")
+@router.get("/user-payments", summary="Get user payments (alias)")
+@router.get("/my", summary="Get user payments (legacy alias)")
+def get_user_payments(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -132,12 +134,16 @@ def get_my_payments(
     service = PaymentService(db)
     payments, total = service.get_my_payments(current_user, page=page, size=size)
     return paginated_response(
-        message="Your payments retrieved successfully",
+        message="User payments retrieved successfully",
         data=[_payment_to_dict(p) for p in payments],
         total=total,
         page=page,
         size=size,
     )
+
+
+# Backward compatibility alias
+get_my_payments = get_user_payments
 
 
 @router.get("/event/{event_id}", summary="Get event payments (Organizer/Admin)")

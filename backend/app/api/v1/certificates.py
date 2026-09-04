@@ -116,8 +116,10 @@ async def generate_bulk_certificates(
     )
 
 
-@router.get("/my", summary="My certificates")
-def my_certificates(
+@router.get("/user", summary="Get user certificates")
+@router.get("/user-certificates", summary="Get user certificates (alias)")
+@router.get("/my", summary="Get user certificates (legacy alias)")
+def get_user_certificates(
     page: int = Query(default=1, ge=1),
     size: int = Query(default=10, ge=1, le=100),
     current_user: User = Depends(get_current_user),
@@ -126,14 +128,18 @@ def my_certificates(
     service = CertificateService(db)
     certs, total = service.get_user_certificates(current_user.user_id, page=page, size=size)
     return paginated_response(
-        message="Your certificates",
+        message="User certificates fetched successfully",
         data=[_cert_to_dict(c, db=db) for c in certs],
         total=total, page=page, size=size
     )
 
 
-@router.get("/performance", summary="Get my performance based on certificates earned")
-def my_performance(
+# Backward compatibility alias
+my_certificates = get_user_certificates
+
+
+@router.get("/performance", summary="Get user performance metrics")
+def get_user_performance(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -146,9 +152,13 @@ def my_performance(
     service = CertificateService(db)
     perf = service.get_user_performance(current_user.user_id)
     return success_response(
-        message="Your certificate performance metrics fetched successfully",
+        message="User certificate performance metrics fetched successfully",
         data=perf
     )
+
+
+# Backward compatibility alias
+my_performance = get_user_performance
 
 
 @router.get("/user/{user_id}/performance", summary="Get a user's performance metrics (Organizer/Admin/Public)")

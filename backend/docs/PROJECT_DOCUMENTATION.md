@@ -235,10 +235,14 @@ Organizer            FastAPI Router          CertificateService            Repor
 
 ## 6. Complete REST API Specification
 
-### 6.1 Authentication Endpoints (`/api/v1/auth`)
+### 6.1 Authentication & User Endpoints (`/api/v1/auth`, `/api/v1/users`)
 - `POST /api/v1/auth/register` — Create new student/organizer account.
 - `POST /api/v1/auth/login` — Verify credentials & return OAuth2 Bearer JWT token.
-- `GET /api/v1/auth/me` — Retrieve profile of currently authenticated user.
+- `GET /api/v1/auth/profile` — Retrieve profile of currently authenticated user (`/api/v1/auth/user`, `/api/v1/auth/me` supported as aliases).
+- `GET /api/v1/users/profile` — Get logged-in user profile with extended data.
+- `PATCH /api/v1/users/profile` — Partial update of user profile.
+- `GET /api/v1/users/profile/appearance` — Get appearance preferences (light/dark, accent color, font size).
+- `PUT /api/v1/users/profile/appearance` — Update appearance preferences.
 
 ### 6.2 Event Management Endpoints (`/api/v1/events`)
 - `GET /api/v1/events` — List all published events (supports filtering by category, status, search).
@@ -246,16 +250,41 @@ Organizer            FastAPI Router          CertificateService            Repor
 - `GET /api/v1/events/{id}` — Retrieve full details of an event.
 - `PUT /api/v1/events/{id}/complete` — Mark event as COMPLETED & trigger certificate engine.
 
-### 6.3 Registration & Attendance Endpoints
-- `POST /api/v1/registrations/event/{id}` — Student 1-click event registration.
-- `GET /api/v1/registrations/my-registrations` — View user's registered events and digital passes.
-- `PUT /api/v1/attendance/{reg_id}` — Update attendance state (`PRESENT` / `ABSENT`).
+### 6.3 Registration Endpoints (`/api/v1/registrations`)
+- `POST /api/v1/registrations` — Register for an event (individual or team).
+- `GET /api/v1/registrations/user` — View user's registered events and digital passes (`/user-registrations`, `/my-registrations`, `/my` supported as aliases).
+- `PATCH /api/v1/registrations/{id}/cancel` — Cancel registration and trigger waitlist promotion.
+- `GET /api/v1/registrations/{id}/qrcode` — Get check-in ticket QR code.
 
-### 6.4 AI Assistant Endpoints (`/api/v1/ai`)
+### 6.4 Attendance Endpoints (`/api/v1/attendance`)
+- `GET /api/v1/attendance/user` — View logged-in user's attendance records (`/my` alias).
+- `GET /api/v1/attendance/user/analytics` — View user attendance analytics & participation rate (`/analytics`, `/my/analytics` aliases).
+- `POST /api/v1/attendance/check-in` — Check in attendee via QR scan / registration code (Organizer/Admin).
+
+### 6.5 Certificate Endpoints (`/api/v1/certificates`)
+- `GET /api/v1/certificates/user` — View logged-in user's earned certificates (`/my` alias).
+- `GET /api/v1/certificates/performance` — View user performance score, badges, and tier progression.
+- `GET /api/v1/certificates/verify/{cert_id}` — Public certificate verification with cryptographic hash.
+
+### 6.6 Payment Endpoints (`/api/v1/payments`)
+- `POST /api/v1/payments` — Initiate registration payment order (Razorpay / test mock).
+- `POST /api/v1/payments/{payment_id}/confirm` — Confirm successful payment and activate registration pass.
+- `GET /api/v1/payments/user` — Retrieve current user's payment history (`/my` alias).
+
+### 6.7 Feedback Endpoints (`/api/v1/feedback`)
+- `POST /api/v1/feedback` — Submit post-event rating and review.
+- `GET /api/v1/feedback/user` — View feedback submitted by current user (`/my` alias).
+- `GET /api/v1/feedback/event/{event_id}` — Aggregated event ratings and sentiment breakdown.
+
+### 6.8 Organizer Profile Endpoints (`/api/v1/organizers`)
+- `GET /api/v1/organizers/profile` — Get organizer profile (`/me` alias).
+- `PATCH /api/v1/organizers/profile` — Update organizer organization & contact info (`/me` alias).
+
+### 6.9 AI Assistant Endpoints (`/api/v1/ai`)
 - `POST /api/v1/ai/chat` — Send query to Camy AI (multilingual text + voice intent).
 - `GET /api/v1/ai/voice-config` — Retrieve synthesized speech parameters (language, pitch, rate).
 
-### 6.5 Super Admin Analytics Endpoints (`/api/v1/analytics`)
+### 6.10 Super Admin Analytics Endpoints (`/api/v1/analytics`)
 - `GET /api/v1/analytics/dashboard` — Platform KPIs: Total Events, Registrations, Students, Organizers.
 - `GET /api/v1/analytics/department-chart` — Department-wise participation breakdown for audit reports.
 

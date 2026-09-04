@@ -77,8 +77,11 @@ async def register_for_event(
     )
 
 
-@router.get("/my", summary="My event registrations")
-def my_registrations(
+@router.get("/user", summary="Get user event registrations")
+@router.get("/user-registrations", summary="Get user event registrations (alias)")
+@router.get("/my-registrations", summary="Get user event registrations (alias)")
+@router.get("/my", summary="Get user event registrations (legacy alias)")
+def get_user_registrations(
     page: int = Query(default=1, ge=1),                 # Page number, minimum 1
     size: int = Query(default=10, ge=1, le=100),        # Items per page, max 100
     current_user: User = Depends(get_current_user),     # Must be logged in
@@ -93,10 +96,14 @@ def my_registrations(
     service = RegistrationService(db)
     regs, total = service.get_user_registrations(current_user.user_id, page=page, size=size)
     return paginated_response(
-        message="Your registrations",
+        message="User registrations fetched successfully",
         data=[_reg_to_dict(r) for r in regs],
         total=total, page=page, size=size
     )
+
+
+# Backward compatibility alias
+my_registrations = get_user_registrations
 
 
 @router.get("/events", summary="Get registrations via query param")

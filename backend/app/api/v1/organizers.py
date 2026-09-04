@@ -70,8 +70,9 @@ def list_organizers(
     return paginated_response(message="Organizers fetched", data=data, total=total, page=page, size=size)
 
 
-@router.get("/me", summary="Get my organizer profile")
-def get_my_organizer_profile(
+@router.get("/profile", summary="Get organizer profile")
+@router.get("/me", summary="Get organizer profile (legacy alias)")
+def get_organizer_profile(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -83,9 +84,11 @@ def get_my_organizer_profile(
     )
 
 
-@router.patch("/me", summary="Update my organizer profile")
-@router.put("/me", summary="Update my organizer profile")
-def update_my_organizer_profile(
+@router.patch("/profile", summary="Update organizer profile")
+@router.put("/profile", summary="Update organizer profile")
+@router.patch("/me", summary="Update organizer profile (legacy alias)")
+@router.put("/me", summary="Update organizer profile (legacy alias)")
+def update_organizer_profile(
     data: UpdateOrganizerRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -97,6 +100,11 @@ def update_my_organizer_profile(
         message="Organizer profile updated successfully",
         data=_organizer_to_dict(updated_org)
     )
+
+
+# Backward compatibility aliases
+get_my_organizer_profile = get_organizer_profile
+update_my_organizer_profile = update_organizer_profile
 
 
 @router.get("/{organizer_id}", summary="Get organizer by ID (Admin only)")
